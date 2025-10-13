@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to PG Maintenance System - Sales Staff</title>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .welcome-section {
+            margin-bottom: 30px;
+        }
+        .welcome-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        .credentials-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .credentials-box h3 {
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            text-align: center;
+        }
+        .credential-item {
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        .credential-item strong {
+            display: inline-block;
+            width: 140px;
+            color: #f8f9fa;
+        }
+        .login-button {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: background-color 0.3s;
+        }
+        .login-button:hover {
+            background: #218838;
+        }
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border-left: 4px solid #007bff;
+        }
+        .info-section h4 {
+            color: #007bff;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .security-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .security-note h4 {
+            color: #856404;
+            margin: 0 0 10px 0;
+        }
+        .security-note p {
+            margin: 0;
+            color: #856404;
+        }
+        .commission-highlight {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .commission-highlight h4 {
+            color: #155724;
+            margin: 0 0 10px 0;
+        }
+        .commission-highlight p {
+            margin: 0;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 PG Maintenance System</h1>
+            <p>Sales Staff Access Granted</p>
+        </div>
+
+        <div class="content">
+            <div class="welcome-section">
+                <h2>Welcome, {{firstName}} {{lastName}}!</h2>
+                <p>You have been successfully registered as a <strong>Sales Staff</strong> member in the PG Maintenance System. This role allows you to add new PG properties and earn commissions on successful conversions.</p>
+            </div>
+
+            <div class="credentials-box">
+                <h3>🔑 Your Login Credentials</h3>
+                <div class="credential-item">
+                    <strong>Unique ID:</strong> {{salesUniqueId}}
+                </div>
+                <div class="credential-item">
+                    <strong>Email:</strong> {{email}}
+                </div>
+                <div class="credential-item">
+                    <strong>Temporary Password:</strong> {{password}}
+                </div>
+                <div class="credential-item">
+                    <strong>Role:</strong> Sales Staff
+                </div>
+                <div class="credential-item">
+                    <strong>Commission Rate:</strong> {{commissionRate}}%
+                </div>
+            </div>
+
+            <div class="commission-highlight">
+                <h4>💰 Your Commission Structure</h4>
+                <p>You will earn <strong>{{commissionRate}}%</strong> commission on each PG property you successfully add to our system. This commission is calculated based on the property's monthly revenue.</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{loginUrl}}" class="login-button">Login to Sales Portal</a>
+            </div>
+
+            <div class="security-note">
+                <h4>🔒 Security Notice</h4>
+                <p><strong>This is your temporary password.</strong> You will be required to change it on your first login for security purposes. Do not share your credentials with anyone.</p>
+            </div>
+
+            <div class="info-section">
+                <h4>🎯 Your Responsibilities</h4>
+                <ul>
+                    <li>Identify and approach potential PG property owners</li>
+                    <li>Register new PG properties in the system</li>
+                    <li>Ensure accurate property information is entered</li>
+                    <li>Follow up with property owners for successful onboarding</li>
+                    <li>Meet monthly/quarterly sales targets</li>
+                    <li>Maintain professional communication with clients</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h4>📋 What You Can Access</h4>
+                <ul>
+                    <li><strong>PG Registration:</strong> Add new PG properties to the system</li>
+                    <li><strong>Property Management:</strong> View and manage properties you've added</li>
+                    <li><strong>Commission Tracking:</strong> Monitor your earnings and performance</li>
+                    <li><strong>Sales Dashboard:</strong> View your sales metrics and targets</li>
+                    <li><strong>Profile Management:</strong> Update your personal and banking information</li>
+                    <li><strong>Payment History:</strong> Track commission payments and payouts</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h4>🚀 Getting Started - Step by Step</h4>
+                <ol>
+                    <li><strong>Click the "Login to Sales Portal" button above</strong> or visit: <strong>{{loginUrl}}</strong></li>
+                    <li><strong>Use your Unique ID ({{salesUniqueId}}) or Email ({{email}}) to login</strong></li>
+                    <li><strong>Enter your temporary password:</strong> {{password}}</li>
+                    <li><strong>You will be prompted to change your password</strong> - choose a strong, secure password</li>
+                    <li><strong>Complete your profile</strong> - add your banking details for commission payouts</li>
+                    <li><strong>Review the sales dashboard</strong> to understand your targets and commission structure</li>
+                    <li><strong>Start adding PG properties</strong> and begin earning commissions!</li>
+                </ol>
+            </div>
+
+            <div class="info-section">
+                <h4>📈 Success Tips</h4>
+                <ul>
+                    <li><strong>Target Quality Properties:</strong> Focus on well-maintained PGs with good occupancy rates</li>
+                    <li><strong>Build Relationships:</strong> Maintain good relationships with property owners</li>
+                    <li><strong>Follow Up:</strong> Regular follow-ups increase conversion rates</li>
+                    <li><strong>Documentation:</strong> Ensure all property details are accurately entered</li>
+                    <li><strong>Compliance:</strong> Follow all local regulations and property laws</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>If you have any questions or need assistance, please contact your sales manager or support at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <p>&copy; 2025 {{companyName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

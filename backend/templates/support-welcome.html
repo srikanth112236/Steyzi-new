@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to PG Maintenance System - Support Staff</title>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .welcome-section {
+            margin-bottom: 30px;
+        }
+        .welcome-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        .credentials-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .credentials-box h3 {
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            text-align: center;
+        }
+        .credential-item {
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        .credential-item strong {
+            display: inline-block;
+            width: 120px;
+            color: #f8f9fa;
+        }
+        .login-button {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: background-color 0.3s;
+        }
+        .login-button:hover {
+            background: #218838;
+        }
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border-left: 4px solid #007bff;
+        }
+        .info-section h4 {
+            color: #007bff;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .security-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .security-note h4 {
+            color: #856404;
+            margin: 0 0 10px 0;
+        }
+        .security-note p {
+            margin: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 PG Maintenance System</h1>
+            <p>Support Staff Access Granted</p>
+        </div>
+        
+        <div class="content">
+            <div class="welcome-section">
+                <h2>Welcome, {{firstName}} {{lastName}}!</h2>
+                <p>You have been successfully registered as a <strong>Support Staff</strong> member in the PG Maintenance System. This role allows you to manage and resolve support tickets across all PG properties.</p>
+            </div>
+            
+            <div class="credentials-box">
+                <h3>🔑 Your Login Credentials</h3>
+                <div class="credential-item">
+                    <strong>Email:</strong> {{email}}
+                </div>
+                <div class="credential-item">
+                    <strong>Password:</strong> {{password}}
+                </div>
+                <div class="credential-item">
+                    <strong>Role:</strong> Support Staff
+                </div>
+                <div class="credential-item">
+                    <strong>Access:</strong> Ticket Management System
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{loginUrl}}" class="login-button">Login to Support Portal</a>
+            </div>
+            
+            <div class="security-note">
+                <h4>🔒 Security Notice</h4>
+                <p>For your security, please change your password immediately after your first login. Your temporary password should not be shared with anyone.</p>
+            </div>
+            
+            <div class="info-section">
+                <h4>🎯 Your Responsibilities</h4>
+                <ul>
+                    <li>Review and manage support tickets from all PG properties</li>
+                    <li>Assign tickets to appropriate staff members</li>
+                    <li>Resolve tickets and provide timely updates</li>
+                    <li>Maintain high customer satisfaction standards</li>
+                    <li>Escalate complex issues to supervisors when needed</li>
+                </ul>
+            </div>
+            
+            <div class="info-section">
+                <h4>📋 What You Can Access</h4>
+                <ul>
+                    <li><strong>Tickets System:</strong> View and manage all support tickets</li>
+                    <li><strong>Ticket Assignment:</strong> Assign tickets to appropriate staff</li>
+                    <li><strong>Ticket Resolution:</strong> Mark tickets as resolved or closed</li>
+                    <li><strong>Ticket Updates:</strong> Add comments and status updates</li>
+                    <li><strong>Profile Management:</strong> Update your personal information</li>
+                </ul>
+            </div>
+            
+            <div class="info-section">
+                <h4>🚀 Getting Started</h4>
+                <ol>
+                    <li>Click the "Login to Support Portal" button above</li>
+                    <li>Enter your email and temporary password</li>
+                    <li>Change your password for security</li>
+                    <li>Review the tickets dashboard</li>
+                    <li>Start managing support requests</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>If you have any questions or need assistance, please contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <p>&copy; 2024 {{companyName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html> 
