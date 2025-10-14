@@ -312,7 +312,7 @@ const ResidentOnboarding = () => {
       if (selectedBranch?._id) params.append('branchId', selectedBranch._id);
       const response = await api.get(`/pg/rooms/available?${params.toString()}`);
       if (response.data.success) {
-        setAvailableRooms(response.data.data || []);
+        setAvailableRooms(response.data.data?.availableRooms || []);
       }
     } catch (error) {
       console.error('Error fetching available rooms:', error);
@@ -398,22 +398,21 @@ const ResidentOnboarding = () => {
   };
 
   const handleBedSelect = (bedNumber) => {
+    console.log('🛏️ Bed selected:', bedNumber);
     setSelectedBed(bedNumber);
     
-    // Check if this is a notice period bed
-    const selectedBedData = selectedRoom?.beds?.find(bed => bed.bedNumber === bedNumber);
-    if (selectedBedData?.residentStatus === 'notice_period') {
-      // Show confirmation for notice period bed selection
-      toast.success(
-        `Notice period bed selected! This bed will be automatically assigned once the notice period expires.`,
-        { duration: 6000 }
-      );
-    }
+    // Since we're only showing available beds, no need for notice period logic
+    toast.success(`Bed ${bedNumber} selected successfully!`);
     
     setCurrentStep(5);
   };
 
   const handlePaymentSubmit = () => {
+    // Validate that bed is selected before proceeding to confirmation
+    if (!selectedBed) {
+      toast.error('Please select a bed before proceeding');
+      return;
+    }
     setCurrentStep(6);
   };
 
@@ -504,31 +503,43 @@ const ResidentOnboarding = () => {
   };
 
   const handleOnboardingSubmit = async () => {
-    if (!selectedResident || !selectedSharingType || !selectedRoom || !selectedBed) {
-      toast.error('Please complete all required fields');
+    console.log('🔍 Validation check:', {
+      selectedResident: !!selectedResident,
+      selectedSharingType: !!selectedSharingType,
+      selectedRoom: !!selectedRoom,
+      selectedBed: !!selectedBed,
+      selectedResidentData: selectedResident,
+      selectedSharingTypeData: selectedSharingType,
+      selectedRoomData: selectedRoom,
+      selectedBedValue: selectedBed
+    });
+
+    // Check for missing required selections
+    const missingSelections = [];
+    if (!selectedResident) missingSelections.push('Resident');
+    if (!selectedSharingType) missingSelections.push('Room Type');
+    if (!selectedRoom) missingSelections.push('Room');
+    if (!selectedBed) missingSelections.push('Bed');
+
+    if (missingSelections.length > 0) {
+      toast.error(`Please select: ${missingSelections.join(', ')}`);
       return;
     }
 
     try {
       setLoading(true);
       
-      // Check if this is a notice period bed
-      const selectedBedData = selectedRoom?.beds?.find(bed => bed.bedNumber === selectedBed);
-      const isNoticePeriodBed = selectedBedData?.residentStatus === 'notice_period';
-      
-      console.log('🔍 Selected bed data:', selectedBedData);
-      console.log('🔍 Is notice period bed:', isNoticePeriodBed);
-      if (isNoticePeriodBed && selectedBedData?.resident) {
-        console.log('🔍 Notice period resident data:', selectedBedData.resident);
-        console.log('🔍 Check out date:', selectedBedData.resident.checkOutDate);
-      }
+      // Since we're only showing available beds, isNoticePeriodBed is always false
+      const isNoticePeriodBed = false;
+
+      console.log('🔍 Starting onboarding process for bed:', selectedBed);
       
       const onboardingData = {
         residentId: selectedResident._id,
-        roomId: selectedRoom._id,
+        roomId: selectedRoom.roomId || selectedRoom._id,
         bedNumber: selectedBed,
         sharingTypeId: selectedSharingType.id,
-        sharingTypeCost: selectedSharingType.cost,
+        sharingTypeCost: parseFloat(selectedSharingType.cost) || 0,
         isNoticePeriodBed: isNoticePeriodBed,
         advancePayment: advancePayment.amount ? {
           amount: parseFloat(advancePayment.amount),
@@ -544,6 +555,18 @@ const ResidentOnboarding = () => {
         } : null,
         paymentStatus: paymentStatus
       };
+
+      console.log('📋 Onboarding data prepared:', onboardingData);
+      console.log('🔍 Selected values:', {
+        selectedResident: selectedResident,
+        selectedRoom: selectedRoom,
+        selectedBed: selectedBed,
+        selectedSharingType: selectedSharingType,
+        residentId: selectedResident?._id,
+        roomId: selectedRoom?.roomId || selectedRoom?._id,
+        bedNumber: selectedBed,
+        sharingTypeId: selectedSharingType?.id
+      });
 
       // Only include onboardingDate if it's different from the resident's existing check-in date
       if (onboardingDate) {
@@ -625,48 +648,44 @@ const ResidentOnboarding = () => {
       console.log('🚀 Sending onboarding data:', JSON.stringify(onboardingData, null, 2));
 
       // Final validation before sending to backend
-      if (!onboardingData.residentId || !onboardingData.roomId || !onboardingData.bedNumber || !onboardingData.sharingTypeId) {
-        toast.error('Missing required fields for onboarding');
+      console.log('🔍 Final validation check:', {
+        residentId: !!onboardingData.residentId,
+        roomId: !!onboardingData.roomId,
+        bedNumber: !!onboardingData.bedNumber,
+        sharingTypeId: !!onboardingData.sharingTypeId,
+        onboardingData
+      });
+
+      const missingFields = [];
+      if (!onboardingData.residentId) missingFields.push('Resident ID');
+      if (!onboardingData.roomId) missingFields.push('Room ID');
+      if (!onboardingData.bedNumber) missingFields.push('Bed Number');
+      if (!onboardingData.sharingTypeId) missingFields.push('Sharing Type ID');
+
+      if (missingFields.length > 0) {
+        console.error('❌ Missing required fields:', missingFields);
+        console.error('❌ Onboarding data values:', {
+          residentId: onboardingData.residentId,
+          roomId: onboardingData.roomId,
+          bedNumber: onboardingData.bedNumber,
+          sharingTypeId: onboardingData.sharingTypeId
+        });
+        toast.error(`Missing required fields: ${missingFields.join(', ')}`);
         return;
       }
 
-      let response;
-      
-      if (isNoticePeriodBed) {
-        // For notice period beds, reserve the bed for future assignment
-        let expectedAvailabilityDate;
-        
-        // Validate the checkOutDate before creating a Date object
-        if (selectedBedData.resident?.checkOutDate) {
-          const parsedDate = new Date(selectedBedData.resident.checkOutDate);
-          if (!isNaN(parsedDate.getTime())) {
-            expectedAvailabilityDate = parsedDate;
-          } else {
-            // If checkOutDate is invalid, use current date + 30 days as fallback
-            expectedAvailabilityDate = new Date();
-            expectedAvailabilityDate.setDate(expectedAvailabilityDate.getDate() + 30);
-            console.warn('Invalid checkOutDate, using fallback date:', expectedAvailabilityDate);
-          }
-        } else {
-          // If no checkOutDate, use current date + 30 days as fallback
-          expectedAvailabilityDate = new Date();
-          expectedAvailabilityDate.setDate(expectedAvailabilityDate.getDate() + 30);
-          console.warn('No checkOutDate found, using fallback date:', expectedAvailabilityDate);
-        }
-        
-        response = await api.post('/pg/rooms/reserve-notice-period-bed', {
-          roomId: selectedRoom._id,
-          bedNumber: selectedBed,
-          residentId: selectedResident._id,
-          expectedAvailabilityDate: expectedAvailabilityDate.toISOString()
-        });
-        
-        if (response.data.success) {
-          toast.success(`Bed ${selectedBed} reserved successfully! It will be automatically assigned once the notice period expires.`);
-        }
-      } else {
         // For available beds, proceed with normal onboarding
+      console.log('🔄 Making API call to /residents/onboard');
+      let response;
+
+      try {
         response = await api.post('/residents/onboard', onboardingData);
+        console.log('✅ API response received:', response.data);
+      } catch (apiError) {
+        console.error('❌ API call failed:', apiError);
+        console.error('❌ API error response:', apiError.response?.data);
+        toast.error(apiError.response?.data?.message || 'Network error occurred');
+        return;
       }
       
       if (response.data.success) {
@@ -1459,7 +1478,7 @@ const ResidentOnboarding = () => {
             <div>
               <p className="text-xs text-gray-600 font-medium">Available Rooms</p>
               <p className="text-sm font-bold text-gray-900">
-                {availableRooms.filter(room => room.availableBedsCount > 0).length} available
+                {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} available
               </p>
             </div>
           </div>
@@ -1473,7 +1492,7 @@ const ResidentOnboarding = () => {
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
             <p className="text-gray-600 font-medium">Loading available rooms...</p>
           </div>
-        ) : availableRooms.length === 0 ? (
+        ) : (availableRooms || []).length === 0 ? (
           <div className="text-center py-12">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Building2 className="h-10 w-10 text-gray-400" />
@@ -1486,7 +1505,7 @@ const ResidentOnboarding = () => {
         ) : (
           <>
             {/* Available Rooms */}
-            {availableRooms.filter(room => room.availableBedsCount > 0).map((room) => {
+            {(availableRooms || []).filter(room => room.availableBedsCount > 0).map((room) => {
             const hasAvailableBeds = room.availableBedsCount > 0;
             
             return (
@@ -1549,8 +1568,7 @@ const ResidentOnboarding = () => {
                         </div>
                       </div>
                       
-                      {/* Enhanced Bed Status with Notice Period */}
-                      {room.beds && (
+                      {/* Enhanced Bed Status */}
                         <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-semibold text-blue-800">Bed Status</span>
@@ -1559,59 +1577,29 @@ const ResidentOnboarding = () => {
                             </span>
                           </div>
                           
-                          {/* Notice Period Warning */}
-                          {room.hasNoticePeriodBeds && (
-                            <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                              <div className="flex items-center space-x-2">
-                                <Clock className="h-3 w-3 text-yellow-600" />
-                                <span className="text-xs font-medium text-yellow-800">
-                                  ⚠️ {room.noticePeriodBedsCount} bed(s) in notice period
+                        {/* Available Bed Numbers */}
+                        {room.availableBedNumbers && room.availableBedNumbers.length > 0 && (
+                          <div className="mb-2">
+                            <span className="text-xs text-blue-700 font-medium">Available beds: </span>
+                            <span className="text-xs text-blue-600">
+                              {room.availableBedNumbers.slice(0, 3).join(', ')}
+                              {room.availableBedNumbers.length > 3 && ` +${room.availableBedNumbers.length - 3} more`}
                                 </span>
-                              </div>
-                              <p className="text-xs text-yellow-700 mt-1">
-                                Will be available in {room.noticePeriodInfo?.earliestAvailability || 'N/A'} days
-                              </p>
                             </div>
                           )}
                           
-                          <div className="grid grid-cols-4 gap-2">
-                            {room.beds.map((bed, index) => {
-                              let bedStatusClass = '';
-                              let bedStatusText = '';
-                              
-                              if (!bed.isOccupied) {
-                                bedStatusClass = 'bg-green-100 text-green-700 border border-green-200';
-                                bedStatusText = 'Available';
-                              } else if (bed.residentStatus === 'notice_period') {
-                                bedStatusClass = 'bg-yellow-100 text-yellow-700 border border-yellow-200';
-                                bedStatusText = 'Notice Period';
-                              } else {
-                                bedStatusClass = 'bg-red-100 text-red-700 border border-red-200';
-                                bedStatusText = 'Occupied';
-                              }
-                              
-                              return (
-                              <div
-                                key={index}
-                                  className={`p-2 rounded-lg text-center text-xs font-semibold ${bedStatusClass}`}
-                                  title={bed.isOccupied && bed.resident ? 
-                                    `${bed.resident.firstName} ${bed.resident.lastName} - ${bedStatusText}` : 
-                                    bedStatusText
-                                  }
-                              >
-                                Bed {bed.bedNumber}
-                                  <span className="block text-xs mt-1">{bedStatusText}</span>
-                                  {bed.isOccupied && bed.residentStatus === 'notice_period' && (
-                                    <span className="block text-xs mt-1 text-yellow-600">
-                                      {bed.resident?.noticeDays || 'N/A'} days
+                        {/* Bed Status Indicators */}
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                          <span className="text-xs text-green-700 font-medium">
+                            {room.availableBedsCount} Available
                                     </span>
-                                )}
+                          <div className="w-3 h-3 rounded-full bg-gray-400 ml-2"></div>
+                          <span className="text-xs text-gray-600 font-medium">
+                            {room.occupiedBeds} Occupied
+                          </span>
                               </div>
-                              );
-                            })}
                           </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                   
@@ -1630,7 +1618,7 @@ const ResidentOnboarding = () => {
           })}
           
           {/* Notice Period Rooms Section */}
-          {availableRooms.filter(room => room.hasNoticePeriodBeds && room.availableBedsCount === 0).length > 0 && (
+          {(availableRooms || []).filter(room => room.hasNoticePeriodBeds && room.availableBedsCount === 0).length > 0 && (
             <div className="mt-8">
               <div className="text-center mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Notice Period Rooms</h3>
@@ -1640,7 +1628,7 @@ const ResidentOnboarding = () => {
               </div>
               
               <div className="grid gap-4">
-                {availableRooms
+                {(availableRooms || [])
                   .filter(room => room.hasNoticePeriodBeds && room.availableBedsCount === 0)
                   .map((room) => (
                     <motion.div
@@ -1744,7 +1732,7 @@ const ResidentOnboarding = () => {
         </button>
         
         <div className="text-sm text-gray-500 font-medium">
-          {availableRooms.filter(room => room.availableBedsCount > 0).length} room{availableRooms.filter(room => room.availableBedsCount > 0).length !== 1 ? 's' : ''} available
+          {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} room{(availableRooms || []).filter(room => room.availableBedsCount > 0).length !== 1 ? 's' : ''} available
         </div>
       </div>
     </motion.div>
@@ -1812,47 +1800,27 @@ const ResidentOnboarding = () => {
         <div className="text-center">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">Available Beds</h3>
           <p className="text-sm text-gray-600">
-            {selectedRoom?.availableBedsCount || 0} of {selectedRoom?.totalBeds || selectedRoom?.numberOfBeds} beds available
+            {selectedRoom?.availableBedsCount || 0} of {selectedRoom?.totalBeds || selectedRoom?.numberOfBeds || 0} beds available
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {selectedRoom?.beds?.map((bed, index) => {
-            // Determine bed status and styling
+          {selectedRoom?.availableBedNumbers?.map((bedNumber, index) => {
+            // Determine bed status and styling (simplified for available beds only)
             let bedStatusClass = '';
             let bedIconClass = '';
             let bedStatusText = '';
             let bedDescription = '';
             let isSelectable = false;
             let isSelected = false;
-            let noticePeriodInfo = null;
             
-            if (!bed.isOccupied) {
+            // All beds from availableBedNumbers are available
               bedStatusClass = 'border-green-200 bg-green-50 hover:border-green-300';
               bedIconClass = 'bg-green-100 text-green-600';
               bedStatusText = 'Available';
               bedDescription = 'Ready for assignment';
               isSelectable = true;
-              isSelected = selectedBed === bed.bedNumber;
-            } else if (bed.residentStatus === 'notice_period') {
-              bedStatusClass = 'border-yellow-200 bg-yellow-50 hover:border-yellow-300';
-              bedIconClass = 'bg-yellow-100 text-yellow-600';
-              bedStatusText = 'Notice Period';
-              bedDescription = 'Will be available soon';
-              isSelectable = true;
-              isSelected = selectedBed === bed.bedNumber;
-              noticePeriodInfo = {
-                days: bed.resident?.noticeDays || 'N/A',
-                residentName: `${bed.resident?.firstName} ${bed.resident?.lastName}`,
-                checkOutDate: bed.resident?.checkOutDate
-              };
-            } else {
-              bedStatusClass = 'border-gray-200 bg-gray-50 opacity-60';
-              bedIconClass = 'bg-gray-200 text-gray-400';
-              bedStatusText = 'Occupied';
-              bedDescription = 'Currently occupied';
-              isSelectable = false;
-            }
+            isSelected = selectedBed === bedNumber;
             
             // Apply selection styling
             if (isSelected) {
@@ -1868,7 +1836,7 @@ const ResidentOnboarding = () => {
                 className={`p-4 rounded-xl border transition-all ${
                   isSelectable ? 'cursor-pointer' : 'cursor-not-allowed'
                 } ${bedStatusClass}`}
-                onClick={() => isSelectable && handleBedSelect(bed.bedNumber)}
+                onClick={() => isSelectable && handleBedSelect(bedNumber)}
             >
               <div className="text-center">
                 {/* Bed Icon */}
@@ -1878,52 +1846,19 @@ const ResidentOnboarding = () => {
                 
                 {/* Bed Number */}
                 <h3 className="font-bold text-gray-900 mb-2">
-                  Bed {bed.bedNumber}
+                  Bed {bedNumber}
                 </h3>
                 
                 {/* Status */}
                   <div className="space-y-1">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      !bed.isOccupied 
-                        ? 'bg-green-100 text-green-600'
-                        : bed.residentStatus === 'notice_period'
-                        ? 'bg-yellow-100 text-yellow-600'
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      {!bed.isOccupied ? (
-                        <>
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-600">
                           <CheckCircle className="h-3 w-3 inline mr-1" />
                           Available
-                        </>
-                      ) : bed.residentStatus === 'notice_period' ? (
-                        <>
-                          <Clock className="h-3 w-3 inline mr-1" />
-                          Notice Period
-                        </>
-                      ) : (
-                        <>
-                      <Clock className="h-3 w-3 inline mr-1" />
-                      Occupied
-                        </>
-                      )}
                     </span>
                     <p className="text-xs text-gray-500">
                       {bedDescription}
                     </p>
                   </div>
-                  
-                  {/* Notice Period Information */}
-                  {bed.residentStatus === 'notice_period' && noticePeriodInfo && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="text-xs text-yellow-800 space-y-1">
-                        <p className="font-medium">Current Resident: {noticePeriodInfo.residentName}</p>
-                        <p>Notice: {noticePeriodInfo.days} days</p>
-                        {noticePeriodInfo.checkOutDate && (
-                          <p>Checkout: {new Date(noticePeriodInfo.checkOutDate).toLocaleDateString()}</p>
-                        )}
-                      </div>
-                  </div>
-                )}
                 
                 {/* Selection Indicator */}
                   {isSelected && (
@@ -1932,15 +1867,6 @@ const ResidentOnboarding = () => {
                       <CheckCircle2 className="h-4 w-4 text-sky-600" />
                       <span className="text-xs font-medium text-sky-700">Selected</span>
                     </div>
-                      
-                      {/* Notice Period Selection Note */}
-                      {bed.residentStatus === 'notice_period' && (
-                        <div className="mt-2 p-2 bg-yellow-100 border border-yellow-200 rounded-lg">
-                          <p className="text-xs text-yellow-800 font-medium text-center">
-                            ⚠️ This bed will be assigned automatically once the notice period is completed
-                          </p>
-                        </div>
-                      )}
                   </div>
                 )}
               </div>
@@ -2579,8 +2505,12 @@ const ResidentOnboarding = () => {
         
         <button
           onClick={handleOnboardingSubmit}
-          disabled={loading}
-          className="flex items-center px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded-lg hover:from-sky-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+          disabled={loading || !selectedBed}
+          className={`flex items-center px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl ${
+            selectedBed
+              ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white hover:from-sky-600 hover:to-blue-600'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           {loading ? (
             <>

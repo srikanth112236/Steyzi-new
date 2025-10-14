@@ -79,6 +79,7 @@ import UserManagement from './components/superadmin/UserManagement';
 import NotificationsPage from './pages/admin/Notifications';
 import PgReports from './pages/admin/Reports';
 import SubscriberManagement from './pages/superadmin/SubscriberManagement';
+import ResidentOnboarding from './pages/admin/ResidentOnboarding';
 
 // Import Billing page
 import Billing from './pages/superadmin/Billing';
@@ -241,13 +242,17 @@ const App = () => {
             <ResidentProfile />
           </ProtectedRoute>
         } />
-
+           <Route path="onboarding" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <ResidentOnboarding />
+          </ProtectedRoute>
+        } />
         <Route path="offboarding" element={
           <ProtectedRoute requireOnboarding={false}>
             <ResidentOffboarding />
           </ProtectedRoute>
         } />
-        <Route path="room-switching" element={
+       <Route path="room-switching" element={
           <ProtectedRoute requireOnboarding={false}>
             <RoomSwitching />
           </ProtectedRoute>

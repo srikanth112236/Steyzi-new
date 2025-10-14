@@ -1,11 +1,14 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/user.model');
+const logger = require('../utils/logger');
 
 const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pg_maintenance';
 
-async function createSuperAdmin() {
+async function createSuperadmin(userData) {
   try {
+    logger.log('info', '🚀 Creating superadmin user...');
+    
     // Connect to MongoDB
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
@@ -15,9 +18,12 @@ async function createSuperAdmin() {
     // Check if a superadmin already exists
     const existingSuperAdmin = await User.findOne({ role: 'superadmin' });
     if (existingSuperAdmin) {
-      console.log('Superadmin already exists. Skipping creation.');
+      logger.log('info', 'Superadmin already exists. Skipping creation.');
       await mongoose.disconnect();
-      return;
+      return { 
+        success: true, 
+        message: 'Superadmin already exists. Skipping creation.' 
+      };
     }
 
     // Generate a secure password
@@ -39,17 +45,36 @@ async function createSuperAdmin() {
     // Save the superadmin user
     await superAdmin.save();
 
-    console.log('Superadmin user created successfully:');
-    console.log(`Email: ${superAdmin.email}`);
-    console.log(`Role: ${superAdmin.role}`);
-
-    // Disconnect from MongoDB
-    await mongoose.disconnect();
+    logger.log('info', '✅ Superadmin user created successfully');
+    return { 
+      success: true, 
+      message: 'Superadmin user created successfully' 
+    };
   } catch (error) {
-    console.error('Error creating superadmin:', error);
-    process.exit(1);
+    logger.log('error', '❌ Error creating superadmin user:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 }
 
-// Run the script
-createSuperAdmin();
+// If script is run directly
+if (require.main === module) {
+  createSuperadmin()
+    .then((result) => {
+      if (result.success) {
+        logger.log('info', '✅ Superadmin creation script completed');
+        process.exit(0);
+      } else {
+        logger.log('error', '❌ Superadmin creation script failed:', result.error);
+        process.exit(1);
+      }
+    })
+    .catch((error) => {
+      logger.log('error', '❌ Superadmin creation script failed:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = { createSuperadmin };

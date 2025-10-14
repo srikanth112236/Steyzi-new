@@ -16,13 +16,79 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Info
+  Info,
+  Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 import { api } from '../../services/auth.service';
-import useBedLimitCheck from '../../hooks/useBedLimitCheck';
-import BedLimitExceededModal from '../common/BedLimitExceededModal';
+import useSubscriptionManager from '../../hooks/useSubscriptionManager';
+import SubscriptionUpgradeModal from '../common/SubscriptionUpgradeModal';
+
+// Upgrade Modal Component
+const RoomUpgradeModal = ({ 
+  isOpen, 
+  onClose, 
+  currentRooms, 
+  maxAllowedRooms, 
+  requestedRooms,
+  onUpgrade 
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="bg-white rounded-lg p-8 w-full max-w-md mx-4"
+      >
+        <div className="flex items-center justify-center mb-6">
+          <div className="bg-yellow-100 text-yellow-600 rounded-full p-4">
+            <AlertCircle className="h-8 w-8" />
+          </div>
+        </div>
+        
+        <h2 className="text-2xl font-bold text-center text-gray-900 mb-4">
+          Room Limit Reached
+        </h2>
+        
+        <div className="text-center text-gray-600 mb-6">
+          <p>
+            You've reached your current plan's room limit. 
+            Current rooms: <span className="font-bold">{currentRooms}</span> / 
+            Max allowed: <span className="font-bold">{maxAllowedRooms}</span>
+          </p>
+          <p className="mt-2">
+            You're trying to add <span className="font-bold">{requestedRooms}</span> more room(s).
+          </p>
+        </div>
+        
+        <div className="space-y-4">
+          <button
+            onClick={onUpgrade}
+            className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Zap className="h-5 w-5 mr-2" />
+            Upgrade Subscription
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+        
+        <div className="mt-6 text-center text-xs text-gray-500">
+          💡 Upgrade to increase your room and bed capacity
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const RoomManagement = () => {
   const { user } = useSelector((state) => state.auth);
@@ -35,15 +101,14 @@ const RoomManagement = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   
-  // Bed limit check hook
-  const {
-    showExceededModal,
-    exceededData,
-    checkRoomAddition,
-    closeExceededModal,
-    updateBedsUsed,
-    getRemainingBeds
-  } = useBedLimitCheck();
+  // Subscription Management
+  const subscriptionManager = useSubscriptionManager();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalData, setUpgradeModalData] = useState({
+    currentRooms: 0,
+    maxAllowedRooms: 5,
+    requestedRooms: 0
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -53,7 +118,14 @@ const RoomManagement = () => {
     sharingType: '',
     cost: '',
     description: '',
-    bedNumbers: [] // Array to store custom bed numbers
+    bedNumbers: []
+  });
+
+  // Add these state variables for bulk upload
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadData, setBulkUploadData] = useState({
+    rooms: [],
+    totalBedsToAdd: 0
   });
 
   useEffect(() => {
@@ -95,37 +167,38 @@ const RoomManagement = () => {
     try {
       setLoading(true);
       
-      // Check bed limit before creating room
-      const checkData = {
-        beds: formData.numberOfBeds
-      };
-      
-      const canProceed = await checkRoomAddition(checkData);
-      
-      if (!canProceed) {
-        setLoading(false);
-        return; // Bed limit exceeded modal will be shown
-      }
-      
-      // Prepare room data with bed numbers
+      // Prepare room data
       const roomData = {
         ...formData,
-        bedNumbers: formData.bedNumbers.filter(bed => bed.trim() !== '') // Only send non-empty bed numbers
+        pgId: user.pgId,
+        bedNumbers: formData.bedNumbers.filter(bed => bed.trim() !== '')
       };
       
+      // Proceed with room creation
       const response = await api.post('/pg/rooms', roomData);
       
       if (response.data.success) {
         toast.success('Room created successfully!');
-        
-        // Update beds used count
-        await updateBedsUsed(formData.numberOfBeds);
-        
         setShowCreateModal(false);
         resetForm();
         fetchRooms();
       } else {
-        toast.error(response.data.message || 'Failed to create room');
+        // Handle specific upgrade requirement
+        if (response.data.requiresUpgrade) {
+          setUpgradeModalData({
+            currentRooms: response.data.currentRooms,
+            maxAllowedRooms: response.data.maxAllowedRooms,
+            currentBeds: response.data.currentBeds,
+            maxAllowedBeds: response.data.maxAllowedBeds,
+            requestedRooms: 1,
+            requestedBeds: formData.numberOfBeds,
+            remainingBeds: response.data.remainingBeds,
+            message: response.data.message
+          });
+          setShowUpgradeModal(true);
+        } else {
+          toast.error(response.data.message || 'Failed to create room');
+        }
       }
     } catch (error) {
       console.error('Error creating room:', error);
@@ -164,7 +237,7 @@ const RoomManagement = () => {
   };
 
   const handleDeleteRoom = async (roomId) => {
-    if (!window.confirm('Are you sure you want to delete this room?')) {
+    if (!window.confirm('Are you sure you want to delete this room? This action cannot be undone.')) {
       return;
     }
 
@@ -175,9 +248,21 @@ const RoomManagement = () => {
       
       if (response.data.success) {
         toast.success('Room deleted successfully!');
+        
+        // Fetch rooms to update the list
         fetchRooms();
       } else {
-        toast.error(response.data.message || 'Failed to delete room');
+        // Handle specific error cases
+        if (response.data.statusCode === 400) {
+          // Room has occupied beds
+          toast.error(response.data.message || 'Cannot delete a room with occupied beds');
+        } else if (response.data.statusCode === 404) {
+          // Room not found
+          toast.error(response.data.message || 'Room not found');
+        } else {
+          // Generic error
+          toast.error(response.data.message || 'Failed to delete room');
+        }
       }
     } catch (error) {
       console.error('Error deleting room:', error);
@@ -246,6 +331,181 @@ const RoomManagement = () => {
       bedNumbers: formData.bedNumbers.slice(0, newNumberOfBeds)
     });
   };
+
+  // Add a method for handling bulk upload
+  const handleBulkUploadRooms = async () => {
+    try {
+      setLoading(true);
+      
+      // Proceed with bulk upload
+      const response = await api.post('/pg/rooms/bulk-upload', {
+        rooms: bulkUploadData.rooms,
+        pgId: user.pgId
+      });
+      
+      if (response.data.success) {
+        const { 
+          uploadedRoomsCount, 
+          failedRoomsCount, 
+          skippedRoomsCount 
+        } = response.data.data;
+
+        // Show detailed upload results
+        toast.success(
+          `Bulk Upload Results: 
+          ${uploadedRoomsCount} rooms uploaded, 
+          ${skippedRoomsCount} rooms skipped, 
+          ${failedRoomsCount} rooms failed`
+        );
+
+        setShowBulkUploadModal(false);
+        fetchRooms();
+      } else {
+        // Handle specific upgrade requirement
+        if (response.data.requiresUpgrade) {
+          setUpgradeModalData({
+            currentRooms: response.data.currentRooms,
+            maxAllowedRooms: response.data.maxAllowedRooms,
+            currentBeds: response.data.currentBeds,
+            maxAllowedBeds: response.data.maxAllowedBeds,
+            requestedRooms: response.data.totalRooms,
+            requestedBeds: response.data.totalBedsToAdd,
+            message: response.data.message
+          });
+          setShowUpgradeModal(true);
+        } else {
+          toast.error(response.data.message || 'Failed to upload rooms');
+        }
+      }
+    } catch (error) {
+      console.error('Error uploading rooms:', error);
+      toast.error('Failed to upload rooms');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a method to handle file upload for bulk rooms
+  const handleBulkUploadFile = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        
+        // Validate data structure
+        if (!Array.isArray(data) || data.length === 0) {
+          toast.error('Invalid file format. Please upload a valid JSON array of rooms.');
+          return;
+        }
+
+        // Validate room data structure
+        const invalidRooms = data.filter(room => 
+          !room.roomNumber || 
+          !room.floor || 
+          !room.sharingType || 
+          !room.numberOfBeds
+        );
+
+        if (invalidRooms.length > 0) {
+          toast.error(`${invalidRooms.length} rooms have invalid or missing data`);
+          return;
+        }
+
+        // Calculate total beds
+        const totalBedsToAdd = data.reduce((total, room) => 
+          total + (room.numberOfBeds || 1), 0);
+
+        // Set bulk upload data
+        setBulkUploadData({
+          rooms: data,
+          totalBedsToAdd
+        });
+
+        // Open bulk upload confirmation modal
+        setShowBulkUploadModal(true);
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        toast.error('Failed to parse uploaded file. Please check the file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Add a method to render bulk upload modal
+  const renderBulkUploadModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Confirm Bulk Upload</h2>
+          <button
+            onClick={() => setShowBulkUploadModal(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XCircle className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <Info className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-blue-800">Upload Summary</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-sm text-blue-700">
+                  Total Rooms: <span className="font-bold">{bulkUploadData.rooms.length}</span>
+                </p>
+                <p className="text-sm text-blue-700">
+                  Total Beds: <span className="font-bold">{bulkUploadData.totalBedsToAdd}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-green-700">
+                  Rooms per Floor:
+                </p>
+                {Object.entries(
+                  bulkUploadData.rooms.reduce((acc, room) => {
+                    const floor = room.floorName || room.floor;
+                    acc[floor] = (acc[floor] || 0) + 1;
+                    return acc;
+                  }, {})
+                ).map(([floor, count]) => (
+                  <p key={floor} className="text-xs text-gray-600">
+                    {floor}: {count} room{count !== 1 ? 's' : ''}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end space-x-3">
+            <button
+              onClick={() => setShowBulkUploadModal(false)}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkUploadRooms}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Uploading...' : 'Confirm Upload'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
 
   const filteredRooms = rooms.filter(room => {
     const matchesSearch = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase());
@@ -708,13 +968,29 @@ const RoomManagement = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Room Management</h1>
               <p className="text-gray-600">Manage rooms, beds, and occupancy</p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add Room
-            </button>
+            <div className="flex items-center space-x-2">
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={handleBulkUploadFile} 
+                className="hidden" 
+                id="bulk-upload-input" 
+              />
+              <label 
+                htmlFor="bulk-upload-input" 
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Bulk Upload
+              </label>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Add Room
+              </button>
+            </div>
           </div>
         </div>
 
@@ -785,21 +1061,35 @@ const RoomManagement = () => {
       <AnimatePresence>
         {showCreateModal && renderCreateModal()}
         {showEditModal && renderEditModal()}
+        {showBulkUploadModal && renderBulkUploadModal()}
       </AnimatePresence>
 
-      {/* Bed Limit Exceeded Modal */}
-      <BedLimitExceededModal
-        isOpen={showExceededModal}
-        onClose={closeExceededModal}
-        requestedBeds={exceededData?.requestedBeds}
-        currentBedsUsed={exceededData?.currentBedsUsed}
-        onTopUpConfirm={async (addedBeds) => {
-          // After top-up, refetch subscription data and allow room creation
-          toast.success('Beds added! You can now create the room.');
-        }}
-        onUpgrade={() => {
-          // Navigate to subscription settings
-          window.location.href = '/admin/settings?tab=subscription';
+      {/* Upgrade Modal */}
+      <RoomUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentRooms={upgradeModalData.currentRooms}
+        maxAllowedRooms={upgradeModalData.maxAllowedRooms}
+        requestedRooms={upgradeModalData.requestedRooms}
+        onUpgrade={handleUpgradeSubscription}
+      />
+
+      {/* Render SubscriptionUpgradeModal */}
+      <SubscriptionUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentPlan={subscriptionManager.getSubscriptionSummary()}
+        limitReached={true}
+        limitDetails={{
+          message: upgradeModalData.message,
+          currentUsage: {
+            rooms: upgradeModalData.currentRooms,
+            max_rooms: upgradeModalData.maxAllowedRooms,
+            beds: upgradeModalData.currentBeds,
+            max_beds: upgradeModalData.maxAllowedBeds,
+            requested_rooms: upgradeModalData.requestedRooms,
+            requested_beds: upgradeModalData.requestedBeds
+          }
         }}
       />
     </div>

@@ -36,7 +36,7 @@ class AdvancedSubscriptionService {
 
       // 2. Check current usage limits
       const currentBedUsage = userSubscription.currentBedUsage || 0;
-      const maxBeds = userSubscription.totalBeds || userSubscription.planId?.baseBedCount || 10;
+      const maxBeds = userSubscription.totalBeds || userSubscription.subscriptionPlanId?.baseBedCount || 10;
 
       if (currentBedUsage >= maxBeds) {
         // Log limit exceeded attempt
@@ -341,7 +341,7 @@ class AdvancedSubscriptionService {
       const subscription = await UserSubscription.findOne({
         userId,
         status: { $in: ['active', 'trial'] }
-      }).populate('planId');
+      }).populate('subscriptionPlanId');
 
       if (!subscription) {
         await this.logActivity(userId, 'access_denied', {
@@ -609,7 +609,7 @@ class AdvancedSubscriptionService {
       case 'bed':
       case 'beds':
         currentUsage = subscription.currentBedUsage || 0;
-        limit = subscription.totalBeds || subscription.planId?.baseBedCount || 10;
+        limit = subscription.totalBeds || subscription.subscriptionPlanId?.baseBedCount || 10;
         break;
 
       case 'branch':
@@ -634,7 +634,7 @@ class AdvancedSubscriptionService {
   }
 
   async checkFeatureAccess(subscription, resourceType) {
-    if (!subscription.planId) {
+    if (!subscription.subscriptionPlanId) {
       return { allowed: false, reason: 'No plan associated with subscription' };
     }
 
@@ -654,7 +654,7 @@ class AdvancedSubscriptionService {
       return { allowed: true }; // No module requirement
     }
 
-    const hasModule = subscription.planId.modules?.some(module =>
+    const hasModule = subscription.subscriptionPlanId.modules?.some(module =>
       module.moduleName === requiredModule && module.enabled
     );
 

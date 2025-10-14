@@ -11,12 +11,12 @@ const connectDB = async () => {
 
     // If no MongoDB URI is provided, try to use a default local connection
     if (!mongoURI) {
-      logger.warn('No MongoDB URI provided, using default local connection');
+      logger.log('warn', 'No MongoDB URI provided, using default local connection');
       mongoURI = 'mongodb://localhost:27017/pg_maintenance';
     }
 
-    logger.info('Attempting to connect to MongoDB...');
-    logger.info(`MongoDB URI: ${mongoURI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
+    logger.log('info', 'Attempting to connect to MongoDB...');
+    logger.log('info', `MongoDB URI: ${mongoURI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
 
     const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
@@ -29,50 +29,50 @@ const connectDB = async () => {
       w: 'majority',
     });
 
-    logger.info(`✅ MongoDB Connected: ${conn.connection.host}`);
+    logger.log('info', `✅ MongoDB Connected: ${conn.connection.host}`);
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB connection error:', err);
+      logger.log('error', 'MongoDB connection error:', err);
     });
 
     mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
+      logger.log('warn', 'MongoDB disconnected');
     });
 
     mongoose.connection.on('reconnected', () => {
-      logger.info('MongoDB reconnected');
+      logger.log('info', 'MongoDB reconnected');
     });
 
     // Graceful shutdown
     process.on('SIGINT', async () => {
       try {
         await mongoose.connection.close();
-        logger.info('MongoDB connection closed through app termination');
+        logger.log('info', 'MongoDB connection closed through app termination');
         process.exit(0);
       } catch (err) {
-        logger.error('Error closing MongoDB connection:', err);
+        logger.log('error', 'Error closing MongoDB connection:', err);
         process.exit(1);
       }
     });
 
   } catch (error) {
-    logger.error('MongoDB connection failed:', error.message);
+    logger.log('error', 'MongoDB connection failed:', error.message);
     
     // If local MongoDB fails, provide helpful error message
     if (error.message.includes('ECONNREFUSED') || error.message.includes('localhost')) {
-      logger.error('❌ Local MongoDB is not running. Please:');
-      logger.error('1. Install MongoDB locally, or');
-      logger.error('2. Use MongoDB Atlas (cloud), or');
-      logger.error('3. Start MongoDB service with: sudo systemctl start mongod');
-      logger.error('4. Or install MongoDB with Docker: docker run -d -p 27017:27017 --name mongodb mongo:latest');
+      logger.log('error', '❌ Local MongoDB is not running. Please:');
+      logger.log('error', '1. Install MongoDB locally, or');
+      logger.log('error', '2. Use MongoDB Atlas (cloud), or');
+      logger.log('error', '3. Start MongoDB service with: sudo systemctl start mongod');
+      logger.log('error', '4. Or install MongoDB with Docker: docker run -d -p 27017:27017 --name mongodb mongo:latest');
     }
     
-    logger.error('Full error:', error);
+    logger.log('error', 'Full error:', error);
     
     // In development, don't exit the process, just log the error
     if (process.env.NODE_ENV === 'development') {
-      logger.warn('Continuing without database connection in development mode');
+      logger.log('warn', 'Continuing without database connection in development mode');
       return;
     }
     

@@ -40,6 +40,8 @@ const salesRoutes = require('./routes/sales.routes');
 const salesManagerRoutes = require('./routes/salesManager.routes');
 const securityRoutes = require('./routes/security.routes');
 const advancedFeaturesRoutes = require('./routes/advancedFeatures.routes');
+const onboardingRoutes = require('./routes/onboarding.routes');
+const logsRoutes = require('./routes/logs.routes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
@@ -186,6 +188,11 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/sales-managers', salesManagerRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/advanced', advancedFeaturesRoutes);
+app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/logs', logsRoutes);
+
+// Add subscription routes
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -12,24 +12,31 @@ const checkTrialExpiration = realTimeTrialCheck;
  * Check if user has access to specific modules/features
  */
 const checkModuleAccess = (requiredModules = []) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
-      // Skip for superadmin
-      if (req.user.role === 'superadmin') {
+      // Completely skip module access checks for these roles
+      const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
+      if (bypassRoles.includes(req.user.role)) {
+        console.log(`🎉 Bypassing ALL module access checks for role: ${req.user.role}`);
+        return next();
+      }
+
+      // If no subscription exists and user is not in bypass roles, continue to check
+      if (!req.subscription) {
         return next();
       }
 
       // Allow full access during trial period - no limitations
-      if (req.subscription && req.subscription.billingCycle === 'trial') {
+      if (req.subscription.billingCycle === 'trial') {
         return next();
       }
 
       // Skip if no subscription restrictions
-      if (!req.subscription || !req.subscription.planId) {
+      if (!req.subscription.subscriptionPlanId) {
         return next();
       }
 
-      const userModules = req.subscription.planId.modules || [];
+      const userModules = req.subscription.subscriptionPlanId.modules || [];
       const hasAccess = requiredModules.every(requiredModule =>
         userModules.some(userModule =>
           userModule.moduleName === requiredModule && userModule.enabled
@@ -56,14 +63,16 @@ const checkModuleAccess = (requiredModules = []) => {
 /**
  * Check if user has exceeded their usage limits
  */
-const checkUsageLimits = (req, res, next) => {
+const checkUsageLimits = async (req, res, next) => {
   try {
-    // Skip for superadmin
-    if (req.user.role === 'superadmin') {
+    // Completely skip usage limit checks for these roles
+    const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
+    if (bypassRoles.includes(req.user.role)) {
+      console.log(`🎉 Bypassing ALL usage limit checks for role: ${req.user.role}`);
       return next();
     }
 
-    // Skip if no subscription
+    // If no subscription exists and user is not in bypass roles, continue to check
     if (!req.subscription) {
       return next();
     }
@@ -76,7 +85,7 @@ const checkUsageLimits = (req, res, next) => {
     const subscription = req.subscription;
     const currentBedUsage = subscription.currentBedUsage || 0;
     const currentBranchUsage = subscription.currentBranchUsage || 1;
-    const maxBeds = subscription.totalBeds || subscription.planId?.baseBedCount || 1;
+    const maxBeds = subscription.totalBeds || subscription.subscriptionPlanId?.baseBedCount || 1;
     const maxBranches = subscription.totalBranches || 1;
 
     if (currentBedUsage >= maxBeds) {

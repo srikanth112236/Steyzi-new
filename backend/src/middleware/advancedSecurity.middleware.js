@@ -189,8 +189,20 @@ const atomicUsageMiddleware = (resourceType) => {
  */
 const realTimeTrialCheck = async (req, res, next) => {
   try {
-    // Skip for non-admin users
-    if (req.user.role !== 'admin') {
+    // Completely skip subscription checks for these roles
+    const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
+    if (bypassRoles.includes(req.user.role)) {
+      console.log(`🎉 Bypassing ALL subscription checks for role: ${req.user.role}`);
+      // Set a dummy subscription context to prevent further checks
+      req.subscriptionContext = {
+        subscriptionId: null,
+        status: 'active',
+        billingCycle: 'active',
+        currentBedUsage: 0,
+        maxBeds: 1000,
+        currentBranchUsage: 0,
+        maxBranches: 1000
+      };
       return next();
     }
 
@@ -198,6 +210,7 @@ const realTimeTrialCheck = async (req, res, next) => {
     const SubscriptionManagementService = require('../services/subscriptionManagement.service');
     const subscriptionResult = await SubscriptionManagementService.getSubscriptionForLogin(req.user._id);
 
+    // If no subscription found and user is not in bypass roles, block access
     if (!subscriptionResult.subscription) {
       return res.status(403).json({
         success: false,
@@ -255,7 +268,7 @@ const realTimeTrialCheck = async (req, res, next) => {
       status: subscription.status,
       billingCycle: subscription.billingCycle,
       currentBedUsage: subscription.currentBedUsage || 0,
-      maxBeds: subscription.totalBeds || subscription.planId?.baseBedCount || 10,
+      maxBeds: subscription.totalBeds || subscription.subscriptionPlanId?.baseBedCount || 10,
       currentBranchUsage: subscription.currentBranchUsage || 0,
       maxBranches: subscription.totalBranches || 1
     };

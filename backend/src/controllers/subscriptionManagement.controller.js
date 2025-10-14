@@ -364,6 +364,27 @@ class SubscriptionManagementController {
       });
     }
   }
+
+  /**
+   * Migrate existing subscriptions to user.subscription field (superadmin only)
+   */
+  async migrateExistingSubscriptions(req, res) {
+    try {
+      const result = await SubscriptionManagementService.migrateExistingSubscriptions();
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      logger.error('Error in migrateExistingSubscriptions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }
 
 module.exports = new SubscriptionManagementController();

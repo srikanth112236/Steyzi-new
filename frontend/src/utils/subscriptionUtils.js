@@ -28,6 +28,12 @@ export class SubscriptionUtils {
    * Get maximum allowed beds
    */
   static getMaxBeds(subscription) {
+    // During trial period, allow higher limits
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing higher bed limit');
+      return 30; // Trial limit
+    }
+
     if (!subscription) return 10; // Default free limit
     return subscription.restrictions?.maxBeds || 10;
   }
@@ -36,6 +42,12 @@ export class SubscriptionUtils {
    * Get maximum allowed branches
    */
   static getMaxBranches(subscription) {
+    // During trial period, allow higher limits
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing higher branch limit');
+      return 10; // Trial limit
+    }
+
     if (!subscription) return 1; // Default free limit
     return subscription.restrictions?.maxBranches || 1;
   }
@@ -112,6 +124,12 @@ export class SubscriptionUtils {
    * Check if a module is enabled
    */
   static hasModule(moduleName, subscription) {
+    // During trial period, allow all modules
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing module:', moduleName);
+      return true;
+    }
+
     if (!subscription || !subscription.restrictions?.modules) return false;
     return subscription.restrictions.modules.some(module =>
       module.moduleName === moduleName && module.enabled
@@ -122,6 +140,12 @@ export class SubscriptionUtils {
    * Check if a specific permission is enabled for a submodule
    */
   static hasPermission(moduleName, submoduleName, permission, subscription) {
+    // During trial period, allow all permissions
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing permission:', { moduleName, submoduleName, permission });
+      return true;
+    }
+
     if (!subscription || !subscription.restrictions?.modules) return false;
 
     const module = subscription.restrictions.modules.find(m =>
@@ -143,6 +167,12 @@ export class SubscriptionUtils {
    * Check if user can perform an action on a submodule
    */
   static canPerformActionOnSubmodule(moduleName, submoduleName, action, subscription) {
+    // During trial period, allow all actions
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing action:', { moduleName, submoduleName, action });
+      return true;
+    }
+
     const actionToPermission = {
       'create': 'create',
       'read': 'read',
@@ -282,6 +312,12 @@ export class SubscriptionUtils {
    * Check if subscription allows multiple branches
    */
   static allowsMultipleBranches(subscription) {
+    // During trial period, allow multiple branches
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing multiple branches');
+      return true;
+    }
+
     if (!subscription || !subscription.plan) return false;
     return subscription.plan.allowMultipleBranches === true;
   }
@@ -332,6 +368,12 @@ export class SubscriptionUtils {
    * Check if user can access a specific route based on subscription
    */
   static canAccessRoute(route, subscription) {
+    // During trial period, allow ALL routes
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial active - allowing route:', route);
+      return true;
+    }
+
     // Always allow dashboard and settings
     if (route.includes('/admin') && (route.includes('/dashboard') || route.includes('/settings'))) {
       return true;

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit, Trash2, Star, MapPin, Phone, Mail, Users, Settings, X, Check, Wifi, Snowflake, Utensils, Sparkles, Shield, Car, Dumbbell, Tv, Refrigerator, Droplets, Sofa } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useSelector } from 'react-redux';
+import branchService from '../../services/branch.service';
 
 const BranchManagement = () => {
+  const { user } = useSelector((state) => state.auth);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,7 +35,8 @@ const BranchManagement = () => {
       availableRooms: 0
     },
     amenities: [],
-    status: 'active'
+    status: 'active',
+    isDefault: false
   });
 
   const amenitiesList = [
@@ -103,39 +107,112 @@ const BranchManagement = () => {
     }
   };
 
+  const validateForm = () => {
+    const { name, address, contact, maintainer } = formData;
+    
+    // Validate name
+    if (!name || name.trim() === '') {
+      toast.error('Branch name is required');
+      return false;
+    }
+    
+    // Validate address
+    if (!address.street || !address.city || !address.state || !address.pincode) {
+      toast.error('Please fill in all address fields (street, city, state, pincode)');
+      return false;
+    }
+    
+    // Validate contact
+    if (!contact.phone || !contact.email) {
+      toast.error('Contact phone and email are required');
+      return false;
+    }
+    
+    // Validate maintainer
+    if (!maintainer.name || !maintainer.mobile || !maintainer.email) {
+      toast.error('Maintainer details (name, mobile, email) are required');
+      return false;
+    }
+    
+    // Validate PG ID
+    if (!user?.pgId) {
+      toast.error('PG ID is required. Please contact support.');
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate form
+    if (!validateForm()) return;
+    
     try {
-      const url = editingBranch 
-        ? `/api/branches/${editingBranch._id}`
-        : '/api/branches';
+      setLoading(true);
       
-      const method = editingBranch ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
+      // Prepare branch data to match backend requirements
+      const branchData = {
+        pgId: user.pgId,  // Add PG ID from user context
+        name: formData.name.trim(),
+        address: {
+          street: formData.address.street.trim(),
+          city: formData.address.city.trim(),
+          state: formData.address.state.trim(),
+          pincode: formData.address.pincode.trim(),
+          landmark: (formData.address.landmark || '').trim()
         },
-        body: JSON.stringify(formData)
-      });
+        maintainer: {
+          name: formData.maintainer.name.trim(),
+          mobile: formData.maintainer.mobile.trim(),
+          email: formData.maintainer.email.trim()
+        },
+        contact: {
+          phone: formData.contact.phone.trim(),
+          email: formData.contact.email.trim(),
+          alternatePhone: (formData.contact.alternatePhone || '').trim()
+        },
+        capacity: {
+          totalRooms: formData.capacity.totalRooms || 0,
+          totalBeds: formData.capacity.totalBeds || 0,
+          availableRooms: formData.capacity.availableRooms || 0
+        },
+        amenities: formData.amenities || [],
+        status: formData.status || 'active',
+        isDefault: false  // Non-default branch by default
+      };
       
-      const data = await response.json();
+      // Determine API method and endpoint
+      const method = editingBranch ? 'updateBranch' : 'createBranch';
+      const apiCall = editingBranch 
+        ? () => branchService.updateBranch(editingBranch._id, branchData)
+        : () => branchService.createBranch(branchData);
       
-      if (data.success) {
-        toast.success(editingBranch ? 'Branch updated successfully' : 'Branch created successfully');
+      const response = await apiCall();
+      
+      if (response.success) {
+        toast.success(
+          editingBranch 
+            ? 'Branch updated successfully!' 
+            : 'Branch created successfully!'
+        );
+        
+        // Close form and reset
         setShowForm(false);
         setEditingBranch(null);
         resetForm();
+        
+        // Refresh branches list
         fetchBranches();
       } else {
-        toast.error(data.message || 'Failed to save branch');
+        toast.error(response.message || 'Failed to save branch');
       }
     } catch (error) {
       console.error('Error saving branch:', error);
-      toast.error('Failed to save branch');
+      toast.error('An error occurred while saving the branch');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -148,7 +225,8 @@ const BranchManagement = () => {
       contact: branch.contact,
       capacity: branch.capacity,
       amenities: branch.amenities || [],
-      status: branch.status
+      status: branch.status,
+      isDefault: branch.isDefault // Ensure isDefault is set
     });
     setShowForm(true);
   };
@@ -318,7 +396,8 @@ const BranchManagement = () => {
         availableRooms: 0
       },
       amenities: [],
-      status: 'active'
+      status: 'active',
+      isDefault: false
     });
   };
 

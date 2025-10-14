@@ -560,7 +560,13 @@ router.put('/rooms/:roomId', authenticate, adminOrSuperadmin, validateRoom, asyn
 
 router.delete('/rooms/:roomId', authenticate, adminOrSuperadmin, async (req, res) => {
   try {
-    const result = await RoomService.deleteRoom(req.params.roomId, req.user._id);
+    const roomId = req.params.roomId;
+    const userId = req.user._id;
+
+    // Use RoomService to delete room
+    const result = await RoomService.deleteRoom(roomId, userId);
+
+    // Return the result
     return res.status(result.statusCode).json(result);
   } catch (error) {
     console.error('Room routes error:', error);

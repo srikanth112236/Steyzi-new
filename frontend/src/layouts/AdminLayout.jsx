@@ -56,7 +56,14 @@ const MODULE_NAV_MAPPING = {
   room_allocation: ['room_availability'],
   qr_code_payments: ['qr-management'],
   ticket_system: ['tickets'],
-  analytics_reports: ['reports']
+  analytics_reports: ['reports'],
+  admin_management: ['admin_routes', 'user_management', 'system_settings', 'subscription_management'],
+  security_management: ['audit_logs', 'security_settings', 'access_control'],
+  bulk_upload: ['file_upload', 'data_validation', 'bulk_import'],
+  email_notifications: ['email_templates', 'email_sending', 'email_history'],
+  sms_notifications: ['sms_templates', 'sms_sending', 'sms_history'],
+  multi_branch: ['branch_management', 'branch_switching', 'branch_reports'],
+  custom_reports: ['report_builder', 'custom_queries', 'report_scheduling']
 };
 
 const AdminLayout = () => {
@@ -342,14 +349,14 @@ const AdminLayout = () => {
       icon: Building2
     },
     {
-      name: 'Usage Dashboard',
-      href: '/admin/usage-dashboard',
-      icon: BarChart3
-    },
-    {
       name: 'Cost Calculator',
       href: '/admin/cost-calculator',
       icon: Calculator
+    },
+    {
+      name: 'Usage Dashboard',
+      href: '/admin/usage-dashboard',
+      icon: BarChart3
     },
     {
       name: 'Self-Service Portal',
@@ -365,6 +372,12 @@ const AdminLayout = () => {
 
   // Filter navigation items based on subscription restrictions
   const getFilteredNavigationItems = () => {
+    // During trial period, show ALL navigation items
+    if (subscription?.billingCycle === 'trial' || subscription?.isTrialActive) {
+      console.log('🎉 Trial period active - showing all navigation items');
+      return navigationItems;
+    }
+
     return navigationItems
       .filter(item => {
         // Always show Dashboard and Settings
@@ -424,6 +437,12 @@ const AdminLayout = () => {
         return true;
       })
       .map(item => {
+        // During trial period, show all dropdown items
+        if ((subscription?.billingCycle === 'trial' || subscription?.isTrialActive) && item.name === 'Resident Management' && item.hasDropdown && item.dropdownItems) {
+          console.log('🎉 Trial period - showing all Resident Management dropdown items');
+          return item; // Return all items without filtering
+        }
+
         // Filter dropdown items for Resident Management
         if (item.name === 'Resident Management' && item.hasDropdown && item.dropdownItems) {
           const filteredDropdownItems = item.dropdownItems.filter(dropdownItem => {

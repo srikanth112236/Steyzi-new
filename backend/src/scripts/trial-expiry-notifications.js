@@ -12,7 +12,7 @@ require('dotenv').config();
  */
 async function sendTrialExpiryNotifications() {
   try {
-    logger.info('🔄 Starting trial expiry notification check...');
+    logger.log('info', '⏰ Starting trial expiry notification process...');
 
     // Calculate date 3 days from now
     const threeDaysFromNow = new Date();
@@ -28,7 +28,7 @@ async function sendTrialExpiryNotifications() {
       }
     }).populate('userId', 'firstName lastName email');
 
-    logger.info(`📧 Found ${expiringTrials.length} trials expiring in 3 days`);
+    logger.log('info', `📧 Found ${expiringTrials.length} trials expiring in 3 days`);
 
     for (const trial of expiringTrials) {
       try {
@@ -49,20 +49,20 @@ async function sendTrialExpiryNotifications() {
           expiryDate: trial.trialEndDate
         });
 
-        logger.info(`📧 Trial expiry notification sent to ${user.email} (${daysLeft} days left)`);
+        logger.log('info', `📧 Trial expiry notification sent to ${user.email} (${daysLeft} days left)`);
 
         // Add small delay to avoid overwhelming email service
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
-        logger.error(`❌ Error sending notification for trial ${trial._id}:`, error);
+        logger.log('error', `❌ Error sending notification for trial ${trial._id}:`, error);
       }
     }
 
-    logger.info('✅ Trial expiry notification check completed');
+    logger.log('info', '✅ Trial expiry notification check completed');
 
   } catch (error) {
-    logger.error('❌ Error in trial expiry notification check:', error);
+    logger.log('error', '❌ Error in trial expiry notification check:', error);
   }
 }
 
@@ -71,7 +71,7 @@ async function sendTrialExpiryNotifications() {
  */
 async function sendTrialExpiredNotifications() {
   try {
-    logger.info('🔄 Starting trial expired notification check...');
+    logger.log('info', '🔄 Starting trial expired notification check...');
 
     // Find trials that expired in the last 24 hours
     const yesterday = new Date();
@@ -86,7 +86,7 @@ async function sendTrialExpiredNotifications() {
       }
     }).populate('userId', 'firstName lastName email');
 
-    logger.info(`📧 Found ${expiredTrials.length} trials that expired recently`);
+    logger.log('info', `📧 Found ${expiredTrials.length} trials that expired recently`);
 
     for (const trial of expiredTrials) {
       try {
@@ -104,20 +104,20 @@ async function sendTrialExpiredNotifications() {
           expiredDate: trial.trialEndDate
         });
 
-        logger.info(`📧 Trial expired notification sent to ${user.email}`);
+        logger.log('info', `📧 Trial expired notification sent to ${user.email}`);
 
         // Add small delay
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
-        logger.error(`❌ Error sending expired notification for trial ${trial._id}:`, error);
+        logger.log('error', `❌ Error sending expired notification for trial ${trial._id}:`, error);
       }
     }
 
-    logger.info('✅ Trial expired notification check completed');
+    logger.log('info', '✅ Trial expired notification check completed');
 
   } catch (error) {
-    logger.error('❌ Error in trial expired notification check:', error);
+    logger.log('error', '❌ Error in trial expired notification check:', error);
   }
 }
 
@@ -125,42 +125,42 @@ async function sendTrialExpiredNotifications() {
  * Start the cron jobs for trial notifications
  */
 function startTrialNotificationCron() {
-  logger.info('🚀 Starting trial notification cron jobs...');
+  logger.log('info', '🚀 Starting trial notification cron jobs...');
 
   // Run trial expiry notifications daily at 9 AM
   cron.schedule('0 9 * * *', async () => {
-    logger.info('⏰ Running daily trial expiry notification check');
+    logger.log('info', '⏰ Running daily trial expiry notification check');
     await sendTrialExpiryNotifications();
   });
 
   // Run trial expired notifications daily at 10 AM
   cron.schedule('0 10 * * *', async () => {
-    logger.info('⏰ Running daily trial expired notification check');
+    logger.log('info', '⏰ Running daily trial expired notification check');
     await sendTrialExpiredNotifications();
   });
 
   // Also run immediately for testing
   if (process.env.NODE_ENV === 'development') {
-    logger.info('🧪 Running trial notifications immediately for testing');
+    logger.log('info', '🧪 Running trial notifications immediately for testing');
     setTimeout(() => {
       sendTrialExpiryNotifications();
       sendTrialExpiredNotifications();
     }, 5000); // 5 second delay
   }
 
-  logger.info('✅ Trial notification cron jobs started successfully');
+  logger.log('info', '✅ Trial notification cron jobs started successfully');
 }
 
 /**
  * Manual execution for testing
  */
 async function runManualCheck() {
-  logger.info('🔧 Running manual trial notification check...');
+  logger.log('info', '🔧 Running manual trial notification check...');
 
   // Connect to database if not connected
   if (mongoose.connection.readyState !== 1) {
     await mongoose.connect(process.env.MONGODB_URI);
-    logger.info('📡 Connected to MongoDB');
+    logger.log('info', '📡 Connected to MongoDB');
   }
 
   await sendTrialExpiryNotifications();
@@ -169,7 +169,7 @@ async function runManualCheck() {
   // Disconnect if we connected manually
   if (mongoose.connection.readyState === 1) {
     await mongoose.disconnect();
-    logger.info('📡 Disconnected from MongoDB');
+    logger.log('info', '📡 Disconnected from MongoDB');
   }
 }
 
@@ -185,11 +185,11 @@ module.exports = {
 if (require.main === module) {
   runManualCheck()
     .then(() => {
-      logger.info('✅ Manual trial notification check completed');
+      logger.log('info', '✅ Manual trial notification check completed');
       process.exit(0);
     })
     .catch((error) => {
-      logger.error('❌ Manual trial notification check failed:', error);
+      logger.log('error', '❌ Manual trial notification check failed:', error);
       process.exit(1);
     });
 }

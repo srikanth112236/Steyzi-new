@@ -13,7 +13,7 @@ const getWebSocketService = (req) => {
  */
 exports.getMySubscription = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate('subscription.planId');
+    const user = await User.findById(req.user._id).populate('subscription.planId').populate('subscription.planId');
 
     if (!user) {
       return res.status(404).json({
@@ -69,8 +69,8 @@ exports.getMySubscription = async (req, res) => {
 
     // Get max beds (considering custom pricing)
     const plan = user.subscription.planId;
-    const maxBeds = user.subscription.customPricing?.maxBedsAllowed || 
-                    plan.maxBedsAllowed || 
+    const maxBeds = user.subscription.customPricing?.maxBedsAllowed ||
+                    plan?.maxBedsAllowed || 
                     plan.baseBedCount;
 
     // Determine billing cycle
@@ -93,7 +93,7 @@ exports.getMySubscription = async (req, res) => {
       success: true,
       data: {
         plan: user.subscription.planId,
-        planId: user.subscription.planId._id,
+        planId: user.subscription.planId?._id,
         status: user.subscription.status,
         billingCycle: billingCycle,
         isTrialActive: isTrialActive,
@@ -216,7 +216,7 @@ exports.updateSubscriptionUsage = async (req, res) => {
   try {
     const { bedsUsed, branchesUsed } = req.body;
 
-    const user = await User.findById(req.user._id).populate('subscription.planId');
+    const user = await User.findById(req.user._id).populate('subscription.planId').populate('subscription.planId');
     
     if (!user) {
       return res.status(404).json({
@@ -281,7 +281,7 @@ exports.checkRestrictions = async (req, res) => {
   try {
     const { resourceType, count } = req.query;
 
-    const user = await User.findById(req.user._id).populate('subscription.planId');
+    const user = await User.findById(req.user._id).populate('subscription.planId').populate('subscription.planId');
 
     if (!user) {
       return res.status(404).json({
@@ -304,7 +304,7 @@ exports.checkRestrictions = async (req, res) => {
     }
 
     const plan = user.subscription.planId;
-    const usage = user.subscription.usage;
+    const usage = user.subscription.usage || { bedsUsed: 0, branchesUsed: 0 };
 
     // Check bed restrictions
     if (resourceType === 'beds') {
@@ -373,7 +373,7 @@ exports.addBedsToSubscription = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user._id).populate('subscription.planId');
+    const user = await User.findById(req.user._id).populate('subscription.planId').populate('subscription.planId');
 
     if (!user) {
       return res.status(404).json({
@@ -390,7 +390,14 @@ exports.addBedsToSubscription = async (req, res) => {
     }
 
     const plan = user.subscription.planId;
-    
+
+    if (!plan) {
+      return res.status(400).json({
+        success: false,
+        message: 'No subscription plan found'
+      });
+    }
+
     // Calculate new pricing
     const baseBedCount = parseInt(plan.baseBedCount) || 0;
     const topUpPricePerBed = parseFloat(plan.topUpPricePerBed) || 0;
@@ -493,7 +500,7 @@ exports.addBranchesToSubscription = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user._id).populate('subscription.planId');
+    const user = await User.findById(req.user._id).populate('subscription.planId').populate('subscription.planId');
 
     if (!user) {
       return res.status(404).json({
@@ -510,6 +517,13 @@ exports.addBranchesToSubscription = async (req, res) => {
     }
 
     const plan = user.subscription.planId;
+
+    if (!plan) {
+      return res.status(400).json({
+        success: false,
+        message: 'No subscription plan found'
+      });
+    }
 
     // Check if plan allows multiple branches
     if (!plan.allowMultipleBranches) {

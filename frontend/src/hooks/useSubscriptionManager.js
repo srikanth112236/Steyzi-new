@@ -1,227 +1,182 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import subscriptionManager from '../services/subscriptionManager.service';
-import toast from 'react-hot-toast';
+import logger from '../utils/logging';
 
 /**
  * Custom hook for managing subscription state and events
- * Provides real-time subscription monitoring, warnings, and permission checks
- * @param {boolean} enabled - Whether to enable the subscription manager (default: true)
+ * @returns {Object} Subscription management utilities
  */
-export const useSubscriptionManager = (enabled = true) => {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [subscriptionEvents, setSubscriptionEvents] = useState([]);
+export const useSubscriptionManager = () => {
+  // Get subscription from Redux store
   const subscription = useSelector(state => state.auth.subscription);
   const isAuthenticated = useSelector(state => state.auth.isAuthenticated);
-  const eventHistoryRef = useRef([]);
+  
+  // Local state for subscription events
+  const [subscriptionEvent, setSubscriptionEvent] = useState(null);
+  const [subscriptionError, setSubscriptionError] = useState(null);
 
-  // Maximum events to keep in history
-  const MAX_EVENT_HISTORY = 50;
-
-  /**
-   * Add event to history
-   */
-  const addEventToHistory = useCallback((event, data) => {
-    const eventEntry = {
-      id: Date.now() + Math.random(),
-      type: event,
-      data,
-      timestamp: new Date().toISOString()
-    };
-
-    eventHistoryRef.current = [eventEntry, ...eventHistoryRef.current].slice(0, MAX_EVENT_HISTORY);
-    setSubscriptionEvents([...eventHistoryRef.current]);
+  // Callback to handle subscription events
+  const handleSubscriptionEvent = useCallback((eventType, eventData) => {
+    logger.info(`Subscription Event: ${eventType}`, eventData);
+    setSubscriptionEvent({ type: eventType, data: eventData });
   }, []);
 
-  /**
-   * Initialize subscription manager
-   */
+  // Callback to handle subscription errors
+  const handleSubscriptionError = useCallback((error) => {
+    logger.error('Subscription Error', error);
+    setSubscriptionError(error);
+  }, []);
+
+  // Effect to set up and clean up subscription event listeners
   useEffect(() => {
-    if (enabled && isAuthenticated && !isInitialized) {
-      console.log('🚀 Initializing subscription manager hook');
+    // Only set up listeners if authenticated
+    if (!isAuthenticated) return;
 
-      // Setup event listeners
-      subscriptionManager.on('subscriptionChecked', (data) => {
-        addEventToHistory('subscriptionChecked', data);
-      });
+    // Event listeners
+    const listeners = [
+      subscriptionManager.on('initialized', (data) => 
+        handleSubscriptionEvent('initialized', data)
+      ),
+      subscriptionManager.on('trialExpiringSoon', (data) => 
+        handleSubscriptionEvent('trialExpiringSoon', data)
+      ),
+      subscriptionManager.on('trialExpired', (data) => 
+        handleSubscriptionEvent('trialExpired', data)
+      ),
+      subscriptionManager.on('noSubscription', () => 
+        handleSubscriptionEvent('noSubscription', null)
+      ),
+      subscriptionManager.on('restrictionsChecked', (data) => 
+        handleSubscriptionEvent('restrictionsChecked', data)
+      ),
+      subscriptionManager.on('error', (error) => 
+        handleSubscriptionError(error)
+      )
+    ];
 
-      subscriptionManager.on('subscriptionCheckFailed', (data) => {
-        addEventToHistory('subscriptionCheckFailed', data);
-        console.error('Subscription check failed:', data.error);
-      });
-
-      subscriptionManager.on('subscriptionUpdated', (data) => {
-        addEventToHistory('subscriptionUpdated', data);
-        toast.success('Subscription updated successfully');
-      });
-
-      subscriptionManager.on('trialExpiringSoon', (data) => {
-        addEventToHistory('trialExpiringSoon', data);
-        toast.warning(
-          `Your trial expires in ${data.daysRemaining} day${data.daysRemaining !== 1 ? 's' : ''}. Upgrade now to continue using all features.`,
-          { duration: 8000 }
-        );
-      });
-
-      subscriptionManager.on('trialExpired', (data) => {
-        addEventToHistory('trialExpired', data);
-        toast.error(
-          'Your trial has expired. Please upgrade your plan to continue using the service.',
-          { duration: 10000 }
-        );
-      });
-
-      subscriptionManager.on('subscriptionExpired', (data) => {
-        addEventToHistory('subscriptionExpired', data);
-        toast.error(
-          'Your subscription has expired. Please renew to continue using the service.',
-          { duration: 10000 }
-        );
-      });
-
-      subscriptionManager.on('bedLimitWarning', (data) => {
-        addEventToHistory('bedLimitWarning', data);
-        const remainingBeds = data.limit - data.current;
-        toast.warning(
-          `You're approaching your bed limit (${data.current}/${data.limit}). ${remainingBeds} beds remaining.`,
-          { duration: 6000 }
-        );
-      });
-
-      subscriptionManager.on('branchLimitWarning', (data) => {
-        addEventToHistory('branchLimitWarning', data);
-        const remainingBranches = data.limit - data.current;
-        toast.warning(
-          `You're approaching your branch limit (${data.current}/${data.limit}). ${remainingBranches} branches remaining.`,
-          { duration: 6000 }
-        );
-      });
-
-      // Initialize the manager
-      subscriptionManager.initialize();
-      setIsInitialized(true);
-    }
-
-    // Cleanup when user logs out or when disabled
+    // Cleanup function
     return () => {
-      if ((!enabled || !isAuthenticated) && isInitialized) {
-        console.log('🗑️ Cleaning up subscription manager hook');
-        subscriptionManager.destroy();
-        setIsInitialized(false);
-        eventHistoryRef.current = [];
-        setSubscriptionEvents([]);
-      }
+      // Remove all event listeners
+      listeners.forEach(unsubscribe => unsubscribe());
     };
-  }, [enabled, isAuthenticated, isInitialized, addEventToHistory]);
+  }, [isAuthenticated, handleSubscriptionEvent, handleSubscriptionError]);
 
-  /**
-   * Check if user can perform an action
-   */
-  const canPerformAction = useCallback((action, context = {}) => {
-    return subscriptionManager.canPerformAction(action, context);
-  }, []);
+  // Methods to interact with subscription
+  const methods = {
+    /**
+     * Check if a specific action is allowed based on subscription
+     * @param {string} action - Action to check
+     * @param {Object} context - Additional context for the action
+     * @returns {boolean} Whether the action is allowed
+     */
+    canPerformAction: (action, context = {}) => {
+      if (!subscription) return false;
 
-  /**
-   * Check if user can add beds
-   */
-  const canAddBed = useCallback((additionalBeds = 1) => {
-    return subscriptionManager.canAddBed({ additionalBeds });
-  }, []);
+      switch (action) {
+        case 'addBed':
+          return subscription.restrictions?.maxBeds > 
+            (subscription.usage?.bedsUsed || 0);
+        
+        case 'addBranch':
+          return subscription.restrictions?.maxBranches > 
+            (subscription.usage?.branchesUsed || 0);
+        
+        case 'accessModule':
+          return subscription.restrictions?.modules?.some(
+            module => module.name === context.moduleName
+          );
+        
+        default:
+          return true;
+      }
+    },
 
-  /**
-   * Check if user can add branches
-   */
-  const canAddBranch = useCallback((additionalBranches = 1) => {
-    return subscriptionManager.canAddBranch({ additionalBranches });
-  }, []);
+    /**
+     * Check if rooms can be added based on subscription
+     * @param {number} roomsToAdd - Number of rooms to add
+     * @returns {Object} Room addition validation result
+     */
+    canAddRooms: (roomsToAdd = 1) => {
+      if (!subscription?.restrictions) return { 
+        allowed: false, 
+        message: 'No subscription restrictions found' 
+      };
 
-  /**
-   * Check if user can access a module
-   */
-  const canAccessModule = useCallback((moduleName, submoduleName = null, permission = null) => {
-    return subscriptionManager.canAccessModule(moduleName, submoduleName, permission);
-  }, []);
+      const maxAllowedRooms = subscription.restrictions.maxRooms || 5;
+      const currentRooms = subscription.usage?.roomsUsed || 0;
 
-  /**
-   * Check if user can access a feature
-   */
-  const canAccessFeature = useCallback((featureName) => {
-    return subscriptionManager.canAccessFeature(featureName);
-  }, []);
+      return {
+        allowed: currentRooms + roomsToAdd <= maxAllowedRooms,
+        currentRooms,
+        maxAllowedRooms,
+        remainingRooms: maxAllowedRooms - (currentRooms + roomsToAdd),
+        requiresUpgrade: currentRooms + roomsToAdd > maxAllowedRooms
+      };
+    },
 
   /**
    * Get remaining resources
-   */
-  const getRemainingResources = useCallback(() => {
-    return subscriptionManager.getRemainingResources();
-  }, []);
+     * @returns {Object} Remaining resources
+     */
+    getRemainingResources: () => {
+      if (!subscription?.restrictions || !subscription?.usage) return {};
 
-  /**
-   * Get subscription status summary
-   */
-  const getSubscriptionSummary = useCallback(() => {
-    return subscriptionManager.getSubscriptionSummary();
-  }, []);
+      return {
+        beds: Math.max(0, subscription.restrictions.maxBeds - 
+          (subscription.usage.bedsUsed || 0)),
+        branches: Math.max(0, subscription.restrictions.maxBranches - 
+          (subscription.usage.branchesUsed || 0)),
+        rooms: Math.max(0, subscription.restrictions.maxRooms - 
+          (subscription.usage.roomsUsed || 0))
+      };
+    },
 
-  /**
-   * Force refresh subscription data
-   */
-  const forceRefresh = useCallback(async () => {
-    try {
-      await subscriptionManager.forceRefresh();
-      toast.success('Subscription data refreshed');
-    } catch (error) {
-      toast.error('Failed to refresh subscription data');
-      console.error('Force refresh failed:', error);
-    }
-  }, []);
+    /**
+     * Get subscription summary
+     * @returns {Object} Subscription summary
+     */
+    getSubscriptionSummary: () => {
+      if (!subscription) return null;
+
+      return {
+        status: subscription.status,
+        planName: subscription.plan?.planName || 'Free',
+        isTrialActive: subscription.isTrialActive,
+        trialDaysRemaining: subscription.trialDaysRemaining || 0,
+        restrictions: subscription.restrictions,
+        usage: subscription.usage
+      };
+    },
 
   /**
    * Get subscription health status
+     * @returns {Object|null} Subscription health details
    */
-  const getSubscriptionHealth = useCallback(() => {
+    getSubscriptionHealth: () => {
     return subscriptionManager.getSubscriptionHealth();
-  }, [subscription]);
+    },
 
-  /**
-   * Clear event history
-   */
-  const clearEventHistory = useCallback(() => {
-    eventHistoryRef.current = [];
-    setSubscriptionEvents([]);
-  }, []);
-
-  /**
-   * Get recent events
-   */
-  const getRecentEvents = useCallback((limit = 10) => {
-    return eventHistoryRef.current.slice(0, limit);
-  }, []);
-
-  /**
-   * Event listener functions
-   */
-  const on = useCallback((event, callback) => {
-    return subscriptionManager.on(event, callback);
-  }, []);
-
-  const off = useCallback((event, callback) => {
-    return subscriptionManager.off(event, callback);
-  }, []);
+    /**
+     * Force refresh of subscription data
+     * @returns {Promise<void>}
+     */
+    forceRefresh: async () => {
+      try {
+        // If you have a method to refresh subscription in the future
+        logger.info('Forcing subscription data refresh');
+        // Placeholder for future implementation
+      } catch (error) {
+        logger.error('Failed to refresh subscription data', error);
+      }
+    }
+  };
 
   // Make subscription manager globally available for debugging
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.subscriptionManager = {
-        canPerformAction,
-        canAddBed,
-        canAddBranch,
-        canAccessModule,
-        getRemainingResources,
-        getSubscriptionSummary,
-        getSubscriptionHealth,
-        forceRefresh,
-        getRecentEvents,
+        ...methods,
         on: (event, callback) => subscriptionManager.on(event, callback),
         off: (event, callback) => subscriptionManager.off(event, callback)
       };
@@ -232,34 +187,13 @@ export const useSubscriptionManager = (enabled = true) => {
         delete window.subscriptionManager;
       }
     };
-  }, [canPerformAction, canAddBed, canAddBranch, canAccessModule, getRemainingResources, getSubscriptionSummary, getSubscriptionHealth, forceRefresh, getRecentEvents, on, off]);
+  }, [methods]);
 
   return {
-    // State
     subscription,
-    isInitialized,
-    subscriptionEvents,
-
-    // Permission checks
-    canPerformAction,
-    canAddBed,
-    canAddBranch,
-    canAccessModule,
-    canAccessFeature,
-
-    // Resource information
-    getRemainingResources,
-    getSubscriptionSummary,
-    getSubscriptionHealth,
-
-    // Actions
-    forceRefresh,
-    clearEventHistory,
-    getRecentEvents,
-
-    // Event management
-    on,
-    off
+    subscriptionEvent,
+    subscriptionError,
+    ...methods
   };
 };
 

@@ -20,13 +20,25 @@ const ResidentForm = ({ isOpen, onClose, onSubmit, editingResident, selectedBran
     workDetails: {
       company: '',
       designation: '',
-      workAddress: ''
+      workAddress: {
+        street: '',
+        city: '',
+        state: '',
+        pincode: '',
+        country: 'India'
+      }
     },
     emergencyContact: {
       name: '',
       relationship: '',
       phone: '',
-      address: ''
+      address: {
+        street: '',
+        city: '',
+        state: '',
+        pincode: '',
+        country: 'India'
+      }
     },
     checkInDate: '',
     contractStartDate: '',
@@ -53,13 +65,49 @@ const ResidentForm = ({ isOpen, onClose, onSubmit, editingResident, selectedBran
         workDetails: {
           company: editingResident.workDetails?.company || '',
           designation: editingResident.workDetails?.designation || '',
-          workAddress: editingResident.workDetails?.workAddress || ''
+          workAddress: (() => {
+            const workAddr = editingResident.workDetails?.workAddress;
+            if (typeof workAddr === 'string') {
+              return {
+                street: workAddr,
+                city: '',
+                state: '',
+                pincode: '',
+                country: 'India'
+              };
+            }
+            return workAddr || {
+              street: '',
+              city: '',
+              state: '',
+              pincode: '',
+              country: 'India'
+            };
+          })()
         },
         emergencyContact: {
           name: editingResident.emergencyContact?.name || '',
           relationship: editingResident.emergencyContact?.relationship || '',
           phone: editingResident.emergencyContact?.phone || '',
-          address: editingResident.emergencyContact?.address || ''
+          address: (() => {
+            const emergencyAddr = editingResident.emergencyContact?.address;
+            if (typeof emergencyAddr === 'string') {
+              return {
+                street: emergencyAddr,
+                city: '',
+                state: '',
+                pincode: '',
+                country: 'India'
+              };
+            }
+            return emergencyAddr || {
+              street: '',
+              city: '',
+              state: '',
+              pincode: '',
+              country: 'India'
+            };
+          })()
         },
         checkInDate: editingResident.checkInDate ? new Date(editingResident.checkInDate).toISOString().split('T')[0] : '',
         contractStartDate: editingResident.contractStartDate ? new Date(editingResident.contractStartDate).toISOString().split('T')[0] : '',
@@ -348,15 +396,40 @@ const ResidentForm = ({ isOpen, onClose, onSubmit, editingResident, selectedBran
                       placeholder="Enter job title"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <label className="block text-sm font-semibold text-gray-700">Work Address</label>
+                  <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={formData.workDetails.workAddress.street}
+                        onChange={(e) => handleChange('workDetails.workAddress.street', e.target.value)}
+                        className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                        placeholder="Street address"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={formData.workDetails.workAddress.city}
+                          onChange={(e) => handleChange('workDetails.workAddress.city', e.target.value)}
+                          className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                          placeholder="City"
+                        />
+                        <input
+                          type="text"
+                          value={formData.workDetails.workAddress.state}
+                          onChange={(e) => handleChange('workDetails.workAddress.state', e.target.value)}
+                          className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                          placeholder="State"
+                        />
+                      </div>
                     <input
                       type="text"
-                      value={formData.workDetails.workAddress}
-                      onChange={(e) => handleChange('workDetails.workAddress', e.target.value)}
+                        value={formData.workDetails.workAddress.pincode}
+                        onChange={(e) => handleChange('workDetails.workAddress.pincode', e.target.value)}
                       className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-                      placeholder="Enter work address"
+                        placeholder="Pincode"
                     />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -409,16 +482,44 @@ const ResidentForm = ({ isOpen, onClose, onSubmit, editingResident, selectedBran
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <label className="block text-sm font-semibold text-gray-700">Contact Address *</label>
-                    <textarea
-                      value={formData.emergencyContact.address}
-                      onChange={(e) => handleChange('emergencyContact.address', e.target.value)}
-                      rows={3}
-                      className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400 resize-none"
-                      placeholder="Enter contact address"
+                  <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={formData.emergencyContact.address.street}
+                        onChange={(e) => handleChange('emergencyContact.address.street', e.target.value)}
+                        className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                        placeholder="Street address"
+                        required
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={formData.emergencyContact.address.city}
+                          onChange={(e) => handleChange('emergencyContact.address.city', e.target.value)}
+                          className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                          placeholder="City"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={formData.emergencyContact.address.state}
+                          onChange={(e) => handleChange('emergencyContact.address.state', e.target.value)}
+                          className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                          placeholder="State"
+                          required
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.emergencyContact.address.pincode}
+                        onChange={(e) => handleChange('emergencyContact.address.pincode', e.target.value)}
+                        className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
+                        placeholder="Pincode"
                       required
                     />
+                    </div>
                   </div>
                 </div>
               </div>

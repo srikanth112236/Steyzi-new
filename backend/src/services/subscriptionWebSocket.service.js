@@ -131,7 +131,7 @@ class SubscriptionWebSocketService {
 
       if (subscription) {
         // Find all users with this subscription plan
-        const users = await User.find({ 'subscription.planId': subscription._id });
+        const users = await User.find({ 'subscription.planId': subscription._id }).populate('subscription.planId');
 
         for (const user of users) {
           await this.sendSubscriptionUpdate(user._id);

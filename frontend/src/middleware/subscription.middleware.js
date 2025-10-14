@@ -92,11 +92,19 @@ const RESOURCE_CHECKS = {
 const checkSubscriptionPermission = (url, method, data = null) => {
   const state = store.getState();
   const subscription = state.auth.subscription;
+  const userRole = state.auth.user?.role;
 
   // Allow auth and trial activation requests for all subscription statuses
   console.log('🔍 Subscription middleware checking URL:', url);
   if (url.includes('/auth/') || url.includes('/activate-trial')) {
     console.log('✅ Allowing request:', url);
+    return { allowed: true };
+  }
+
+  // Completely bypass subscription checks for superadmin and other privileged roles
+  const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
+  if (bypassRoles.includes(userRole)) {
+    console.log(`🎉 Bypassing ALL subscription checks for role: ${userRole}`);
     return { allowed: true };
   }
 

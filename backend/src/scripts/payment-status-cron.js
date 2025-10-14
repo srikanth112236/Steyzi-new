@@ -11,7 +11,7 @@ const setupPaymentStatusCron = () => {
   cron.schedule('1 0 * * *', async () => {
     try {
       console.log('🕐 Payment Status Cron: Starting daily payment status update...');
-      logger.info('Payment Status Cron: Starting daily payment status update');
+      logger.log('info', 'Payment Status Cron: Starting daily payment status update');
       
       // Get all PGs and update payment status for each
       const Pg = require('../models/pg.model');
@@ -25,20 +25,20 @@ const setupPaymentStatusCron = () => {
           if (result.success) {
             totalUpdated += result.data.updatedCount || 0;
             console.log(`✅ Updated ${result.data.updatedCount || 0} residents in PG: ${pg.name}`);
-            logger.info(`Updated ${result.data.updatedCount || 0} residents in PG: ${pg.name}`);
+            logger.log('info', `Updated ${result.data.updatedCount || 0} residents in PG: ${pg.name}`);
           }
         } catch (error) {
           console.error(`❌ Error updating residents in PG ${pg.name}:`, error.message);
-          logger.error(`Error updating residents in PG ${pg.name}: ${error.message}`);
+          logger.log('error', `Error updating residents in PG ${pg.name}: ${error.message}`);
         }
       }
       
       console.log(`🎉 Payment Status Cron: Completed! Total updated: ${totalUpdated} residents`);
-      logger.info(`Payment Status Cron: Completed! Total updated: ${totalUpdated} residents`);
+      logger.log('info', `Payment Status Cron: Completed! Total updated: ${totalUpdated} residents`);
       
     } catch (error) {
       console.error('❌ Payment Status Cron: Error in daily update:', error);
-      logger.error(`Payment Status Cron: Error in daily update: ${error.message}`);
+      logger.log('error', `Payment Status Cron: Error in daily update: ${error.message}`);
     }
   }, {
     scheduled: true,
@@ -46,7 +46,7 @@ const setupPaymentStatusCron = () => {
   });
   
   console.log('✅ Payment Status Cron: Scheduled daily at 12:01 AM IST');
-  logger.info('Payment Status Cron: Scheduled daily at 12:01 AM IST');
+  logger.log('info', 'Payment Status Cron: Scheduled daily at 12:01 AM IST');
 };
 
 module.exports = { setupPaymentStatusCron }; 

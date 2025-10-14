@@ -3,6 +3,48 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+// Add Onboarding Schema
+const userOnboardingSchema = new mongoose.Schema({
+  pgCreation: {
+    status: { 
+      type: String, 
+      enum: ['not_started', 'in_progress', 'completed'],
+      default: 'not_started'
+    },
+    pgId: { type: mongoose.Schema.Types.ObjectId, ref: 'PG' },
+    completedAt: Date
+  },
+  branchSetup: {
+    status: { 
+      type: String, 
+      enum: ['not_started', 'in_progress', 'completed'],
+      default: 'not_started'
+    },
+    defaultBranchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
+    completedAt: Date
+  },
+  pgConfiguration: {
+    status: { 
+      type: String, 
+      enum: ['not_started', 'in_progress', 'completed'],
+      default: 'not_started'
+    },
+    sharingTypesConfigured: { type: Boolean, default: false },
+    completedAt: Date
+  },
+  currentOnboardingStep: {
+    type: String,
+    enum: [
+      'pg_creation', 
+      'branch_setup', 
+      'pg_configuration', 
+      'completed'
+    ],
+    default: 'pg_creation'
+  }
+}, { _id: false });
+
+// Modify existing user schema to include onboarding
 const userSchema = new mongoose.Schema({
   // Basic Information
   firstName: {
@@ -66,7 +108,8 @@ const userSchema = new mongoose.Schema({
     planId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Subscription',
-      default: null
+      default: null,
+      strictPopulate: false
     },
     status: {
       type: String,
@@ -250,6 +293,12 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     default: null
+  },
+
+  // Onboarding
+  onboarding: {
+    type: userOnboardingSchema,
+    default: () => ({})
   }
 }, {
   timestamps: true

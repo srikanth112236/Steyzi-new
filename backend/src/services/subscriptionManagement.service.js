@@ -84,6 +84,29 @@ class SubscriptionManagementService {
       // Save the new subscription
       await newSubscription.save();
 
+      // Update user's subscription data
+      const user = await User.findById(userId);
+      if (user) {
+        user.subscription = {
+          planId: subscriptionPlanId,
+          status: billingCycle === 'trial' ? 'trial' : 'active',
+          startDate: startDate,
+          endDate: endDate,
+          trialEndDate: billingCycle === 'trial' ? trialEndDate : null,
+          autoRenew: true,
+          totalBeds: totalBeds,
+          totalBranches: totalBranches || 1,
+          totalPrice: totalPrice,
+          basePrice: subscriptionPlan.basePrice,
+          billingCycle: billingCycle,
+          usage: {
+            bedsUsed: 0,
+            branchesUsed: 1
+          }
+        };
+        await user.save();
+      }
+
       // Update plan's subscribed count
       subscriptionPlan.subscribedCount += 1;
       await subscriptionPlan.save();
@@ -361,6 +384,83 @@ class SubscriptionManagementService {
   }
 
   /**
+   * Migrate existing UserSubscription data to user.subscription field
+   * This ensures backward compatibility for existing subscriptions
+   */
+  async migrateExistingSubscriptions() {
+    try {
+      console.log('Starting subscription migration...');
+
+      // Find all active subscriptions from UserSubscription collection
+      const activeSubscriptions = await UserSubscription.find({
+        status: { $in: ['active', 'trial'] },
+        endDate: { $gt: new Date() }
+      }).sort({ createdAt: -1 });
+
+      console.log(`Found ${activeSubscriptions.length} active subscriptions to migrate`);
+
+      let migratedCount = 0;
+      const processedUsers = new Set();
+
+      for (const sub of activeSubscriptions) {
+        // Skip if we've already processed this user
+        if (processedUsers.has(sub.userId.toString())) {
+          continue;
+        }
+
+        try {
+          const user = await User.findById(sub.userId);
+          if (!user) {
+            console.log(`User ${sub.userId} not found, skipping`);
+            continue;
+          }
+
+          // Update user's subscription field with the latest active subscription
+          user.subscription = {
+            planId: sub.subscriptionPlanId,
+            status: sub.status,
+            startDate: sub.startDate,
+            endDate: sub.endDate,
+            trialEndDate: sub.trialEndDate,
+            autoRenew: sub.autoRenew || true,
+            totalBeds: sub.totalBeds,
+            totalBranches: sub.totalBranches,
+            totalPrice: sub.totalPrice,
+            basePrice: sub.basePrice,
+            billingCycle: sub.billingCycle,
+            usage: {
+              bedsUsed: sub.currentBedUsage || 0,
+              branchesUsed: sub.currentBranchUsage || 1
+            }
+          };
+
+          await user.save();
+          migratedCount++;
+          processedUsers.add(sub.userId.toString());
+
+          console.log(`Migrated subscription for user ${user.firstName} ${user.lastName}`);
+        } catch (userError) {
+          console.error(`Error migrating subscription for user ${sub.userId}:`, userError.message);
+        }
+      }
+
+      console.log(`Migration completed. Migrated ${migratedCount} users.`);
+
+      return {
+        success: true,
+        migratedCount,
+        totalFound: activeSubscriptions.length
+      };
+    } catch (error) {
+      console.error('Error during subscription migration:', error);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
+  /**
    * Check and handle trial expiration for all users
    */
   async checkAndHandleTrialExpirations() {
@@ -582,55 +682,123 @@ class SubscriptionManagementService {
    */
   async getAllSubscribers(filters = {}) {
     try {
-      const query = {};
+      // Build query for users with subscriptions
+      let userQuery = {};
 
-      // Apply filters
-      if (filters.status) {
-        query.status = filters.status;
+      // Handle status filter
+      if (filters.status === 'all' || !filters.status) {
+        // Show all users with any subscription status except 'free'
+        userQuery = {
+          'subscription.status': { $in: ['active', 'trial', 'expired', 'cancelled'] }
+        };
+      } else {
+        // Filter by specific status
+        userQuery = {
+          'subscription.status': filters.status
+        };
       }
-      if (filters.billingCycle) {
-        query.billingCycle = filters.billingCycle;
+
+      if (filters.billingCycle && filters.billingCycle !== 'all') {
+        userQuery['subscription.billingCycle'] = filters.billingCycle;
       }
-      if (filters.subscriptionPlanId) {
-        query.subscriptionPlanId = filters.subscriptionPlanId;
+
+      if (filters.subscriptionPlanId && filters.subscriptionPlanId !== 'all') {
+        userQuery['subscription.planId'] = filters.subscriptionPlanId;
       }
-      if (filters.userRole) {
-        // Need to populate user and filter by role
-        const usersWithRole = await User.find({ role: filters.userRole }).select('_id');
-        const userIds = usersWithRole.map(u => u._id);
-        query.userId = { $in: userIds };
+
+      if (filters.userRole && filters.userRole !== 'all') {
+        userQuery.role = filters.userRole;
       }
 
       // Date range filters
       if (filters.startDate) {
-        query.startDate = { $gte: new Date(filters.startDate) };
+        userQuery['subscription.startDate'] = { $gte: new Date(filters.startDate) };
       }
       if (filters.endDate) {
-        query.endDate = { $lte: new Date(filters.endDate) };
+        userQuery['subscription.endDate'] = { $lte: new Date(filters.endDate) };
       }
 
-      const subscribers = await UserSubscription.find(query)
-        .populate('userId', 'firstName lastName email role pgId createdAt')
-        .populate('subscriptionPlanId', 'planName billingCycle basePrice')
-        .populate('previousSubscriptionId', 'subscriptionPlanId startDate')
-        .sort({ createdAt: -1 });
+      // Find users with subscriptions
+      const subscribers = await User.find(userQuery)
+        .populate('subscription.planId', 'planName billingCycle basePrice features')
+        .populate('pgId', 'name email')
+        .sort({ 'subscription.startDate': -1 })
+        .limit(100); // Limit for performance
 
-      // Add virtual fields
-      const subscribersWithVirtuals = subscribers.map(sub => {
-        const subObj = sub.toObject();
-        subObj.durationDays = sub.durationDays;
-        subObj.daysRemaining = sub.daysRemaining;
-        subObj.trialDaysRemaining = sub.trialDaysRemaining;
-        subObj.isExpiringSoon = sub.isExpiringSoon;
-        subObj.isExpired = sub.isExpired;
-        subObj.isTrialActive = sub.isTrialActive;
-        return subObj;
+      // Transform data to match expected format
+      const transformedSubscribers = subscribers.map(user => {
+        const subscription = user.subscription;
+
+        // Skip users without subscription data
+        if (!subscription || !subscription.status) {
+          return null;
+        }
+
+        const plan = subscription.planId;
+
+        // Calculate additional fields
+        const now = new Date();
+        const endDate = subscription.endDate ? new Date(subscription.endDate) : null;
+        const trialEndDate = subscription.trialEndDate ? new Date(subscription.trialEndDate) : null;
+
+        const daysRemaining = endDate ? Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)) : null;
+        const trialDaysRemaining = trialEndDate ?
+          Math.ceil((trialEndDate - now) / (1000 * 60 * 60 * 24)) : null;
+
+        const isExpiringSoon = daysRemaining <= 30 && daysRemaining > 0;
+        const isExpired = daysRemaining < 0;
+        const isTrialActive = subscription.status === 'trial' && trialDaysRemaining > 0;
+
+        return {
+          _id: user._id,
+          userId: {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            pgId: user.pgId
+          },
+          subscriptionPlanId: plan ? {
+            _id: plan._id,
+            planName: plan.planName,
+            billingCycle: plan.billingCycle,
+            basePrice: plan.basePrice,
+            features: plan.features
+          } : null,
+          billingCycle: subscription.billingCycle,
+          startDate: subscription.startDate,
+          endDate: subscription.endDate,
+          trialEndDate: subscription.trialEndDate,
+          basePrice: subscription.basePrice || 0,
+          totalPrice: subscription.totalPrice || subscription.basePrice || 0,
+          totalBeds: subscription.totalBeds,
+          totalBranches: subscription.totalBranches,
+          currentBedUsage: subscription.usage?.bedsUsed || 0,
+          currentBranchUsage: subscription.usage?.branchesUsed || 1,
+          status: subscription.status,
+          paymentStatus: 'completed', // Assume completed for active subscriptions
+          createdBy: user._id,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+
+          // Virtual fields
+          durationDays: Math.ceil((endDate - new Date(subscription.startDate)) / (1000 * 60 * 60 * 24)),
+          daysRemaining: daysRemaining,
+          trialDaysRemaining: trialDaysRemaining,
+          isExpiringSoon: isExpiringSoon,
+          isExpired: isExpired,
+          isTrialActive: isTrialActive
+        };
       });
+
+      // Filter out null entries
+      const validSubscribers = transformedSubscribers.filter(sub => sub !== null);
 
       return {
         success: true,
-        data: subscribersWithVirtuals,
-        count: subscribers.length
+        data: validSubscribers,
+        count: validSubscribers.length
       };
     } catch (error) {
       logger.error('Error fetching subscribers:', error);
@@ -646,15 +814,59 @@ class SubscriptionManagementService {
    */
   async getUserSubscriptionHistory(userId) {
     try {
-      const history = await UserSubscription.getSubscriptionHistoryForUser(userId);
+      // Get current subscription status
+      const user = await User.findById(userId).populate('subscription.planId', 'planName billingCycle basePrice features');
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found'
+        };
+      }
+
+      // Get subscription history from UserSubscription collection
+      const history = await UserSubscription.find({ userId })
+        .populate('subscriptionPlanId', 'planName billingCycle basePrice features')
+        .sort({ createdAt: -1 });
+
+      // Add current subscription as the latest entry if it exists
+      const currentSubscription = user.subscription && user.subscription.status !== 'free' ? [{
+        _id: user._id + '_current',
+        userId: user._id,
+        subscriptionPlanId: user.subscription.planId,
+        billingCycle: user.subscription.billingCycle,
+        status: user.subscription.status,
+        startDate: user.subscription.startDate,
+        endDate: user.subscription.endDate,
+        trialEndDate: user.subscription.trialEndDate,
+        totalPrice: user.subscription.totalPrice,
+        totalBeds: user.subscription.totalBeds,
+        totalBranches: user.subscription.totalBranches,
+        createdAt: user.subscription.startDate,
+        isCurrent: true
+      }] : [];
+
+      const allHistory = [...currentSubscription, ...history];
 
       return {
         success: true,
-        data: history.map(sub => {
-          const subObj = sub.toObject();
-          subObj.durationDays = sub.durationDays;
-          subObj.daysRemaining = sub.daysRemaining;
-          subObj.trialDaysRemaining = sub.trialDaysRemaining;
+        data: allHistory.map(sub => {
+          const subObj = sub.toObject ? sub.toObject() : sub;
+
+          // Calculate virtual fields
+          if (sub.endDate) {
+            const endDate = new Date(sub.endDate);
+            const now = new Date();
+            subObj.daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+            subObj.durationDays = sub.startDate ?
+              Math.ceil((endDate - new Date(sub.startDate)) / (1000 * 60 * 60 * 24)) : null;
+          }
+
+          if (sub.trialEndDate) {
+            const trialEnd = new Date(sub.trialEndDate);
+            const now = new Date();
+            subObj.trialDaysRemaining = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+          }
+
           return subObj;
         })
       };
@@ -672,22 +884,93 @@ class SubscriptionManagementService {
    */
   async getSubscriptionStats() {
     try {
-      const stats = await UserSubscription.getSubscriptionStats();
+      const now = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-      // Get additional stats
-      const expiringSoon = await UserSubscription.getExpiringSoonSubscriptions(7);
-      const trialActive = await UserSubscription.find({
-        billingCycle: 'trial',
-        status: 'trial',
-        trialEndDate: { $gt: new Date() }
-      }).countDocuments();
+      // Get total active subscribers
+      const totalActive = await User.countDocuments({
+        'subscription.status': 'active'
+      });
+
+      // Get total trial users
+      const trialActiveCount = await User.countDocuments({
+        'subscription.status': 'trial',
+        'subscription.trialEndDate': { $gt: now }
+      });
+
+      // Get revenue calculations
+      const monthlyRevenueResult = await User.aggregate([
+        {
+          $match: {
+            'subscription.status': { $in: ['active', 'trial'] },
+            'subscription.billingCycle': 'monthly'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$subscription.totalPrice' }
+          }
+        }
+      ]);
+
+      const annualRevenueResult = await User.aggregate([
+        {
+          $match: {
+            'subscription.status': { $in: ['active', 'trial'] },
+            'subscription.billingCycle': 'annual'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$subscription.totalPrice' }
+          }
+        }
+      ]);
+
+      const monthlyRevenue = monthlyRevenueResult[0]?.total || 0;
+      const annualRevenue = annualRevenueResult[0]?.total || 0;
+
+      // Get billing cycle counts
+      const monthlyCount = await User.countDocuments({
+        'subscription.status': { $in: ['active', 'trial'] },
+        'subscription.billingCycle': 'monthly'
+      });
+
+      const annualCount = await User.countDocuments({
+        'subscription.status': { $in: ['active', 'trial'] },
+        'subscription.billingCycle': 'annual'
+      });
+
+      // Get expiring soon (30 days)
+      const expiringSoonCount = await User.countDocuments({
+        'subscription.status': { $in: ['active', 'trial'] },
+        'subscription.endDate': {
+          $gt: now,
+          $lte: thirtyDaysFromNow
+        }
+      });
+
+      // Get expired count
+      const expiredCount = await User.countDocuments({
+        'subscription.status': 'expired',
+        'subscription.endDate': { $lte: now }
+      });
 
       return {
         success: true,
         data: {
-          ...stats,
-          expiringSoonCount: expiringSoon.length,
-          trialActiveCount: trialActive
+          totalActive,
+          trialActiveCount,
+          monthlyRevenue,
+          annualRevenue,
+          totalRevenue: monthlyRevenue + annualRevenue,
+          monthlyCount,
+          annualCount,
+          expiringSoonCount,
+          expiredCount
         }
       };
     } catch (error) {
@@ -704,35 +987,41 @@ class SubscriptionManagementService {
    */
   async updateSubscriptionUsage(userId, usageData) {
     try {
-      const { currentBedUsage, currentBranchUsage } = usageData;
+      const { bedsUsed, branchesUsed } = usageData;
 
-      const activeSubscription = await UserSubscription.findOne({
-        userId,
-        status: { $in: ['active', 'trial'] },
-        endDate: { $gt: new Date() }
-      });
+      const user = await User.findById(userId);
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found'
+        };
+      }
 
-      if (!activeSubscription) {
+      if (!user.subscription || !['active', 'trial'].includes(user.subscription.status)) {
         return {
           success: false,
           message: 'No active subscription found for user'
         };
       }
 
-      // Update usage
-      if (currentBedUsage !== undefined) {
-        activeSubscription.currentBedUsage = currentBedUsage;
+      // Update usage in user's subscription
+      if (bedsUsed !== undefined) {
+        user.subscription.usage.bedsUsed = bedsUsed;
       }
-      if (currentBranchUsage !== undefined) {
-        activeSubscription.currentBranchUsage = currentBranchUsage;
+      if (branchesUsed !== undefined) {
+        user.subscription.usage.branchesUsed = branchesUsed;
       }
 
-      await activeSubscription.save();
+      await user.save();
 
       return {
         success: true,
         message: 'Subscription usage updated successfully',
-        data: activeSubscription
+        data: {
+          userId: user._id,
+          bedsUsed: user.subscription.usage.bedsUsed,
+          branchesUsed: user.subscription.usage.branchesUsed
+        }
       };
     } catch (error) {
       logger.error('Error updating subscription usage:', error);
@@ -955,6 +1244,72 @@ class SubscriptionManagementService {
             features: freeFeatures
           }
         }
+      };
+    }
+  }
+
+  // Add a new method to get user's active subscription
+  async getUserActiveSubscription(userId) {
+    try {
+      // Find the most recent active subscription for the user
+      const activeSubscription = await UserSubscription.findOne({
+        userId: userId,
+        status: { $in: ['active', 'trial'] },
+        endDate: { $gt: new Date() }
+      }).populate('subscriptionPlanId');
+
+      if (!activeSubscription) {
+        // If no active subscription, try to activate free trial
+        const trialResult = await this.activateFreeTrial(userId, userId);
+        
+        if (trialResult.success) {
+          // Fetch the newly created trial subscription
+          const newSubscription = await UserSubscription.findOne({
+            userId: userId,
+            status: 'trial'
+          }).populate('subscriptionPlanId');
+
+          return {
+            success: true,
+            data: newSubscription
+          };
+        }
+
+        return {
+          success: false,
+          message: 'No active subscription found'
+        };
+      }
+
+      // Process and return subscription data
+      const plan = activeSubscription.subscriptionPlanId;
+      const processedModules = (plan.modules || []).map(module => ({
+        ...module.toObject(),
+        permissions: module.permissions instanceof Map
+          ? Object.fromEntries(module.permissions)
+          : module.permissions || {}
+      }));
+
+      return {
+        success: true,
+        data: {
+          ...activeSubscription.toObject(),
+          plan: {
+            ...plan.toObject(),
+            modules: processedModules
+          }
+        }
+      };
+    } catch (error) {
+      logger.log('error', 'Error fetching active subscription', { 
+        userId, 
+        error: error.message 
+      });
+
+      return {
+        success: false,
+        message: 'Failed to fetch active subscription',
+        error: error.message
       };
     }
   }

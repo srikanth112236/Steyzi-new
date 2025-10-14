@@ -163,4 +163,50 @@ router.get('/custom/:pgId',
     }
 });
 
+/**
+ * @route   GET /api/subscriptions/updates
+ * @desc    Fetch current subscription updates
+ * @access  Private
+ */
+router.get('/updates', authenticate, async (req, res) => {
+  try {
+    // Get user's active subscription
+    const subscriptionResult = await SubscriptionService.getUserActiveSubscription(req.user._id);
+
+    if (!subscriptionResult.success) {
+      logger.log('warn', 'No active subscription found', { 
+        userId: req.user._id 
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'No active subscription',
+        subscription: null
+      });
+    }
+
+    // Log subscription update fetch
+    logger.log('info', 'Fetched subscription updates', { 
+      userId: req.user._id,
+      subscriptionId: subscriptionResult.data._id
+    });
+
+    return res.status(200).json({
+      success: true,
+      subscription: subscriptionResult.data
+    });
+  } catch (error) {
+    logger.log('error', 'Error fetching subscription updates', { 
+      userId: req.user._id,
+      error: error.message 
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch subscription updates',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

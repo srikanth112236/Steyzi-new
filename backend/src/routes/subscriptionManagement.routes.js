@@ -101,4 +101,11 @@ router.post('/check-trial-expirations',
   SubscriptionManagementController.checkTrialExpirations
 );
 
+// Migrate existing subscriptions to user.subscription field
+router.post('/migrate-subscriptions',
+  authenticate,
+  authorize('superadmin'),
+  SubscriptionManagementController.migrateExistingSubscriptions
+);
+
 module.exports = router;

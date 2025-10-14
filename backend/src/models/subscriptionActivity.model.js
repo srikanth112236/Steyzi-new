@@ -41,7 +41,10 @@ const subscriptionActivitySchema = new mongoose.Schema({
       'fraud_attempt_detected',
       'api_key_generated',
       'api_key_revoked',
-      'rate_limit_exceeded'
+      'rate_limit_exceeded',
+      'access_validation_error',
+      'module_access_denied',
+      'usage_limit_reached'
     ],
     index: true
   },

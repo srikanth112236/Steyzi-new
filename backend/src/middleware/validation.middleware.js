@@ -777,19 +777,71 @@ const validateResident = (req, res, next) => {
       pincode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
       country: Joi.string().trim().default('India')
     }).optional(),
+    permanentAddress: Joi.object({
+      street: Joi.string().trim().max(200).optional(),
+      city: Joi.string().trim().max(50).optional(),
+      state: Joi.string().trim().max(50).optional(),
+      pincode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
+      country: Joi.string().trim().default('India')
+    }).optional(),
     emergencyContact: Joi.object({
       name: Joi.string().trim().max(100).optional(),
       relationship: Joi.string().trim().max(50).optional(),
-      phone: Joi.string().pattern(/^[0-9]{10}$/).optional()
+      phone: Joi.alternatives().try(
+        Joi.string().pattern(/^[0-9]{10}$/).messages({
+          'string.pattern.base': 'Emergency contact phone must be 10 digits'
+        }),
+        Joi.string().allow('').optional()
+      ).optional(),
+      address: Joi.alternatives().try(
+        Joi.object({
+          street: Joi.string().trim().max(200).optional(),
+          city: Joi.string().trim().max(50).optional(),
+          state: Joi.string().trim().max(50).optional(),
+          pincode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
+          country: Joi.string().trim().default('India')
+        }),
+        Joi.object().allow(null),
+        Joi.string().allow('').allow(null),
+        Joi.string().trim().max(500).allow('').allow(null)
+      ).optional()
     }).optional(),
-    roomId: Joi.string().required()
+    workDetails: Joi.object({
+      company: Joi.string().trim().max(100).optional(),
+      companyName: Joi.string().trim().max(100).optional(),
+      designation: Joi.string().trim().max(50).optional(),
+      workAddress: Joi.alternatives().try(
+        Joi.object({
+          street: Joi.string().trim().max(200).optional(),
+          city: Joi.string().trim().max(50).optional(),
+          state: Joi.string().trim().max(50).optional(),
+          pincode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
+          country: Joi.string().trim().default('India')
+        }),
+        Joi.object().allow(null),
+        Joi.string().allow('').allow(null),
+        Joi.string().trim().max(500).allow('').allow(null)
+      ).optional(),
+      officeAddress: Joi.object({
+        street: Joi.string().trim().max(200).optional(),
+        city: Joi.string().trim().max(50).optional(),
+        state: Joi.string().trim().max(50).optional(),
+        pincode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
+        country: Joi.string().trim().default('India')
+      }).optional()
+    }).optional(),
+    roomId: Joi.string().optional()
       .messages({
-        'string.empty': 'Room ID is required'
+        'string.empty': 'Room ID is required when assigning a room'
       }),
-    checkInDate: Joi.date().required()
+    branchId: Joi.string().optional(),
+    checkInDate: Joi.date().optional()
       .messages({
-        'date.base': 'Check-in date must be a valid date',
-        'any.required': 'Check-in date is required'
+        'date.base': 'Check-in date must be a valid date'
+      }),
+    contractStartDate: Joi.date().optional()
+      .messages({
+        'date.base': 'Contract start date must be a valid date'
       }),
     checkOutDate: Joi.date().optional(),
     documents: Joi.array().items(Joi.object({

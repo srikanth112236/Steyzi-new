@@ -3,9 +3,11 @@ import { useSelector } from 'react-redux';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../../utils/subscriptionUtils';
 import authService from '../../services/auth.service';
+import { selectSubscription } from '../../store/slices/authSlice';
 
 const ProtectedRoute = ({ children, requireOnboarding = false }) => {
   const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const subscription = useSelector(selectSubscription);
   const { canAccessRoute } = useSubscription();
   const location = useLocation();
 
@@ -38,7 +40,13 @@ const ProtectedRoute = ({ children, requireOnboarding = false }) => {
 
   // Check subscription restrictions for admin users on other routes
   if (user?.role === 'admin') {
+    console.log('🔍 ProtectedRoute: Checking subscription access for admin user');
+    console.log('🔍 ProtectedRoute: Subscription data:', subscription);
+    console.log('🔍 ProtectedRoute: Route path:', location.pathname);
+
     const canAccess = canAccessRoute(location.pathname);
+    console.log('🔍 ProtectedRoute: Can access route:', canAccess);
+
     if (!canAccess) {
       console.log('🚫 ProtectedRoute: User subscription does not allow access to this route, redirecting to dashboard');
       return <Navigate to="/admin" replace />;
