@@ -81,7 +81,12 @@ const validateSalesManagerCreation = (req, res, next) => {
         'string.pattern.base': 'Phone number must be 10 digits',
         'string.empty': 'Phone number is required'
       }),
-    status: Joi.string().valid('active', 'inactive', 'suspended').default('active')
+    status: Joi.string().valid('active', 'inactive', 'suspended').default('active'),
+    commissionRate: Joi.number().min(0).max(100).default(10)
+      .messages({
+        'number.min': 'Commission rate cannot be negative',
+        'number.max': 'Commission rate cannot exceed 100%'
+      })
   });
 
   const { error, value } = schema.validate(req.body, { abortEarly: false });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   MessageSquare, 
@@ -15,6 +15,7 @@ import {
   Settings,
   Zap
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import ticketService from '../../services/ticket.service';
 
 const SupportDashboard = () => {
@@ -33,56 +34,46 @@ const SupportDashboard = () => {
   });
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Load all tickets for statistics
-      const ticketsResponse = await ticketService.getAllTickets();
-      const tickets = ticketsResponse.data || [];
+      // Fetch ticket stats
+      const statsResponse = await ticketService.getTicketStats();
+      if (statsResponse.success) {
+        setStats({
+          totalTickets: statsResponse.data.totalTickets || 0,
+          openTickets: statsResponse.data.openTickets || 0,
+          inProgressTickets: statsResponse.data.inProgressTickets || 0,
+          resolvedTickets: statsResponse.data.resolvedTickets || 0,
+          closedTickets: statsResponse.data.closedTickets || 0
+        });
+      }
+
+      // Fetch analytics for performance metrics
+      const analyticsResponse = await ticketService.getAnalytics('week');
+      if (analyticsResponse.success) {
+        const overview = analyticsResponse.data.overview || {};
+        setPerformance({
+          avgResponseTime: parseFloat(overview.avgResponseTime) || 0,
+          avgResolutionTime: parseFloat(overview.avgResolutionTime) || 0,
+          satisfactionScore: overview.satisfactionScore || 0,
+          ticketsThisWeek: overview.totalTickets || 0
+        });
+      }
+
+      // Fetch recent tickets
+      const ticketsResponse = await ticketService.getTickets({ 
+        limit: 5, 
+        sortBy: 'createdAt', 
+        sortOrder: 'desc' 
+      });
       
-      // Calculate statistics
-      const totalTickets = tickets.length;
-      const openTickets = tickets.filter(ticket => ticket.status === 'open').length;
-      const inProgressTickets = tickets.filter(ticket => ticket.status === 'in_progress').length;
-      const resolvedTickets = tickets.filter(ticket => ticket.status === 'resolved').length;
-      const closedTickets = tickets.filter(ticket => ticket.status === 'closed').length;
-
-      // Calculate performance metrics
-      const thisWeek = new Date();
-      thisWeek.setDate(thisWeek.getDate() - 7);
-      const ticketsThisWeek = tickets.filter(ticket => new Date(ticket.createdAt) > thisWeek).length;
-
-      // Mock performance data (in real app, this would come from backend analytics)
-      const avgResponseTime = 2.5; // hours
-      const avgResolutionTime = 8.3; // hours
-      const satisfactionScore = 4.6; // out of 5
-
-      setStats({
-        totalTickets,
-        openTickets,
-        inProgressTickets,
-        resolvedTickets,
-        closedTickets
-      });
-
-      setPerformance({
-        avgResponseTime,
-        avgResolutionTime,
-        satisfactionScore,
-        ticketsThisWeek
-      });
-
-      // Get recent tickets (last 5)
-      const recentTicketsData = tickets
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 5)
-        .map(ticket => ({
+      if (ticketsResponse.success) {
+        const formattedTickets = ticketsResponse.data.map(ticket => ({
           id: ticket._id,
           title: ticket.title,
           status: ticket.status,
@@ -90,12 +81,14 @@ const SupportDashboard = () => {
           createdAt: new Date(ticket.createdAt).toLocaleDateString(),
           description: ticket.description?.substring(0, 50) + '...'
         }));
-
-      setRecentTickets(recentTicketsData);
+        setRecentTickets(formattedTickets);
+      }
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      // Set default data if API fails
+      setError('Failed to load dashboard data. Please try again later.');
+      
+      // Fallback to default data
       setStats({
         totalTickets: 156,
         openTickets: 12,
@@ -103,12 +96,14 @@ const SupportDashboard = () => {
         resolvedTickets: 89,
         closedTickets: 47
       });
+      
       setPerformance({
         avgResponseTime: 2.5,
         avgResolutionTime: 8.3,
         satisfactionScore: 4.6,
         ticketsThisWeek: 23
       });
+      
       setRecentTickets([
         {
           id: 1,
@@ -125,20 +120,26 @@ const SupportDashboard = () => {
           priority: 'medium',
           createdAt: '2024-01-14',
           description: 'Payment gateway not responding...'
-        },
-        {
-          id: 3,
-          title: 'Account Access Request',
-          status: 'resolved',
-          priority: 'low',
-          createdAt: '2024-01-13',
-          description: 'User needs access to admin panel...'
         }
       ]);
+
+      // Show error toast
+      toast.error('Unable to fetch real-time dashboard data');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Initial load and periodic refresh
+  useEffect(() => {
+    loadDashboardData();
+
+    // Set up interval for periodic updates
+    const intervalId = setInterval(loadDashboardData, 30000); // Update every 30 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [loadDashboardData]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -173,12 +174,20 @@ const SupportDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Support Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's your support overview</p>
+          <p className="text-gray-600">Real-time support overview</p>
         </div>
-        <div className="text-sm text-gray-500">
-          Last updated: {new Date().toLocaleTimeString()}
+        <div className="text-sm text-gray-500 flex items-center space-x-2">
+          <Zap className="h-4 w-4 text-yellow-500" />
+          <span>Last updated: {new Date().toLocaleTimeString()}</span>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -442,4 +451,5 @@ const SupportDashboard = () => {
   );
 };
 
-export default SupportDashboard; 
+export default SupportDashboard;
+

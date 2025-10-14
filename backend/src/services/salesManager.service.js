@@ -31,7 +31,11 @@ class SalesManagerService {
         ...salesManagerData,
         salesUniqueId,
         password: tempPassword,
-        createdBy: createdBy._id
+        createdBy: createdBy._id,
+        // Validate and set commission rate, defaulting to 10 if not provided
+        commissionRate: salesManagerData.commissionRate !== undefined 
+          ? salesManagerData.commissionRate 
+          : 10
       });
 
       // Save Sales Manager
@@ -82,6 +86,13 @@ class SalesManagerService {
    */
   async updateSalesManager(salesManagerId, updateData) {
     try {
+      // Validate commission rate if provided
+      if (updateData.commissionRate !== undefined) {
+        if (updateData.commissionRate < 0 || updateData.commissionRate > 100) {
+          throw new Error('Commission rate must be between 0 and 100');
+        }
+      }
+
       const salesManager = await SalesManager.findByIdAndUpdate(
         salesManagerId, 
         updateData, 

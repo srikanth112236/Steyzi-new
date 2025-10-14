@@ -40,7 +40,8 @@ const SalesManagerManagement = () => {
     firstName: '',
     lastName: '',
     email: '',
-    phone: ''
+    phone: '',
+    commissionRate: 10  // Default commission rate
   });
 
   useEffect(() => {
@@ -64,6 +65,7 @@ const SalesManagerManagement = () => {
   const handleAddSalesManager = async (e) => {
     e.preventDefault();
     try {
+      // Include commission rate in the submission
       const response = await salesManagerService.createSalesManager(newManagerForm);
       toast.success('Sales Manager added successfully');
       setSalesManagers([...salesManagers, response.data.data]);
@@ -229,14 +231,13 @@ const SalesManagerManagement = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Commission Rate (%)</label>
               <Input
                 type="number"
-                min="0"
-                max="100"
                 value={newManagerForm.commissionRate}
                 onChange={(e) => setNewManagerForm({...newManagerForm, commissionRate: parseFloat(e.target.value) || 0})}
-                placeholder="Enter commission rate (0-100%)"
-                required
+                min="0"
+                max="100"
+                step="0.1"
+                className="w-full"
               />
-              <p className="text-xs text-gray-500 mt-1">Commission rate for PGs added by this sales manager and their sub-staff</p>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
               <Button 
@@ -613,7 +614,8 @@ const SalesManagerManagement = () => {
                             firstName: manager.firstName,
                             lastName: manager.lastName,
                             email: manager.email,
-                            phone: manager.phone
+                            phone: manager.phone,
+                            commissionRate: manager.commissionRate || 10
                           });
                           setShowEditModal(true);
                         }}

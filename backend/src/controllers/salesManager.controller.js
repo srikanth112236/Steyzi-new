@@ -25,6 +25,7 @@ class SalesManagerController {
         phone: salesManager.phone,
         salesUniqueId: salesManager.salesUniqueId,
         status: salesManager.status,
+        commissionRate: salesManager.commissionRate,
         createdAt: salesManager.createdAt
       }
     });
@@ -70,6 +71,7 @@ class SalesManagerController {
         phone: updatedSalesManager.phone,
         salesUniqueId: updatedSalesManager.salesUniqueId,
         status: updatedSalesManager.status,
+        commissionRate: updatedSalesManager.commissionRate,
         createdAt: updatedSalesManager.createdAt
       }
     });
@@ -113,7 +115,7 @@ class SalesManagerController {
   getSalesManagerPerformance = catchAsync(async (req, res) => {
     const { id } = req.params;
 
-    const salesManager = await SalesManager.findById(id)
+    const salesManager = await SalesManagerService.findById(id)
       .select('performanceMetrics salesUniqueId');
 
     if (!salesManager) {

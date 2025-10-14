@@ -48,7 +48,6 @@ import {
 import { Calendar as CalendarComponent } from "../../components/ui/calendar";
 
 import ticketService from '../../services/ticket.service';
-import pgService from '../../services/pg.service';
 
 const TicketManagement = () => {
   const [tickets, setTickets] = useState([]);
@@ -75,7 +74,7 @@ const TicketManagement = () => {
   useEffect(() => {
     const loadPGs = async () => {
       try {
-        const response = await pgService.getAllPGs();
+        const response = await ticketService.getTicketPGs();
         if (response.success) {
           setPGs(response.data);
         }
@@ -116,6 +115,7 @@ const TicketManagement = () => {
       });
 
       const response = await ticketService.getTickets(filteredParams);
+      console.log("responsetickets",response);
       if (response.success) {
         const formattedTickets = response.data.map(ticket => 
           ticketService.formatTicketData(ticket)
