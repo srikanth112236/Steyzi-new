@@ -166,7 +166,7 @@ const AdminLayout = () => {
   };
 
   // Callback for PG configuration
-  const handlePGConfigured = () => {
+  const handlePGConfigured = (configData) => {
     // Update Redux state to mark PG as configured and onboarding as completed
     dispatch(updateAuthState({
       pg_configured: true,
@@ -174,8 +174,11 @@ const AdminLayout = () => {
       onboarding_completed: true
     }));
 
-    // Close the modal
+    // Close the modal after state update
     setShowPGConfigModal(false);
+
+    // Show success message
+    toast.success('PG Configuration completed successfully! You can now start managing your PG.');
   };
 
   // Calculate trial time left and info
@@ -536,44 +539,40 @@ const AdminLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 bg-white shadow-2xl border-r border-gray-100 transition-all duration-300 ease-in-out flex flex-col ${
+      <div className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-100 transition-all duration-300 ease-in-out flex flex-col ${
         sidebarCollapsed ? 'w-16' : 'w-64'
       }`}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100">
-          {!sidebarCollapsed && (
-            <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-blue-600 rounded-xl shadow-lg">
-                <Shield className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold text-gray-900">PG Admin</h1>
-                <p className="text-xs text-gray-600">Management</p>
-              </div>
-            </div>
-          )}
-          {sidebarCollapsed && (
-            <div className="flex justify-center w-full">
-              <div className="p-2.5 bg-blue-600 rounded-xl shadow-lg">
-                <Shield className="h-5 w-5 text-white" />
-              </div>
-            </div>
-          )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
+        <div className="h-16 flex items-center justify-center border-b border-gray-100">
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center w-full' : 'space-x-2'}`}>
+            {!sidebarCollapsed && (
+              <>
+                <div className="text-xl font-bold tracking-tight text-gray-800">PG Admin</div>
+                <button 
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              </>
             )}
-          </button>
+            {sidebarCollapsed && (
+              <button 
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
 
+       
         {/* Navigation */}
-        <nav className="mt-6 px-3 flex-1 overflow-y-auto">
-          <div className="space-y-2">
+        <nav className={`flex-1 overflow-y-auto custom-scrollbar px-2 py-4 ${
+          sidebarCollapsed ? 'scrollbar-hide' : ''
+        }`}>
+          <div className="space-y-1">
             {getFilteredNavigationItems().map((item) => {
               if (item.name === 'Settings' && !selectedBranch?.isDefault) {
                 return null;
@@ -583,32 +582,30 @@ const AdminLayout = () => {
                 : isActiveRoute(item.href);
               
               return (
-                <div key={item.name}>
+                <div key={item.name} className="group">
                   {item.hasDropdown ? (
                     // Dropdown Item
                     <div>
                       <button
                         onClick={() => toggleDropdown(item.name)}
-                        className={`w-full group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                           isActive
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                            : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'text-gray-600 hover:bg-gray-100'
                         }`}
                       >
                         <item.icon
-                          className={`h-5 w-5 transition-all duration-200 ${
-                            isActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'
+                          className={`h-5 w-5 mr-3 ${
+                            isActive ? 'text-blue-600' : 'text-gray-500'
                           }`}
                         />
                         {!sidebarCollapsed && (
                           <>
-                            <div className="flex-1 ml-3 text-left">
-                              <div className="font-medium">{item.name}</div>
-                            </div>
+                            <div className="flex-1 text-left">{item.name}</div>
                             {isDropdownExpanded(item.name) ? (
-                              <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
                             ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                              <ChevronRight className="h-4 w-4 text-gray-400" />
                             )}
                           </>
                         )}
@@ -616,58 +613,47 @@ const AdminLayout = () => {
                       
                       {/* Dropdown Content */}
                       {!sidebarCollapsed && isDropdownExpanded(item.name) && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="ml-6 mt-2 space-y-1"
-                        >
+                        <div className="ml-6 mt-1 space-y-1">
                           {item.dropdownItems.map((dropdownItem) => {
                             const isDropdownItemActive = isActiveRoute(dropdownItem.href);
                             return (
                               <Link
                                 key={dropdownItem.name}
                                 to={dropdownItem.href}
-                                className={`group flex items-center px-3 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                                className={`flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                                   isDropdownItemActive
-                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                    : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'text-gray-600 hover:bg-gray-100'
                                 }`}
                               >
                                 <dropdownItem.icon
-                                  className={`h-4 w-4 transition-all duration-200 ${
-                                    isDropdownItemActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'
+                                  className={`h-4 w-4 mr-3 ${
+                                    isDropdownItemActive ? 'text-blue-600' : 'text-gray-500'
                                   }`}
                                 />
-                                <div className="ml-3">
-                                  <div className="font-medium">{dropdownItem.name}</div>
-                                </div>
+                                <div>{dropdownItem.name}</div>
                               </Link>
                             );
                           })}
-                        </motion.div>
+                        </div>
                       )}
                     </div>
                   ) : (
                     // Regular Item
                     <Link
                       to={item.href}
-                      className={`group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                      className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         isActive
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                          : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
                       <item.icon
-                        className={`h-5 w-5 transition-all duration-200 ${
-                          isActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'
+                        className={`h-5 w-5 mr-3 ${
+                          isActive ? 'text-blue-600' : 'text-gray-500'
                         }`}
                       />
-                      {!sidebarCollapsed && (
-                        <div className="flex-1 ml-3">
-                          <div className="font-medium">{item.name}</div>
-                        </div>
-                      )}
+                      {!sidebarCollapsed && <div>{item.name}</div>}
                     </Link>
                   )}
                 </div>
@@ -676,23 +662,28 @@ const AdminLayout = () => {
           </div>
         </nav>
 
-        {/* User info at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-gray-100">
+       
+        {/* User Profile */}
+        <div className="p-4 border-t border-gray-100">
           <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
-                <User className="h-4 w-4 text-white" />
-              </div>
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+              <img 
+                src={user?.profilePicture || 'https://via.placeholder.com/40'} 
+                alt="User" 
+                className="w-full h-full rounded-full object-cover"
+              />
             </div>
             {!sidebarCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-gray-800">
                   {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                <p className="text-xs text-blue-600 font-medium capitalize">
+                </div>
+                <div className="text-xs text-gray-500 truncate">
+                  {user?.email}
+                </div>
+                <div className="text-xs font-medium text-blue-600 capitalize">
                   {user?.role}
-                </p>
+                </div>
               </div>
             )}
           </div>

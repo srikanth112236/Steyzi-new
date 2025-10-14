@@ -152,7 +152,7 @@ async function initDefaultTrialPlan() {
           permissions: new Map([
             ['admin_routes', { create: true, read: true, update: true, delete: true }],
             ['user_management', { create: true, read: true, update: true, delete: true }],
-            ['system_settings', { create: true, read: true, update: true, delete: true }],
+            ['settings', { create: true, read: true, update: true, delete: true }],
             ['subscription_management', { create: true, read: true, update: true, delete: true }]
           ])
         },
@@ -183,7 +183,7 @@ async function initDefaultTrialPlan() {
         { name: 'Admin Management', description: 'Full administrative access and user management', enabled: true },
         { name: 'Security Management', description: 'Complete security settings and audit logs', enabled: true },
         { name: 'Custom Reports', description: 'Build custom reports and queries', enabled: true },
-        { name: 'System Settings', description: 'Access to all system configuration', enabled: true },
+        { name: 'Settings', description: 'Access to all system configuration', enabled: true },
         { name: 'Subscription Management', description: 'Manage subscriptions and billing', enabled: true }
       ];
 
@@ -325,7 +325,7 @@ async function initDefaultTrialPlan() {
           permissions: new Map([
             ['admin_routes', { create: true, read: true, update: true, delete: true }],
             ['user_management', { create: true, read: true, update: true, delete: true }],
-            ['system_settings', { create: true, read: true, update: true, delete: true }],
+            ['settings', { create: true, read: true, update: true, delete: true }],
             ['subscription_management', { create: true, read: true, update: true, delete: true }]
           ])
         },
@@ -354,7 +354,7 @@ async function initDefaultTrialPlan() {
         { name: 'Admin Management', description: 'Full administrative access and user management', enabled: true },
         { name: 'Security Management', description: 'Complete security settings and audit logs', enabled: true },
         { name: 'Custom Reports', description: 'Build custom reports and queries', enabled: true },
-        { name: 'System Settings', description: 'Access to all system configuration', enabled: true },
+        { name: 'Settings', description: 'Access to all system configuration', enabled: true },
         { name: 'Subscription Management', description: 'Manage subscriptions and billing', enabled: true }
       ]
     });

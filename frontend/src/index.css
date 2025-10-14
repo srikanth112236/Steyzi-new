@@ -12,22 +12,33 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(229, 231, 235, 0.3); /* Light gray with opacity */
+  border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5); /* Blue with opacity */
+  border-radius: 10px;
+  transition: background 0.3s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.7);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Loading animation */

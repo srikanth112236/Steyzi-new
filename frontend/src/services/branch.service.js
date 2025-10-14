@@ -126,6 +126,43 @@ class BranchService {
   }
 
   /**
+   * Fetch branches for a specific PG
+   * @param {string} pgId - PG ID to fetch branches for
+   * @returns {Promise<Object>} Branches fetch result
+   */
+  async getBranchesByPG(pgId) {
+    try {
+      if (!pgId) {
+        return {
+          success: false,
+          message: 'PG ID is required. Please contact support.',
+          error: 'Missing PG ID'
+        };
+      }
+
+      const response = await axios.get(`/api/branches?pgId=${pgId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Branches fetched successfully',
+        data: response.data.data
+      };
+    } catch (error) {
+      console.error('Branches fetch error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch branches',
+        error: error.response?.data || error.message
+      };
+    }
+  }
+
+  /**
    * Fetch branches for the current PG
    * @returns {Promise<Object>} Branches fetch result
    */

@@ -169,14 +169,7 @@ const PGConfigurationModal = ({
       if (response.success) {
         toast.success('PG Configuration completed successfully');
 
-        // Update Redux state to mark PG as configured and associate PG if needed
-        dispatch(updateAuthState({
-          pgId: user.pgId || pgId,
-          pg_configured: true,
-          pgConfigured: true
-        }));
-
-        // Call onConfigured callback
+        // Call onConfigured callback to handle state updates and modal closing
         onConfigured && onConfigured(response.data);
 
         // Close the modal
