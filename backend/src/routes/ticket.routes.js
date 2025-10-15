@@ -46,6 +46,38 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// Get assigned tickets for current user (convenience route)
+router.get('/assigned', authenticate, async (req, res) => {
+  try {
+    const filters = {
+      status: req.query.status,
+      priority: req.query.priority,
+      category: req.query.category,
+      search: req.query.search,
+      pg: req.query.pg
+    };
+
+    let result;
+    if (req.user.role === 'superadmin') {
+      result = await TicketService.getAllTickets(filters);
+    } else if (req.user.role === 'support') {
+      // Support staff should only see tickets assigned to them
+      result = await TicketService.getTicketsForSupport(req.user._id, filters);
+    } else {
+      result = await TicketService.getTicketsForAdmin(req.user._id, filters);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting assigned tickets:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assigned tickets',
+      error: error.message
+    });
+  }
+});
+
 // Get ticket statistics
 router.get('/stats', authenticate, async (req, res) => {
   try {
@@ -194,6 +226,37 @@ router.post('/', authenticate, adminOrSuperadmin, async (req, res) => {
   }
 });
 
+// Separate route for support dashboard analytics
+router.get('/support-dashboard-analytics', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Directly call the dashboard analytics method without ticket lookup
+    const result = await TicketService.getSupportStaffDashboardAnalytics(userId);
+
+    // Ensure the result matches the expected structure
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        data: null,
+        message: result.message || 'Failed to retrieve dashboard analytics'
+      });
+    }
+
+    // Optional: Broadcast updates via socket if available
+    broadcast(req, 'support-dashboard-update', result.data);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in support dashboard analytics route:', error);
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: `Failed to fetch support dashboard analytics: ${error.message}`
+    });
+  }
+});
+
 // Get ticket by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
@@ -257,13 +320,13 @@ router.delete('/:id', authenticate, adminOrSuperadmin, async (req, res) => {
   }
 });
 
-// Assign ticket (superadmin only)
+// Assign ticket (superadmin and admin only)
 router.post('/:id/assign', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'superadmin') {
+    if (!['superadmin', 'admin'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Only superadmin can assign tickets'
+        message: 'Access denied. Superadmin or admin role required.'
       });
     }
 
@@ -450,13 +513,13 @@ router.post('/:id/update-status', authenticate, async (req, res) => {
   }
 });
 
-// Get support staff list (superadmin only)
+// Get support staff list (superadmin and admin only)
 router.get('/support-staff/list', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'superadmin') {
+    if (!['superadmin', 'admin'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Only superadmin can view support staff list'
+        message: 'Access denied. Superadmin or admin role required.'
       });
     }
 
@@ -467,6 +530,88 @@ router.get('/support-staff/list', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get support staff',
+      error: error.message
+    });
+  }
+});
+
+// Request to reopen a closed ticket (admin only)
+router.post('/:id/request-reopen', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can request ticket reopening'
+      });
+    }
+
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reopen reason is required (minimum 10 characters)'
+      });
+    }
+
+    const result = await TicketService.requestReopenTicket(req.params.id, reason.trim(), req.user._id);
+    res.json(result);
+  } catch (error) {
+    console.error('Error requesting ticket reopen:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to request ticket reopen',
+      error: error.message
+    });
+  }
+});
+
+// Reopen a ticket (superadmin only)
+router.post('/:id/reopen', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only superadmin can reopen tickets'
+      });
+    }
+
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reopen reason is required (minimum 10 characters)'
+      });
+    }
+
+    const result = await TicketService.reopenTicket(req.params.id, reason.trim(), req.user._id);
+    res.json(result);
+  } catch (error) {
+    console.error('Error reopening ticket:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reopen ticket',
+      error: error.message
+    });
+  }
+});
+
+// Get reopen requests (superadmin only)
+router.get('/reopen-requests/list', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only superadmin can view reopen requests'
+      });
+    }
+
+    const result = await TicketService.getReopenRequests();
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting reopen requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get reopen requests',
       error: error.message
     });
   }

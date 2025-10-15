@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye,
+  Edit,
   Trash2,
   MessageSquare,
   Clock,
@@ -26,12 +26,20 @@ import {
 import ticketService from '../../services/ticket.service';
 import TicketDetailsModal from '../../components/common/TicketDetailsModal';
 import StatusUpdateModal from '../../components/common/StatusUpdateModal';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
 import { selectUser } from '../../store/slices/authSlice';
 
 const SupportTickets = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tickets, setTickets] = useState([]);
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +49,10 @@ const SupportTickets = () => {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [assignedView, setAssignedView] = useState('me'); // default to 'me'
+  const [assignedView, setAssignedView] = useState(() => {
+    // Set initial view based on current route
+    return location.pathname.includes('/assigned') ? 'me' : 'all';
+  });
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
   const [showTicketDetails, setShowTicketDetails] = useState(false);
   const [showStatusUpdate, setShowStatusUpdate] = useState(false);
@@ -231,6 +242,11 @@ const SupportTickets = () => {
                 <span className="w-2 h-2 rounded-full bg-current mr-2" />
                 {ticket.priority}
               </span>
+              {ticket.isReopened && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                  🔄 Reopened
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -339,7 +355,21 @@ const SupportTickets = () => {
           </div>
           <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1">
             <button
-              onClick={() => setAssignedView('me')}
+              onClick={() => {
+                setAssignedView('all');
+                navigate('/support/tickets');
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                assignedView === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              All Tickets
+            </button>
+            <button
+              onClick={() => {
+                setAssignedView('me');
+                navigate('/support/tickets/assigned');
+              }}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 assignedView === 'me' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:text-gray-900'
               }`}
@@ -546,33 +576,35 @@ const SupportTickets = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Priorities</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Priorities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Categories</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="billing">Billing</option>
-                  <option value="complaint">Complaint</option>
-                  <option value="suggestion">Suggestion</option>
-                  <option value="emergency">Emergency</option>
-                  <option value="other">Other</option>
-                </select>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="billing">Billing</SelectItem>
+                    <SelectItem value="complaint">Complaint</SelectItem>
+                    <SelectItem value="suggestion">Suggestion</SelectItem>
+                    <SelectItem value="emergency">Emergency</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </motion.div>

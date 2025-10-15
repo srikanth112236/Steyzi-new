@@ -141,6 +141,40 @@ const ticketSchema = new mongoose.Schema({
     }
   },
 
+  // Reopen Information
+  isReopened: {
+    type: Boolean,
+    default: false
+  },
+  originalTicketId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ticket'
+  },
+  reopenedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  reopenedAt: {
+    type: Date
+  },
+  reopenReason: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Reopen reason cannot exceed 500 characters']
+  },
+  reopenRequestBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  reopenRequestAt: {
+    type: Date
+  },
+  reopenRequestReason: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Reopen request reason cannot exceed 500 characters']
+  },
+
   // Timestamps
   createdAt: {
     type: Date,
@@ -171,6 +205,7 @@ ticketSchema.virtual('isOverdue').get(function() {
 
 // Virtual for response time
 ticketSchema.virtual('responseTime').get(function() {
+  if (!this.timeline || !Array.isArray(this.timeline)) return null;
   const firstUpdate = this.timeline.find(t => t.action !== 'created');
   if (!firstUpdate) return null;
   return Math.floor((firstUpdate.timestamp - this.createdAt) / (1000 * 60 * 60));

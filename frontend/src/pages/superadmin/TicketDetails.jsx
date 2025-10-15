@@ -17,15 +17,16 @@ import toast from 'react-hot-toast';
 import ticketService from '../../services/ticket.service';
 
 // Shadcn UI Components
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
   SelectValue,
   SelectGroup,
   SelectLabel
 } from "../../components/ui/select";
+// Using simple HTML elements instead of UI library components
 
 /**
  * TicketDetails
@@ -48,6 +49,8 @@ const TicketDetails = () => {
   const [priorityLevels, setPriorityLevels] = useState([]);
   const [selectedPriority, setSelectedPriority] = useState('');
   const [newComment, setNewComment] = useState('');
+  const [reopenReason, setReopenReason] = useState('');
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
 
   const activeSection = useMemo(() => searchParams.get('section') || 'overview', [searchParams]);
 
@@ -147,6 +150,30 @@ const TicketDetails = () => {
     }
   };
 
+  const handleReopenTicket = async () => {
+    if (!reopenReason.trim()) {
+      toast.error('Please provide a reason for reopening');
+      return;
+    }
+    try {
+      setSaving(true);
+      const res = await ticketService.reopenTicket(id, reopenReason.trim());
+      if (res?.success) {
+        toast.success('Ticket reopened successfully');
+        // Navigate to the new reopened ticket
+        navigate(`/superadmin/tickets/${res.data._id}`);
+      } else {
+        toast.error(res?.message || 'Failed to reopen ticket');
+      }
+    } catch (e) {
+      toast.error(e.message || 'Failed to reopen ticket');
+    } finally {
+      setSaving(false);
+      setShowReopenDialog(false);
+      setReopenReason('');
+    }
+  };
+
   const getStatusIcon = (status) => {
     const map = {
       open: <AlertCircle className="h-4 w-4 text-blue-600" />,
@@ -199,6 +226,14 @@ const TicketDetails = () => {
           <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
             <span className="w-2 h-2 rounded-full bg-current mr-2" />{ticket.priority}
           </span>
+          {ticket.status === 'closed' && (
+            <button
+              onClick={() => setShowReopenDialog(true)}
+              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+            >
+              🔄 Reopen Ticket
+            </button>
+          )}
         </div>
       </div>
 
@@ -393,6 +428,50 @@ const TicketDetails = () => {
           )}
         </div>
       </div>
+
+      {/* Reopen Ticket Modal */}
+      {showReopenDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Reopen Ticket</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will create a new ticket with the same details. The original ticket will remain closed for reference.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for reopening <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+                rows={4}
+                placeholder="Please provide a detailed reason for reopening this ticket..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowReopenDialog(false);
+                  setReopenReason('');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReopenTicket}
+                disabled={saving || !reopenReason.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? 'Reopening...' : 'Reopen Ticket'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -42,7 +42,20 @@ export const useAuth = () => {
 
   const handleGetCurrentUser = async () => {
     try {
-      console.log('🔍 Checking current user...');
+      // Check if user is a privileged user (sales or support) - they might not need /auth/me verification
+      const storedUser = authService.getCurrentUserFromStorage();
+      const isPrivilegedUser = storedUser?.role === 'sales' ||
+                              storedUser?.role === 'support' ||
+                              storedUser?.salesRole === 'sub_sales';
+
+      if (isPrivilegedUser) {
+        console.log(`🔍 ${storedUser.role || storedUser.salesRole} user detected, skipping /auth/me call to avoid subscription checks`);
+        // For privileged users, just ensure the Redux state is updated with stored user data
+        // Don't make the /auth/me API call that might trigger subscription middleware
+        return { success: true };
+      }
+
+      console.log('🔍 Checking current user via API...');
       await dispatch(getCurrentUser()).unwrap();
       console.log('✅ Current user check successful');
       return { success: true };

@@ -329,6 +329,7 @@ const App = () => {
       <Route path="/support" element={<SupportLayout />}>
         <Route path="dashboard" element={<SupportDashboard />} />
         <Route path="tickets" element={<SupportTickets />} />
+        <Route path="tickets/assigned" element={<SupportTickets />} />
         <Route path="tickets/:id" element={<SupportTicketDetails />} />
         <Route path="activities" element={<SupportActivities />} />
         <Route path="analytics" element={<TicketAnalytics />} />

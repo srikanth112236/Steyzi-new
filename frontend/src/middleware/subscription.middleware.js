@@ -93,18 +93,55 @@ const checkSubscriptionPermission = (url, method, data = null) => {
   const state = store.getState();
   const subscription = state.auth.subscription;
   const userRole = state.auth.user?.role;
+  const isAuthenticated = state.auth.isAuthenticated;
+
+  console.log(`🔍 Subscription check - URL: ${url}, User Role: ${userRole}, Authenticated: ${isAuthenticated}`);
+
+  // Check for support users from localStorage as backup
+  let storedUserRole = userRole;
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      storedUserRole = parsedUser?.role || parsedUser?.salesRole || userRole;
+      console.log(`📦 Stored user role: ${storedUserRole}`);
+    }
+  } catch (error) {
+    console.log('❌ Error reading stored user:', error);
+  }
 
   // Allow auth and trial activation requests for all subscription statuses
-  console.log('🔍 Subscription middleware checking URL:', url);
-  if (url.includes('/auth/') || url.includes('/activate-trial')) {
-    console.log('✅ Allowing request:', url);
+  // This includes /auth/me, /auth/login, /auth/sales-login, etc.
+  if (url.includes('/auth/') || url.includes('/activate-trial') || url.includes('/users/support-profile')) {
+    console.log('✅ Allowing auth-related request:', url);
     return { allowed: true };
+  }
+
+  // Allow support dashboard analytics for support users
+  if (url.includes('/tickets/support-dashboard-analytics')) {
+    console.log('✅ Allowing support dashboard analytics for support users:', url);
+    return { allowed: true };
+  }
+
+  // Priority check for support users - check localStorage first
+  if (storedUserRole === 'support') {
+    console.log('🚫 Support user detected from stored data - completely bypassing subscription checks');
+    return { allowed: true };
+  }
+
+  // Additional check: if URL contains 'support' and we have a stored user, allow it
+  if (url.includes('/support') || url.includes('support-') || url.includes('/tickets/support')) {
+    console.log('🎯 Support-related URL detected, checking for support user...');
+    if (storedUserRole === 'support') {
+      console.log('✅ Support user confirmed for support URL - allowing request');
+      return { allowed: true };
+    }
   }
 
   // Completely bypass subscription checks for superadmin and other privileged roles
   const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
-  if (bypassRoles.includes(userRole)) {
-    console.log(`🎉 Bypassing ALL subscription checks for role: ${userRole}`);
+  if (bypassRoles.includes(storedUserRole)) {
+    console.log(`🎉 Bypassing ALL subscription checks for privileged role: ${storedUserRole}`);
     return { allowed: true };
   }
 

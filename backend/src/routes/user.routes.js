@@ -50,6 +50,34 @@ router.put('/profile', authenticate, validateRequest(schemas.updateProfile), asy
 });
 
 /**
+ * @route   GET /api/users/support-profile
+ * @desc    Get support user profile with statistics, activity and achievements
+ * @access  Private (Support users only)
+ */
+router.get('/support-profile', authenticate, async (req, res) => {
+  try {
+    // Only allow support users to access this endpoint
+    if (req.user.role !== 'support') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Support role required.'
+      });
+    }
+
+    const userId = req.user._id || req.user.id;
+    const result = await UserService.getSupportProfile(userId);
+    return res.status(result.statusCode).json(result);
+  } catch (error) {
+    console.error('Get support profile route error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get support profile.',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route   PUT /api/users/change-password
  * @desc    Change user password
  * @access  Private

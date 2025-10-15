@@ -24,7 +24,7 @@ import {
   Activity
 } from 'lucide-react';
 
-const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate }) => {
+const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenRequest }) => {
   const [activeTab, setActiveTab] = useState('overview');
 
   if (!ticket) return null;
@@ -524,7 +524,15 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate }) => {
                   >
                     Close
                   </button>
-                  {onStatusUpdate && (
+                  {ticket.status === 'closed' && onReopenRequest && (
+                    <button
+                      onClick={() => onReopenRequest(ticket)}
+                      className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      🔄 Request Reopen
+                    </button>
+                  )}
+                  {onStatusUpdate && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
                     <button
                       onClick={() => onStatusUpdate(ticket)}
                       className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

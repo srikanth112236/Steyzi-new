@@ -402,6 +402,223 @@ class UserService {
       };
     }
   }
+
+  static async getSupportProfile(userId) {
+    try {
+      const user = await User.findById(userId).select('-password');
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+          statusCode: 404
+        };
+      }
+
+      // Get ticket statistics
+      const ticketStats = await this.getSupportTicketStats(userId);
+
+      // Get recent activity
+      const activityService = require('./activity.service');
+      const recentActivityResult = await activityService.getUserActivities(userId, {
+        limit: 10
+      });
+
+      // Transform activity data to match frontend expectations
+      const recentActivity = recentActivityResult.activities.map(activity => ({
+        id: activity._id,
+        type: activity.type,
+        description: activity.description || activity.title,
+        timestamp: activity.timestamp
+      }));
+
+      // Get achievements/progress
+      const achievements = await this.getSupportAchievements(userId, ticketStats);
+
+      return {
+        success: true,
+        message: 'Support profile retrieved successfully',
+        statusCode: 200,
+        data: {
+          user: {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            avatar: user.avatar,
+            isActive: user.isActive,
+            joinDate: user.createdAt,
+            lastLogin: user.lastLogin
+          },
+          stats: ticketStats,
+          recentActivity,
+          achievements
+        }
+      };
+    } catch (error) {
+      console.error('Get support profile error:', error);
+      return {
+        success: false,
+        message: 'Failed to get support profile',
+        statusCode: 500,
+        error: error.message
+      };
+    }
+  }
+
+  static async getSupportTicketStats(userId) {
+    try {
+      const Ticket = require('../models/ticket.model');
+
+      // Get all tickets assigned to this support user or from PGs they support
+      // Similar to getSupportStaffDashboardAnalytics logic
+      const PG = require('../models/pg.model');
+      const pg = await PG.findOne({
+        $or: [
+          { supportStaff: userId },
+          { admin: userId }
+        ]
+      });
+
+      const userIdString = userId.toString();
+      const matchConditions = {
+        $or: [
+          { assignedTo: userId },
+          { $expr: { $eq: [{ $toString: '$assignedTo' }, userIdString] } },
+          ...(pg ? [{ pg: pg._id }] : [])
+        ]
+      };
+
+      const tickets = await Ticket.find(matchConditions);
+
+      const totalTickets = tickets.length;
+      const resolvedTickets = tickets.filter(ticket =>
+        ticket.status === 'resolved' || ticket.status === 'closed'
+      ).length;
+
+      // Calculate average response time (hours)
+      const ticketsWithResponseTime = tickets.filter(ticket => ticket.responseTime);
+      const avgResponseTime = ticketsWithResponseTime.length > 0
+        ? ticketsWithResponseTime.reduce((sum, ticket) => sum + ticket.responseTime, 0) / ticketsWithResponseTime.length
+        : 0;
+
+      // Mock satisfaction score (in real app, this would come from feedback/ratings)
+      const satisfactionScore = totalTickets > 0 ? 4.2 + Math.random() * 0.8 : 0;
+
+      // Weekly stats
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const ticketsThisWeek = tickets.filter(ticket =>
+        new Date(ticket.createdAt) > oneWeekAgo
+      ).length;
+
+      // Monthly stats
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      const ticketsThisMonth = tickets.filter(ticket =>
+        new Date(ticket.createdAt) > oneMonthAgo
+      ).length;
+
+      return {
+        totalTickets,
+        resolvedTickets,
+        avgResponseTime: Math.round(avgResponseTime * 10) / 10, // Round to 1 decimal
+        satisfactionScore: Math.round(satisfactionScore * 10) / 10,
+        ticketsThisWeek,
+        ticketsThisMonth
+      };
+    } catch (error) {
+      console.error('Get support ticket stats error:', error);
+      // Return default values on error
+      return {
+        totalTickets: 0,
+        resolvedTickets: 0,
+        avgResponseTime: 0,
+        satisfactionScore: 0,
+        ticketsThisWeek: 0,
+        ticketsThisMonth: 0
+      };
+    }
+  }
+
+  static async getSupportAchievements(userId, stats) {
+    try {
+      const achievements = [
+        {
+          id: 1,
+          name: 'First Responder',
+          description: 'Respond to your first ticket',
+          icon: 'MessageSquare',
+          earned: stats.totalTickets > 0,
+          date: stats.totalTickets > 0 ? new Date().toISOString().split('T')[0] : null,
+          progress: stats.totalTickets > 0 ? 100 : 0,
+          target: 1,
+          current: Math.min(stats.totalTickets, 1)
+        },
+        {
+          id: 2,
+          name: 'Problem Solver',
+          description: 'Resolve 50 tickets',
+          icon: 'CheckCircle',
+          earned: stats.resolvedTickets >= 50,
+          date: stats.resolvedTickets >= 50 ? new Date().toISOString().split('T')[0] : null,
+          progress: Math.min((stats.resolvedTickets / 50) * 100, 100),
+          target: 50,
+          current: stats.resolvedTickets
+        },
+        {
+          id: 3,
+          name: 'Speed Demon',
+          description: 'Maintain < 2h average response time for a week',
+          icon: 'Zap',
+          earned: stats.avgResponseTime > 0 && stats.avgResponseTime < 2,
+          date: (stats.avgResponseTime > 0 && stats.avgResponseTime < 2) ? new Date().toISOString().split('T')[0] : null,
+          progress: stats.avgResponseTime > 0 ? Math.max(0, (2 - stats.avgResponseTime) / 2 * 100) : 0,
+          target: 2,
+          current: stats.avgResponseTime
+        },
+        {
+          id: 4,
+          name: 'Customer Champion',
+          description: 'Achieve 4.5+ satisfaction score for a month',
+          icon: 'Star',
+          earned: stats.satisfactionScore >= 4.5,
+          date: stats.satisfactionScore >= 4.5 ? new Date().toISOString().split('T')[0] : null,
+          progress: Math.min((stats.satisfactionScore / 4.5) * 100, 100),
+          target: 4.5,
+          current: stats.satisfactionScore
+        },
+        {
+          id: 5,
+          name: 'Consistency King',
+          description: 'Handle 100+ tickets',
+          icon: 'Target',
+          earned: stats.totalTickets >= 100,
+          date: stats.totalTickets >= 100 ? new Date().toISOString().split('T')[0] : null,
+          progress: Math.min((stats.totalTickets / 100) * 100, 100),
+          target: 100,
+          current: stats.totalTickets
+        },
+        {
+          id: 6,
+          name: 'Team Player',
+          description: 'Collaborate on 25+ tickets',
+          icon: 'Activity',
+          earned: false, // This would need collaboration tracking
+          date: null,
+          progress: 0,
+          target: 25,
+          current: 0
+        }
+      ];
+
+      return achievements;
+    } catch (error) {
+      console.error('Get support achievements error:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = UserService; 

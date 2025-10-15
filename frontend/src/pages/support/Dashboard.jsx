@@ -41,40 +41,31 @@ const SupportDashboard = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch ticket stats
-      const statsResponse = await ticketService.getTicketStats();
-      if (statsResponse.success) {
-        setStats({
-          totalTickets: statsResponse.data.totalTickets || 0,
-          openTickets: statsResponse.data.openTickets || 0,
-          inProgressTickets: statsResponse.data.inProgressTickets || 0,
-          resolvedTickets: statsResponse.data.resolvedTickets || 0,
-          closedTickets: statsResponse.data.closedTickets || 0
-        });
-      }
-
-      // Fetch analytics for performance metrics
-      const analyticsResponse = await ticketService.getAnalytics('week');
-      if (analyticsResponse.success) {
-        const overview = analyticsResponse.data.overview || {};
-        setPerformance({
-          avgResponseTime: parseFloat(overview.avgResponseTime) || 0,
-          avgResolutionTime: parseFloat(overview.avgResolutionTime) || 0,
-          satisfactionScore: overview.satisfactionScore || 0,
-          ticketsThisWeek: overview.totalTickets || 0
-        });
-      }
-
-      // Fetch recent tickets
-      const ticketsResponse = await ticketService.getTickets({ 
-        limit: 5, 
-        sortBy: 'createdAt', 
-        sortOrder: 'desc' 
-      });
+      // Fetch ticket stats and analytics in a single call
+      const response = await ticketService.getTicketStats();
       
-      if (ticketsResponse.success) {
-        const formattedTickets = ticketsResponse.data.map(ticket => ({
-          id: ticket._id,
+      // Check for successful response with data
+      if (response.success && response.data) {
+        // Update stats
+        setStats({
+          totalTickets: response.data.stats?.totalTickets || 0,
+          openTickets: response.data.stats?.openTickets || 0,
+          inProgressTickets: response.data.stats?.inProgressTickets || 0,
+          resolvedTickets: response.data.stats?.resolvedTickets || 0,
+          closedTickets: response.data.stats?.closedTickets || 0
+        });
+
+        // Update performance metrics
+        setPerformance({
+          avgResponseTime: response.data.performance?.avgResponseTime || 0,
+          avgResolutionTime: response.data.performance?.avgResolutionTime || 0,
+          satisfactionScore: response.data.performance?.satisfactionScore || 0,
+          ticketsThisWeek: response.data.performance?.totalTickets || 0
+        });
+
+        // Update recent tickets
+        const formattedTickets = (response.data.recentTickets || []).map(ticket => ({
+          id: ticket.id,
           title: ticket.title,
           status: ticket.status,
           priority: ticket.priority,
@@ -82,13 +73,15 @@ const SupportDashboard = () => {
           description: ticket.description?.substring(0, 50) + '...'
         }));
         setRecentTickets(formattedTickets);
+      } else {
+        // If response is not successful or data is null, throw an error to trigger fallback
+        throw new Error(response.message || 'Failed to fetch dashboard data');
       }
-
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again later.');
+      setError(error.message || 'Failed to load dashboard data. Please try again later.');
       
-      // Fallback to default data
+      // Fallback to default data (same as before)
       setStats({
         totalTickets: 156,
         openTickets: 12,
@@ -122,7 +115,7 @@ const SupportDashboard = () => {
           description: 'Payment gateway not responding...'
         }
       ]);
-
+      
       // Show error toast
       toast.error('Unable to fetch real-time dashboard data');
     } finally {

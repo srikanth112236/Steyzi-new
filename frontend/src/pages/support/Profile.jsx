@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import ticketService from '../../services/ticket.service';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 const SupportProfile = () => {
   const { user } = useAuth();
@@ -47,131 +49,121 @@ const SupportProfile = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
-      
-      // Load ticket statistics
-      const ticketsResponse = await ticketService.getMyTickets();
-      const tickets = ticketsResponse.data || [];
-      
-      // Calculate statistics
-      const totalTickets = tickets.length;
-      const resolvedTickets = tickets.filter(ticket => ticket.status === 'resolved' || ticket.status === 'closed').length;
-      const thisWeek = new Date();
-      thisWeek.setDate(thisWeek.getDate() - 7);
-      const ticketsThisWeek = tickets.filter(ticket => new Date(ticket.createdAt) > thisWeek).length;
-      
-      const thisMonth = new Date();
-      thisMonth.setMonth(thisMonth.getMonth() - 1);
-      const ticketsThisMonth = tickets.filter(ticket => new Date(ticket.createdAt) > thisMonth).length;
 
-      // Mock performance data (in real app, this would come from backend)
-      const avgResponseTime = 2.5; // hours
-      const satisfactionScore = 4.6; // out of 5
+      // Load support profile data from backend using the api service
+      const response = await api.get('/users/support-profile');
 
-      setStats({
-        totalTickets,
-        resolvedTickets,
-        avgResponseTime,
-        satisfactionScore,
-        ticketsThisWeek,
-        ticketsThisMonth
-      });
+      if (response.data.success) {
+        const { user, stats, recentActivity, achievements } = response.data.data;
 
-      // Mock recent activity
-      setRecentActivity([
-        {
-          id: 1,
-          action: 'Resolved ticket',
-          description: 'Technical issue with login system',
-          time: '2 hours ago',
-          type: 'resolved'
-        },
-        {
-          id: 2,
-          action: 'Updated ticket status',
-          description: 'Payment processing inquiry',
-          time: '4 hours ago',
-          type: 'updated'
-        },
-        {
-          id: 3,
-          action: 'Assigned new ticket',
-          description: 'Account access request',
-          time: '6 hours ago',
-          type: 'assigned'
-        },
-        {
-          id: 4,
-          action: 'Resolved ticket',
-          description: 'Feature request for mobile app',
-          time: '1 day ago',
-          type: 'resolved'
-        },
-        {
-          id: 5,
-          action: 'Updated ticket status',
-          description: 'Billing question resolved',
-          time: '2 days ago',
-          type: 'updated'
-        }
-      ]);
+        // Update profile data
+        setProfileData({
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          role: 'Support Staff',
+          joinDate: new Date(user.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          avatar: user.firstName?.charAt(0) || 'S'
+        });
 
-      // Mock achievements
-      setAchievements([
-        {
-          id: 1,
-          name: 'First Responder',
-          description: 'Respond to your first ticket',
-          icon: MessageSquare,
-          earned: true,
-          date: 'Jan 15, 2024'
-        },
-        {
-          id: 2,
-          name: 'Problem Solver',
-          description: 'Resolve 50 tickets',
-          icon: CheckCircle,
-          earned: totalTickets >= 50,
-          date: totalTickets >= 50 ? 'Feb 20, 2024' : null
-        },
-        {
-          id: 3,
-          name: 'Speed Demon',
-          description: 'Maintain < 2h average response time for a week',
-          icon: Zap,
-          earned: avgResponseTime < 2,
-          date: avgResponseTime < 2 ? 'Mar 10, 2024' : null
-        },
-        {
-          id: 4,
-          name: 'Customer Champion',
-          description: 'Achieve 4.5+ satisfaction score for a month',
-          icon: Star,
-          earned: satisfactionScore >= 4.5,
-          date: satisfactionScore >= 4.5 ? 'Mar 15, 2024' : null
-        },
-        {
-          id: 5,
-          name: 'Consistency King',
-          description: 'Handle 100+ tickets',
-          icon: Target,
-          earned: totalTickets >= 100,
-          date: totalTickets >= 100 ? null : null
-        },
-        {
-          id: 6,
-          name: 'Team Player',
-          description: 'Collaborate on 25+ tickets',
-          icon: Activity,
-          earned: false,
-          date: null
-        }
-      ]);
+        // Update stats
+        setStats(stats);
+
+        // Transform recent activity data
+        const transformedActivity = recentActivity.map(activity => ({
+          id: activity.id,
+          action: getActivityAction(activity.type),
+          description: activity.description,
+          time: getRelativeTime(activity.timestamp),
+          type: getActivityType(activity.type)
+        }));
+
+        setRecentActivity(transformedActivity);
+
+        // Transform achievements data
+        const transformedAchievements = achievements.map(achievement => ({
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          icon: getIconComponent(achievement.icon),
+          earned: achievement.earned,
+          date: achievement.date,
+          progress: achievement.progress,
+          target: achievement.target,
+          current: achievement.current
+        }));
+
+        setAchievements(transformedAchievements);
+      } else {
+        throw new Error(response.data.message || 'Failed to load profile data');
+      }
 
     } catch (error) {
       console.error('Error loading profile data:', error);
+
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        // Clear invalid tokens
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        // Redirect to login
+        window.location.href = '/login';
+      } else {
+        toast.error('Failed to load profile data');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const getActivityAction = (type) => {
+    const actions = {
+      ticket_created: 'Created ticket',
+      ticket_updated: 'Updated ticket status',
+      ticket_resolved: 'Resolved ticket',
+      ticket_assigned: 'Assigned new ticket',
+      ticket_closed: 'Closed ticket'
+    };
+    return actions[type] || 'Activity';
+  };
+
+  const getActivityType = (type) => {
+    const types = {
+      ticket_created: 'assigned',
+      ticket_updated: 'updated',
+      ticket_resolved: 'resolved',
+      ticket_assigned: 'assigned',
+      ticket_closed: 'resolved'
+    };
+    return types[type] || 'updated';
+  };
+
+  const getRelativeTime = (timestamp) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInHours = Math.floor((now - time) / (1000 * 60 * 60));
+
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return '1 day ago';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+
+    return time.toLocaleDateString();
+  };
+
+  const getIconComponent = (iconName) => {
+    const icons = {
+      MessageSquare,
+      CheckCircle,
+      Zap,
+      Star,
+      Target,
+      Activity
+    };
+    return icons[iconName] || Activity;
   };
 
   const getActivityIcon = (type) => {
@@ -407,6 +399,20 @@ const SupportProfile = () => {
                     <p className="text-xs text-gray-600">{achievement.description}</p>
                     {achievement.earned && achievement.date && (
                       <p className="text-xs text-green-600 mt-1">Earned {achievement.date}</p>
+                    )}
+                    {!achievement.earned && achievement.target && (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>{achievement.current}/{achievement.target}</span>
+                          <span>{Math.round(achievement.progress)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${achievement.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     )}
                   </div>
                   {achievement.earned && (

@@ -3,6 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, CheckCircle, XCircle, AlertCircle, MessageSquare, Send, Play, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ticketService from '../../services/ticket.service';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
 
 const SupportTicketDetails = () => {
   const navigate = useNavigate();
@@ -175,15 +182,29 @@ const SupportTicketDetails = () => {
         {/* Right: Status Update */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 h-fit">
           <h3 className="font-semibold mb-3">Update Status</h3>
-          <select
-            value={statusToSet}
-            onChange={(e) => setStatusToSet(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3"
-          >
-            <option value="in_progress">In Progress - Start working</option>
-            <option value="resolved">Resolved - Work completed</option>
-            <option value="closed">Closed</option>
-          </select>
+          {(ticket?.status === 'resolved' || ticket?.status === 'closed') ? (
+            <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm mb-3">
+              Cannot change status. Ticket is {ticket.status.replace('_', ' ')}.
+            </div>
+          ) : (
+            <Select value={statusToSet} onValueChange={setStatusToSet}>
+              <SelectTrigger className="w-full mb-3">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Only show valid status transitions */}
+                {ticket?.status === 'open' && (
+                  <SelectItem value="in_progress">In Progress - Start working</SelectItem>
+                )}
+                {(ticket?.status === 'open' || ticket?.status === 'in_progress') && (
+                  <>
+                    <SelectItem value="resolved">Resolved - Work completed</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          )}
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
@@ -192,10 +213,16 @@ const SupportTicketDetails = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3"
           />
           <div className="flex justify-end">
-            <button onClick={updateStatus} disabled={saving} className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50">
-              {statusToSet === 'in_progress' ? <Play className="h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
-              Update Status
-            </button>
+            {(ticket?.status === 'resolved' || ticket?.status === 'closed') ? (
+              <div className="text-sm text-gray-600 text-center py-2">
+                This ticket cannot be updated. Contact admin to reopen if needed.
+              </div>
+            ) : (
+              <button onClick={updateStatus} disabled={saving || !statusToSet} className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50">
+                {statusToSet === 'in_progress' ? <Play className="h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
+                Update Status
+              </button>
+            )}
           </div>
         </div>
       </div>

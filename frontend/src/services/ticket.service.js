@@ -38,7 +38,7 @@ class TicketService {
   async getSuperadminTickets(filters = {}) {
     try {
       const params = new URLSearchParams(filters);
-      const response = await api.get(`/tickets/superadmin?${params.toString()}`);
+      const response = await api.get(`/tickets?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching superadmin tickets:', error);
@@ -135,8 +135,38 @@ class TicketService {
   // Get ticket statistics
   async getTicketStats() {
     try {
-      const response = await api.get('/tickets/stats');
-      return response.data;
+      const response = await api.get('/tickets/support-dashboard-analytics');
+      
+      // Validate response structure
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Failed to fetch ticket statistics');
+      }
+
+      // Ensure data is present and has the expected structure
+      const data = response.data.data || {};
+      
+      return {
+        success: true,
+        data: {
+          stats: data.stats || {
+            totalTickets: 0,
+            openTickets: 0,
+            inProgressTickets: 0,
+            resolvedTickets: 0,
+            closedTickets: 0
+          },
+          performance: data.performance || {
+            avgResponseTime: 0,
+            avgResolutionTime: 0,
+            satisfactionScore: 0,
+            totalTickets: 0
+          },
+          recentTickets: data.recentTickets || [],
+          user: data.user || null,
+          pg: data.pg || null
+        },
+        message: response.data.message || 'Ticket statistics retrieved successfully'
+      };
     } catch (error) {
       console.error('Error fetching ticket stats:', error);
       
@@ -145,7 +175,7 @@ class TicketService {
         throw new Error(error.response.data.message || 'Failed to fetch ticket statistics');
       }
       
-      throw new Error('Network error or server unavailable');
+      throw new Error(error.message || 'Network error or server unavailable');
     }
   }
 
@@ -309,14 +339,99 @@ class TicketService {
       return response.data;
     } catch (error) {
       console.error('Error fetching statuses:', error);
-      
+
       // Standardized error handling
       if (error.response) {
         throw new Error(error.response.data.message || 'Failed to fetch status options');
       }
-      
+
       throw new Error('Network error or server unavailable');
     }
+  }
+
+  // Get support staff list
+  async getSupportStaff() {
+    try {
+      const response = await api.get('/tickets/support-staff/list');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching support staff:', error);
+
+      // Standardized error handling
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch support staff');
+      }
+
+      throw new Error('Network error or server unavailable');
+    }
+  }
+
+  // Request to reopen a closed ticket (admin only)
+  async requestReopenTicket(ticketId, reason) {
+    try {
+      const response = await api.post(`/tickets/${ticketId}/request-reopen`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error('Error requesting ticket reopen:', error);
+
+      // Standardized error handling
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to request ticket reopen');
+      }
+
+      throw new Error('Network error or server unavailable');
+    }
+  }
+
+  // Reopen a ticket (superadmin only)
+  async reopenTicket(ticketId, reason) {
+    try {
+      const response = await api.post(`/tickets/${ticketId}/reopen`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error('Error reopening ticket:', error);
+
+      // Standardized error handling
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to reopen ticket');
+      }
+
+      throw new Error('Network error or server unavailable');
+    }
+  }
+
+  // Get reopen requests (superadmin only)
+  async getReopenRequests() {
+    try {
+      const response = await api.get('/tickets/reopen-requests/list');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching reopen requests:', error);
+
+      // Standardized error handling
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Failed to fetch reopen requests');
+      }
+
+      throw new Error('Network error or server unavailable');
+    }
+  }
+
+  // Validate status transition (client-side validation)
+  validateStatusTransition(currentStatus, newStatus) {
+    const invalidTransitions = {
+      'resolved': ['open', 'in_progress'],
+      'closed': ['open', 'in_progress', 'resolved']
+    };
+
+    if (invalidTransitions[currentStatus] && invalidTransitions[currentStatus].includes(newStatus)) {
+      return {
+        valid: false,
+        message: `Cannot change status from ${currentStatus.replace('_', ' ')} to ${newStatus.replace('_', ' ')}. Please reopen the ticket instead.`
+      };
+    }
+
+    return { valid: true };
   }
 
   // Upload ticket attachments

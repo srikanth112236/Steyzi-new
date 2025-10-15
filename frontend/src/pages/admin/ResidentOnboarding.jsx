@@ -690,7 +690,7 @@ const ResidentOnboarding = () => {
       
       if (response.data.success) {
         // Store allocation data for the success screen
-        const currentDate = new Date();
+        let currentDate = new Date();
         if (isNaN(currentDate.getTime())) {
           console.error('❌ Invalid current date, using fallback');
           currentDate = new Date('2024-01-01'); // Fallback date

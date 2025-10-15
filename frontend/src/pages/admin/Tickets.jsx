@@ -26,6 +26,13 @@ import ticketService from '../../services/ticket.service';
 import TicketForm from '../../components/admin/TicketForm';
 import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
 import TicketDetailsModal from '../../components/common/TicketDetailsModal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
 
 const Tickets = () => {
   const [tickets, setTickets] = useState([]);
@@ -46,6 +53,8 @@ const Tickets = () => {
   const [showTicketDetails, setShowTicketDetails] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [showReopenModal, setShowReopenModal] = useState(false);
 
   // Load tickets and stats
   useEffect(() => {
@@ -146,6 +155,39 @@ const Tickets = () => {
     }
   };
 
+  const handleReopenRequest = async (ticket) => {
+    setSelectedTicket(ticket);
+    setShowReopenModal(true);
+  };
+
+  const submitReopenRequest = async () => {
+    if (!selectedTicket || !reopenReason.trim()) {
+      toast.error('Please provide a reason for reopening');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await ticketService.requestReopenTicket(selectedTicket._id, reopenReason.trim());
+      if (response.success) {
+        toast.success('Reopen request submitted successfully');
+        loadTickets();
+        loadStats();
+        setShowReopenModal(false);
+        setShowTicketDetails(false);
+        setSelectedTicket(null);
+        setReopenReason('');
+      } else {
+        toast.error(response.message || 'Failed to submit reopen request');
+      }
+    } catch (error) {
+      toast.error('Failed to submit reopen request');
+      console.error('Error submitting reopen request:', error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleFormSuccess = () => {
     loadTickets();
     loadStats();
@@ -223,6 +265,11 @@ const Tickets = () => {
                 <span className="w-2 h-2 rounded-full bg-current mr-2" />
                 {ticket.priority}
               </span>
+              {ticket.isReopened && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                  🔄 Reopened
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -487,50 +534,53 @@ const Tickets = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Status</option>
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Status</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                  <select
-                    value={filters.priority}
-                    onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Priority</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                  <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Priority</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                  <select
-                    value={filters.category}
-                    onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Categories</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="billing">Billing</option>
-                    <option value="complaint">Complaint</option>
-                    <option value="suggestion">Suggestion</option>
-                    <option value="emergency">Emergency</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <Select value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Categories</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="billing">Billing</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                      <SelectItem value="suggestion">Suggestion</SelectItem>
+                      <SelectItem value="emergency">Emergency</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </motion.div>
@@ -619,9 +669,16 @@ const Tickets = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ticket.priorityColor}`}>
-                        {ticket.priority}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ticket.priorityColor}`}>
+                          {ticket.priority}
+                        </span>
+                        {ticket.isReopened && (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold bg-purple-100 text-purple-800 rounded-full">
+                            🔄
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 capitalize">{ticket.category}</div>
@@ -699,7 +756,52 @@ const Tickets = () => {
           // Handle status update if needed
           console.log('Status update requested for ticket:', ticket._id);
         }}
+        onReopenRequest={handleReopenRequest}
       />
+
+      {/* Reopen Request Modal */}
+      {showReopenModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Request Ticket Reopen</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will submit a request to superadmin to reopen the ticket: <strong>{selectedTicket?.title}</strong>
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for reopening <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+                rows={4}
+                placeholder="Please provide a detailed reason for reopening this ticket..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowReopenModal(false);
+                  setReopenReason('');
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReopenRequest}
+                disabled={actionLoading || !reopenReason.trim()}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {actionLoading ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
