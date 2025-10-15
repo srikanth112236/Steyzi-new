@@ -1,11 +1,22 @@
 const { UserSubscription, User, Resident, Room, Payment } = require('../models');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
 
 /**
  * Usage Dashboard Service
  * Provides real-time usage monitoring and analytics
  */
 class UsageDashboardService {
+  /**
+   * Generate a stable random number based on a seed
+   */
+  stableRandom(seed, min = 0, max = 1) {
+    const hash = crypto.createHash('md5').update(seed.toString()).digest('hex');
+    const hashNum = parseInt(hash.substr(0, 8), 16);
+    const normalized = hashNum / 0xffffffff;
+    return min + normalized * (max - min);
+  }
+
   /**
    * Get comprehensive usage dashboard data for a user
    */
@@ -28,7 +39,7 @@ class UsageDashboardService {
       const usageData = await this.calculateUsageMetrics(userId, timeframe);
       const limitData = await this.getSubscriptionLimits(subscription);
       const trendData = await this.getUsageTrends(userId, timeframe);
-      const alerts = await this.generateUsageAlerts(subscription, usageData);
+      const alerts = await this.generateUsageAlerts(subscription, usageData, timeframe);
 
       return {
         success: true,
@@ -57,48 +68,66 @@ class UsageDashboardService {
   }
 
   /**
-   * Calculate current usage metrics
+   * Calculate current usage metrics from actual database records
    */
   async calculateUsageMetrics(userId, timeframe) {
     try {
       const startDate = this.getTimeframeStart(timeframe);
 
-      // Count active residents (beds in use)
+      // Fetch actual residents
       const activeResidents = await Resident.countDocuments({
         userId,
         status: { $in: ['active', 'onboarding'] },
         createdAt: { $gte: startDate }
       });
 
-      // Count total rooms
+      // Fetch rooms and occupancy
       const totalRooms = await Room.countDocuments({
         userId,
         status: 'active'
       });
 
-      // Count occupied rooms
       const occupiedRooms = await Room.countDocuments({
         userId,
         status: 'active',
         'beds.status': 'occupied'
       });
 
-      // Get bed utilization details
-      const rooms = await Room.find({
-        userId,
-        status: 'active'
-      }).select('beds capacity sharingType');
+      // Detailed bed utilization
+      const rooms = await Room.aggregate([
+        { 
+          $match: { 
+            userId, 
+            status: 'active' 
+          } 
+        },
+        {
+          $project: {
+            totalBeds: { $size: '$beds' },
+            occupiedBeds: { 
+              $size: { 
+                $filter: { 
+                  input: '$beds', 
+                  as: 'bed', 
+                  cond: { $eq: ['$$bed.status', 'occupied'] } 
+                } 
+              } 
+            }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalBeds: { $sum: '$totalBeds' },
+            occupiedBeds: { $sum: '$occupiedBeds' }
+          }
+        }
+      ]);
 
-      let totalBeds = 0;
-      let occupiedBeds = 0;
+      const bedsData = rooms[0] || { totalBeds: 0, occupiedBeds: 0 };
 
-      rooms.forEach(room => {
-        totalBeds += room.capacity || room.beds?.length || 0;
-        occupiedBeds += room.beds?.filter(bed => bed.status === 'occupied').length || 0;
-      });
-
-      // Calculate payment metrics
-      const payments = await Payment.aggregate([
+      // Payment metrics
+      const paymentMetrics = await Payment.aggregate([
         {
           $match: {
             userId: this.convertToObjectId(userId),
@@ -116,16 +145,24 @@ class UsageDashboardService {
         }
       ]);
 
-      const paymentMetrics = payments[0] || {
+      const payments = paymentMetrics[0] || {
         totalAmount: 0,
         transactionCount: 0,
         averageAmount: 0
       };
 
+      // Subscription limits
+      const subscription = await UserSubscription.findOne({
+        userId,
+        status: { $in: ['active', 'trial'] }
+      }).populate('subscriptionPlanId');
+
+      const maxBeds = subscription ? subscription.totalBeds : 60;
+
       return {
         residents: {
           active: activeResidents,
-          total: activeResidents // For now, same as active
+          total: activeResidents
         },
         rooms: {
           total: totalRooms,
@@ -134,21 +171,21 @@ class UsageDashboardService {
           occupancyRate: totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0
         },
         beds: {
-          total: totalBeds,
-          occupied: occupiedBeds,
-          vacant: totalBeds - occupiedBeds,
-          utilizationRate: totalBeds > 0 ? (occupiedBeds / totalBeds) * 100 : 0
+          total: bedsData.totalBeds,
+          occupied: bedsData.occupiedBeds,
+          vacant: bedsData.totalBeds - bedsData.occupiedBeds,
+          utilizationRate: bedsData.totalBeds > 0 ? 
+            (bedsData.occupiedBeds / bedsData.totalBeds) * 100 : 0
         },
         payments: {
-          totalAmount: paymentMetrics.totalAmount,
-          transactionCount: paymentMetrics.transactionCount,
-          averageAmount: paymentMetrics.averageAmount
+          totalAmount: payments.totalAmount,
+          transactionCount: payments.transactionCount,
+          averageAmount: payments.averageAmount
         },
         timeframe
       };
-
     } catch (error) {
-      logger.error('Usage metrics calculation error:', error);
+      logger.error('Actual usage metrics calculation error:', error);
       throw error;
     }
   }
@@ -177,7 +214,7 @@ class UsageDashboardService {
   }
 
   /**
-   * Get usage trends over time
+   * Generate actual usage trends
    */
   async getUsageTrends(userId, timeframe) {
     try {
@@ -185,21 +222,95 @@ class UsageDashboardService {
       const trends = [];
 
       for (const period of periods) {
-        const usage = await this.calculateUsageMetrics(userId, `${period.days}d`);
+        const periodStartDate = new Date(Date.now() - period.days * 24 * 60 * 60 * 1000);
+
+        // Aggregate residents for this period
+        const residentTrend = await Resident.aggregate([
+          {
+            $match: {
+              userId: this.convertToObjectId(userId),
+              status: { $in: ['active', 'onboarding'] },
+              createdAt: { 
+                $gte: periodStartDate,
+                $lt: new Date(periodStartDate.getTime() + 24 * 60 * 60 * 1000)
+              }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+
+        // Aggregate room occupancy
+        const roomTrend = await Room.aggregate([
+          {
+            $match: {
+              userId: this.convertToObjectId(userId),
+              status: 'active',
+              updatedAt: { 
+                $gte: periodStartDate,
+                $lt: new Date(periodStartDate.getTime() + 24 * 60 * 60 * 1000)
+              }
+            }
+          },
+          {
+            $project: {
+              occupiedBeds: { 
+                $size: { 
+                  $filter: { 
+                    input: '$beds', 
+                    as: 'bed', 
+                    cond: { $eq: ['$$bed.status', 'occupied'] } 
+                  } 
+                } 
+              }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              occupiedRooms: { $sum: { $cond: [{ $gt: ['$occupiedBeds', 0] }, 1, 0] } },
+              totalRooms: { $sum: 1 }
+            }
+          }
+        ]);
+
+        // Aggregate payments
+        const paymentTrend = await Payment.aggregate([
+          {
+            $match: {
+              userId: this.convertToObjectId(userId),
+              status: 'completed',
+              createdAt: { 
+                $gte: periodStartDate,
+                $lt: new Date(periodStartDate.getTime() + 24 * 60 * 60 * 1000)
+              }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: '$amount' }
+            }
+          }
+        ]);
 
         trends.push({
-          date: period.date,
-          residents: usage.residents.active,
-          rooms: usage.rooms.occupied,
-          beds: usage.beds.occupied,
-          payments: usage.payments.totalAmount
+          date: periodStartDate.toISOString().split('T')[0],
+          residents: residentTrend[0]?.count || 0,
+          rooms: roomTrend[0]?.occupiedRooms || 0,
+          beds: residentTrend[0]?.count || 0,
+          payments: paymentTrend[0]?.totalAmount || 0
         });
       }
 
-      return trends;
+      return trends.reverse(); // Ensure chronological order
 
     } catch (error) {
-      logger.error('Usage trends error:', error);
+      logger.error('Actual usage trends error:', error);
       return [];
     }
   }
@@ -207,7 +318,7 @@ class UsageDashboardService {
   /**
    * Generate usage alerts
    */
-  async generateUsageAlerts(subscription, usageData) {
+  async generateUsageAlerts(subscription, usageData, timeframe = '30d') {
     const alerts = [];
     const plan = subscription.subscriptionPlanId;
 
@@ -382,34 +493,48 @@ class UsageDashboardService {
   }
 
   /**
-   * Get usage cost breakdown
+   * Get actual usage cost breakdown
    */
   async getUsageCostBreakdown(userId, subscription) {
     try {
       const plan = subscription.subscriptionPlanId;
       const currentUsage = await this.calculateUsageMetrics(userId, '30d');
 
+      // Calculate actual extra beds and branches
+      const extraBedsCount = Math.max(0, currentUsage.beds.occupied - plan.baseBedCount);
+      const extraBranchesCount = plan.allowMultipleBranches ?
+        Math.max(0, subscription.totalBranches - plan.branchCount) : 0;
+
+      // Actual base subscription price
+      const baseSubscription = plan.basePrice;
+
       const breakdown = {
-        baseSubscription: plan.basePrice,
-        extraBeds: Math.max(0, currentUsage.beds.occupied - plan.baseBedCount) * plan.topUpPricePerBed,
-        extraBranches: plan.allowMultipleBranches ?
-          Math.max(0, subscription.totalBranches - plan.branchCount) * plan.costPerBranch : 0,
+        baseSubscription: baseSubscription,
+        extraBeds: extraBedsCount,
+        extraBedCost: extraBedsCount * plan.topUpPricePerBed,
+        extraBranches: extraBranchesCount,
+        branchCost: extraBranchesCount * plan.costPerBranch,
         discounts: plan.billingCycle === 'annual' ?
-          (plan.basePrice * 12 * plan.annualDiscount / 100) : 0,
-        taxes: 0, // Will be calculated
+          (baseSubscription * 12 * plan.annualDiscount / 100) : 0,
+        taxes: 0,
+        subtotal: 0,
         total: 0
       };
 
       // Calculate taxes (18% GST)
-      const subtotal = breakdown.baseSubscription + breakdown.extraBeds +
-                      breakdown.extraBranches - breakdown.discounts;
+      const subtotal = breakdown.baseSubscription + 
+                       breakdown.extraBedCost + 
+                       breakdown.branchCost - 
+                       breakdown.discounts;
+      
       breakdown.taxes = subtotal * 0.18;
+      breakdown.subtotal = subtotal;
       breakdown.total = subtotal + breakdown.taxes;
 
       return breakdown;
 
     } catch (error) {
-      logger.error('Cost breakdown error:', error);
+      logger.error('Actual cost breakdown error:', error);
       return null;
     }
   }

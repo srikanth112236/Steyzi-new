@@ -5,11 +5,11 @@ import { Platform } from 'react-native';
 const getApiUrl = () => {
   switch (Platform.OS) {
     case 'ios':
-      return 'http://localhost:5000/api';
+      return 'http://192.168.0.8:5000/api';
     case 'android':
-      return 'http:192.168.0.3:5000/api'; // Android emulator
+      return 'http://192.168.0.8:5000/api'; // Android emulator
     default:
-      return 'http://192.168.0.3:5000/api'; // Fallback to local IP
+      return 'http://192.168.0.8:5000/api'; // Fallback to local IP
   }
 };
 

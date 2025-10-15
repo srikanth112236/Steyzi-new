@@ -3,6 +3,7 @@ export { default as LoginScreen } from './auth/LoginScreen';
 
 // Dashboard Screens
 export { default as DashboardScreen } from './dashboard/DashboardScreen';
+export { default as DashboardsScreen } from './dashboards/DashboardsScreen';
 
 // Resident Screens
 export { default as ResidentsScreen } from './residents/ResidentsScreen';

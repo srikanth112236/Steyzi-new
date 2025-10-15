@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calculator,
@@ -18,82 +18,102 @@ import {
   Settings
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
-// Cost Calculator API service
+// Enhanced Cost Calculator API service
 const costService = {
+  // Fetch active subscription plans
+  fetchActivePlans: async () => {
+    try {
+      const response = await axios.get('/api/subscriptions/active/plans', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch active plans:', error);
+      throw error;
+    }
+  },
+
+  // Calculate cost for a specific plan
   calculateCost: async (planId, configuration) => {
-    const response = await fetch('/api/advanced/cost/calculate', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ planId, configuration })
-    });
-    return response.json();
+    try {
+      const response = await axios.post('/api/advanced/cost/calculate', 
+        { 
+          planId, 
+          configuration 
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Cost calculation error:', error);
+      throw error;
+    }
   },
 
+  // Compare multiple plans
   comparePlans: async (planIds, configuration) => {
-    const response = await fetch('/api/advanced/cost/compare', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ planIds, configuration })
-    });
-    return response.json();
+    try {
+      const response = await axios.post('/api/advanced/cost/compare', 
+        { 
+          planIds, 
+          configuration 
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Plan comparison error:', error);
+      throw error;
+    }
   },
 
-  getCurrentCost: async () => {
-    const response = await fetch('/api/advanced/cost/current', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.json();
+  // Get current cost and optimization suggestions
+  getOptimizationSuggestions: async () => {
+    try {
+      const response = await axios.get('/api/advanced/cost/optimization', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Optimization suggestions error:', error);
+      throw error;
+    }
   },
 
-  calculateUpgrade: async (currentPlanId, targetPlanId, configuration) => {
-    const response = await fetch('/api/advanced/cost/upgrade', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ currentPlanId, targetPlanId, configuration })
-    });
-    return response.json();
-  },
-
-  getOptimization: async () => {
-    const response = await fetch('/api/advanced/cost/optimization', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.json();
-  },
-
-  getPricingTiers: async (beds, branches, billingCycle) => {
-    const params = new URLSearchParams();
-    if (beds) params.append('beds', beds);
-    if (branches) params.append('branches', branches);
-    if (billingCycle) params.append('billingCycle', billingCycle);
-
-    const response = await fetch(`/api/advanced/cost/tiers?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.json();
+  // Get pricing tiers based on configuration
+  getPricingTiers: async (configuration) => {
+    try {
+      const { beds, branches, billingCycle } = configuration;
+      const response = await axios.get('/api/advanced/cost/tiers', {
+        params: { beds, branches, billingCycle },
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Pricing tiers error:', error);
+      throw error;
+    }
   }
 };
 
 const CostCalculator = () => {
+  // State management
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [configuration, setConfiguration] = useState({
@@ -101,76 +121,87 @@ const CostCalculator = () => {
     branches: 1,
     billingCycle: 'monthly'
   });
+  
+  // Calculation states
   const [calculation, setCalculation] = useState(null);
   const [comparison, setComparison] = useState(null);
   const [optimization, setOptimization] = useState(null);
   const [pricingTiers, setPricingTiers] = useState(null);
+  
+  // UI and loading states
   const [loading, setLoading] = useState(false);
-  const [currentView, setCurrentView] = useState('calculator'); // calculator, compare, optimize
+  const [currentView, setCurrentView] = useState('calculator');
 
+  // Fetch plans and initial data on component mount
   useEffect(() => {
-    loadPlans();
-    loadCurrentCost();
+    const initializeData = async () => {
+      try {
+        const plansResponse = await costService.fetchActivePlans();
+        
+        if (plansResponse.success) {
+          setPlans(plansResponse.data);
+          
+          // Automatically select the first plan
+          if (plansResponse.data.length > 0) {
+            setSelectedPlan(plansResponse.data[0]);
+            
+            // Perform initial cost calculation
+            await calculateCost(plansResponse.data[0]._id);
+          }
+        }
+      } catch (error) {
+        toast.error('Failed to load initial data');
+      }
+    };
+
+    initializeData();
   }, []);
 
-  const loadPlans = async () => {
-    try {
-      const response = await fetch('/api/subscriptions/active/plans', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+  // Memoized currency formatter
+  const formatCurrency = useMemo(() => 
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format
+  , []);
 
-      const data = await response.json();
-      if (data.success) {
-        setPlans(data.data);
-        if (data.data.length > 0 && !selectedPlan) {
-          setSelectedPlan(data.data[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load plans:', error);
-      toast.error('Failed to load subscription plans');
+  // Calculate cost for selected plan
+  const calculateCost = async (planId = selectedPlan?._id) => {
+    if (!planId) {
+      toast.error('Please select a plan');
+      return;
     }
-  };
-
-  const loadCurrentCost = async () => {
-    try {
-      const result = await costService.getCurrentCost();
-      if (result.success) {
-        setCalculation(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load current cost:', error);
-    }
-  };
-
-  const calculateCost = async () => {
-    if (!selectedPlan) return;
 
     try {
       setLoading(true);
-      const result = await costService.calculateCost(selectedPlan._id, configuration);
+      const result = await costService.calculateCost(planId, configuration);
 
       if (result.success) {
         setCalculation(result.data);
+        setCurrentView('calculator');
         toast.success('Cost calculated successfully');
       } else {
         toast.error(result.message || 'Failed to calculate cost');
       }
     } catch (error) {
-      console.error('Cost calculation error:', error);
-      toast.error('Failed to calculate cost');
+      toast.error('An error occurred while calculating cost');
     } finally {
       setLoading(false);
     }
   };
 
+  // Compare top 3 plans
   const comparePlans = async () => {
+    if (plans.length < 2) {
+      toast.error('Not enough plans to compare');
+      return;
+    }
+
     try {
       setLoading(true);
-      const planIds = plans.slice(0, 3).map(plan => plan._id); // Compare first 3 plans
+      const planIds = plans.slice(0, 3).map(plan => plan._id);
       const result = await costService.comparePlans(planIds, configuration);
 
       if (result.success) {
@@ -181,17 +212,17 @@ const CostCalculator = () => {
         toast.error(result.message || 'Failed to compare plans');
       }
     } catch (error) {
-      console.error('Plan comparison error:', error);
-      toast.error('Failed to compare plans');
+      toast.error('An error occurred while comparing plans');
     } finally {
       setLoading(false);
     }
   };
 
-  const getOptimization = async () => {
+  // Get optimization suggestions
+  const getOptimizationSuggestions = async () => {
     try {
       setLoading(true);
-      const result = await costService.getOptimization();
+      const result = await costService.getOptimizationSuggestions();
 
       if (result.success) {
         setOptimization(result.data);
@@ -201,21 +232,17 @@ const CostCalculator = () => {
         toast.error(result.message || 'Failed to get optimization suggestions');
       }
     } catch (error) {
-      console.error('Optimization error:', error);
-      toast.error('Failed to get optimization suggestions');
+      toast.error('An error occurred while fetching optimization suggestions');
     } finally {
       setLoading(false);
     }
   };
 
-  const getPricingTiers = async () => {
+  // Get pricing tiers
+  const fetchPricingTiers = async () => {
     try {
       setLoading(true);
-      const result = await costService.getPricingTiers(
-        configuration.beds,
-        configuration.branches,
-        configuration.billingCycle
-      );
+      const result = await costService.getPricingTiers(configuration);
 
       if (result.success) {
         setPricingTiers(result.data);
@@ -225,21 +252,13 @@ const CostCalculator = () => {
         toast.error(result.message || 'Failed to load pricing tiers');
       }
     } catch (error) {
-      console.error('Pricing tiers error:', error);
-      toast.error('Failed to load pricing tiers');
+      toast.error('An error occurred while fetching pricing tiers');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
+  // Render methods remain the same as in the previous implementation
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 lg:p-8">
       {/* Header */}
@@ -359,9 +378,10 @@ const CostCalculator = () => {
           </div>
         </div>
 
+        {/* Buttons for calculations */}
         <div className="flex space-x-3 mt-4">
           <button
-            onClick={calculateCost}
+            onClick={() => calculateCost()}
             disabled={loading || !selectedPlan}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -371,7 +391,7 @@ const CostCalculator = () => {
 
           <button
             onClick={comparePlans}
-            disabled={loading}
+            disabled={loading || plans.length < 2}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <BarChart3 className="h-4 w-4" />
@@ -379,7 +399,7 @@ const CostCalculator = () => {
           </button>
 
           <button
-            onClick={getOptimization}
+            onClick={getOptimizationSuggestions}
             disabled={loading}
             className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -388,7 +408,7 @@ const CostCalculator = () => {
           </button>
 
           <button
-            onClick={getPricingTiers}
+            onClick={fetchPricingTiers}
             disabled={loading}
             className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >

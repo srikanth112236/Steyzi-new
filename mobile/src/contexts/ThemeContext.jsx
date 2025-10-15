@@ -1,37 +1,11 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '@/constants/theme';
 
 // Theme configuration
-const lightTheme = {
-  background: '#F8FAFC',
-  text: '#1F2937',
-  secondaryText: '#6B7280',
-  primary: '#3B82F6',
-  card: '#FFFFFF',
-  border: 'rgba(0,0,0,0.1)',
-  statusColors: {
-    success: { text: '#10B981', background: '#D1FAE5' },
-    warning: { text: '#F59E0B', background: '#FEF3C7' },
-    danger: { text: '#EF4444', background: '#FEE2E2' },
-    neutral: { text: '#6B7280', background: '#F3F4F6' }
-  }
-};
-
-const darkTheme = {
-  background: '#1E293B',
-  text: '#F1F5F9',
-  secondaryText: '#94A3B8',
-  primary: '#60A5FA',
-  card: '#2D3748',
-  border: 'rgba(255,255,255,0.1)',
-  statusColors: {
-    success: { text: '#6EE7B7', background: '#064E3B' },
-    warning: { text: '#FCD34D', background: '#92400E' },
-    danger: { text: '#FCA5A5', background: '#7F1D1D' },
-    neutral: { text: '#9CA3AF', background: '#374151' }
-  }
-};
+const lightTheme = Colors.light;
+const darkTheme = Colors.dark;
 
 // Create context
 export const ThemeContext = createContext({

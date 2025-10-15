@@ -20,11 +20,14 @@ import { Button, Input } from '../../components/ui';
 import NetInfo from '@react-native-community/netinfo';
 
 const ALLOWED_ROLES = [
-  'admin', 
-  'superadmin', 
-  'support', 
-  'sales_manager', 
-  'pg_manager'
+  'admin',
+  'superadmin',
+  'support',
+  'sales_manager',
+  'pg_manager',
+  'user',
+  'resident',
+  'staff'
 ];
 
 const LoginScreen = () => {
@@ -171,6 +174,9 @@ const LoginScreen = () => {
       'support': 'Support Staff',
       'sales_manager': 'Sales Manager',
       'pg_manager': 'Property Manager',
+      'user': 'User',
+      'resident': 'Resident',
+      'staff': 'Staff',
       'default': 'User'
     };
     return roleMap[role] || roleMap['default'];
@@ -191,11 +197,11 @@ const LoginScreen = () => {
           <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             {loginStatus === 'success' && (
               <>
-                <Text style={[styles.modalTitle, { color: theme.statusColors.success.text }]}>
+                <Text style={[styles.modalTitle, { color: theme.statusColors?.success?.text || theme.text }]}>
                   Login Successful
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: theme.text }]}>
-                  Welcome, {getRoleDisplayName(user?.role)}!
+                  Welcome, {getRoleDisplayName(user?.role || 'default')}!
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: theme.secondaryText, fontSize: 14 }]}>
                   Redirecting to dashboard...
@@ -205,7 +211,7 @@ const LoginScreen = () => {
 
             {loginStatus === 'error' && (
               <>
-                <Text style={[styles.modalTitle, { color: theme.statusColors.danger.text }]}>
+                <Text style={[styles.modalTitle, { color: theme.statusColors?.danger?.text || theme.text }]}>
                   Login Failed
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: theme.text }]}>
@@ -216,7 +222,10 @@ const LoginScreen = () => {
 
             <ActivityIndicator 
               size="large" 
-              color={loginStatus === 'success' ? theme.statusColors.success.text : theme.statusColors.danger.text} 
+              color={loginStatus === 'success' 
+                ? (theme.statusColors?.success?.text || theme.primary)
+                : (theme.statusColors?.danger?.text || theme.primary)
+              } 
               style={styles.modalSpinner}
             />
 
@@ -309,16 +318,16 @@ const LoginScreen = () => {
 
             {/* Error Messages */}
             {networkError && (
-              <View style={[styles.errorContainer, { backgroundColor: theme.statusColors.danger.background }]}>
-                <Text style={[styles.errorText, { color: theme.statusColors.danger.text }]}>
+              <View style={[styles.errorContainer, { backgroundColor: theme.statusColors?.danger?.background || 'rgba(239, 68, 68, 0.1)' }]}>
+                <Text style={[styles.errorText, { color: theme.statusColors?.danger?.text || 'red' }]}>
                   No internet connection. Please check your network settings.
                 </Text>
               </View>
             )}
 
             {globalError && (
-              <View style={[styles.errorContainer, { backgroundColor: theme.statusColors.danger.background }]}>
-                <Text style={[styles.errorText, { color: theme.statusColors.danger.text }]}>
+              <View style={[styles.errorContainer, { backgroundColor: theme.statusColors?.danger?.background || 'rgba(239, 68, 68, 0.1)' }]}>
+                <Text style={[styles.errorText, { color: theme.statusColors?.danger?.text || 'red' }]}>
                   {globalError}
                 </Text>
               </View>
