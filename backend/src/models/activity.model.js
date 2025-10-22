@@ -64,6 +64,7 @@ const activitySchema = new mongoose.Schema({
     enum: [
       'user',
       'branch',
+      'floor',
       'room',
       'bed',
       'resident',
@@ -73,6 +74,10 @@ const activitySchema = new mongoose.Schema({
       'report',
       'settings',
       'notification',
+      'subscription',
+      'pg',
+      'sales',
+      'analytics',
       'activity',
       'other'
     ]

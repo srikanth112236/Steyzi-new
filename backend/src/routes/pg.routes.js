@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticate, adminOrSuperadmin, superadminOnly } = require('../middleware/auth.middleware');
 const { validateFloor, validateRoom, validatePG } = require('../middleware/validation.middleware');
 const { uploadPGImages, uploadExcelFile, handleExcelUploadError } = require('../middleware/fileUpload.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const FloorService = require('../services/floor.service');
 const RoomService = require('../services/room.service');
 const Branch = require('../models/branch.model');
@@ -106,7 +107,7 @@ router.get('/sales-list', authenticate, async (req, res) => {
 
 // Floor Routes - MUST COME BEFORE /:pgId ROUTES
 // Get all floors for the user's PG (with optional branch filtering)
-router.get('/floors', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/floors', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -170,7 +171,7 @@ router.get('/floors', authenticate, adminOrSuperadmin, async (req, res) => {
   }
 });
 
-router.get('/floors/:floorId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/floors/:floorId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await FloorService.getFloorById(req.params.floorId);
     return res.status(result.statusCode).json(result);
@@ -183,7 +184,7 @@ router.get('/floors/:floorId', authenticate, adminOrSuperadmin, async (req, res)
   }
 });
 
-router.post('/floors', authenticate, adminOrSuperadmin, validateFloor, async (req, res) => {
+router.post('/floors', authenticate, adminOrSuperadmin, validateFloor, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     
@@ -210,7 +211,7 @@ router.post('/floors', authenticate, adminOrSuperadmin, validateFloor, async (re
   }
 });
 
-router.put('/floors/:floorId', authenticate, adminOrSuperadmin, validateFloor, async (req, res) => {
+router.put('/floors/:floorId', authenticate, adminOrSuperadmin, validateFloor, trackAdminActivity(), async (req, res) => {
   try {
     const result = await FloorService.updateFloor(req.params.floorId, req.body, req.user._id);
     return res.status(result.statusCode).json(result);
@@ -223,7 +224,7 @@ router.put('/floors/:floorId', authenticate, adminOrSuperadmin, validateFloor, a
   }
 });
 
-router.delete('/floors/:floorId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/floors/:floorId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await FloorService.deleteFloor(req.params.floorId, req.user._id);
     return res.status(result.statusCode).json(result);
@@ -238,7 +239,7 @@ router.delete('/floors/:floorId', authenticate, adminOrSuperadmin, async (req, r
 
 // Room Routes - MUST COME BEFORE /:pgId ROUTES
 // Get all rooms for the user's PG (Enhanced for Room Availability, with optional branch filtering)
-router.get('/rooms', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -373,7 +374,7 @@ router.get('/rooms', authenticate, adminOrSuperadmin, async (req, res) => {
 });
 
 // Get rooms by floor
-router.get('/rooms/floor/:floorId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms/floor/:floorId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await RoomService.getRoomsByFloor(req.params.floorId);
     return res.status(result.statusCode).json(result);
@@ -387,7 +388,7 @@ router.get('/rooms/floor/:floorId', authenticate, adminOrSuperadmin, async (req,
 });
 
 // Get available rooms - MUST COME BEFORE /rooms/:roomId
-router.get('/rooms/available', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms/available', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { sharingType } = req.query;
     const result = await RoomService.getAvailableRooms(req.user.pgId, sharingType);
@@ -402,7 +403,7 @@ router.get('/rooms/available', authenticate, adminOrSuperadmin, async (req, res)
 });
 
 // Auto-assign notice period beds after expiry
-router.post('/rooms/auto-assign-notice-period', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/rooms/auto-assign-notice-period', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { roomId, bedNumber, residentId } = req.body;
     
@@ -425,7 +426,7 @@ router.post('/rooms/auto-assign-notice-period', authenticate, adminOrSuperadmin,
 });
 
 // Reserve notice period bed for future assignment
-router.post('/rooms/reserve-notice-period-bed', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/rooms/reserve-notice-period-bed', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { roomId, bedNumber, residentId, expectedAvailabilityDate } = req.body;
     
@@ -448,7 +449,7 @@ router.post('/rooms/reserve-notice-period-bed', authenticate, adminOrSuperadmin,
 });
 
 // Process expired notice period beds (admin trigger)
-router.post('/rooms/process-expired-notice-periods', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/rooms/process-expired-notice-periods', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const NoticePeriodService = require('../services/noticePeriod.service');
     const result = await NoticePeriodService.processExpiredNoticePeriodBeds();
@@ -478,7 +479,7 @@ router.post('/rooms/process-expired-notice-periods', authenticate, adminOrSupera
 });
 
 // Get pending notice period bed reservations
-router.get('/rooms/pending-reservations', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms/pending-reservations', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const NoticePeriodService = require('../services/noticePeriod.service');
     const result = await NoticePeriodService.getPendingReservations();
@@ -505,7 +506,7 @@ router.get('/rooms/pending-reservations', authenticate, adminOrSuperadmin, async
   }
 });
 
-router.get('/rooms/:roomId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms/:roomId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await RoomService.getRoomById(req.params.roomId);
     return res.status(result.statusCode).json(result);
@@ -518,7 +519,7 @@ router.get('/rooms/:roomId', authenticate, adminOrSuperadmin, async (req, res) =
   }
 });
 
-router.post('/rooms', authenticate, adminOrSuperadmin, validateRoom, async (req, res) => {
+router.post('/rooms', authenticate, adminOrSuperadmin, validateRoom, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     
@@ -545,7 +546,7 @@ router.post('/rooms', authenticate, adminOrSuperadmin, validateRoom, async (req,
   }
 });
 
-router.put('/rooms/:roomId', authenticate, adminOrSuperadmin, validateRoom, async (req, res) => {
+router.put('/rooms/:roomId', authenticate, adminOrSuperadmin, validateRoom, trackAdminActivity(), async (req, res) => {
   try {
     const result = await RoomService.updateRoom(req.params.roomId, req.body, req.user._id);
     return res.status(result.statusCode).json(result);
@@ -558,7 +559,7 @@ router.put('/rooms/:roomId', authenticate, adminOrSuperadmin, validateRoom, asyn
   }
 });
 
-router.delete('/rooms/:roomId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/rooms/:roomId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const roomId = req.params.roomId;
     const userId = req.user._id;
@@ -578,7 +579,7 @@ router.delete('/rooms/:roomId', authenticate, adminOrSuperadmin, async (req, res
 });
 
 // Stats routes
-router.get('/floors/stats', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/floors/stats', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await FloorService.getFloorStats(req.user.pgId);
     return res.status(result.statusCode).json(result);
@@ -591,7 +592,7 @@ router.get('/floors/stats', authenticate, adminOrSuperadmin, async (req, res) =>
   }
 });
 
-router.get('/rooms/stats', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/rooms/stats', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await RoomService.getRoomStats(req.user.pgId);
     return res.status(result.statusCode).json(result);
@@ -621,7 +622,7 @@ router.get('/stats', authenticate, async (req, res) => {
 
 
 // Get sharing types
-router.get('/sharing-types', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/sharing-types', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const sharingTypes = [
       { id: '1-sharing', name: 'Single Occupancy', description: 'One person per room', cost: 8000 },
@@ -720,7 +721,7 @@ router.post('/configure-sharing-types', authenticate, async (req, res) => {
  * @desc    Get branch sharing types
  * @access  Private (Admin only)
  */
-router.get('/branch/:branchId/sharing-types', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/branch/:branchId/sharing-types', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { branchId } = req.params;
 
@@ -742,23 +743,9 @@ router.get('/branch/:branchId/sharing-types', authenticate, adminOrSuperadmin, a
       });
     }
 
-    // Get branch sharing types (currently stored at PG level)
-    const pgData = await pgService.getPGById(req.user.pgId);
-
-    if (!pgData.success || !pgData.data) {
-      return res.status(404).json({
-        success: false,
-        message: 'PG not found'
-      });
-    }
-
-    const sharingTypes = pgData.data.sharingTypes || [];
-
-    return res.status(200).json({
-      success: true,
-      data: sharingTypes,
-      message: 'Branch sharing types retrieved successfully'
-    });
+    // Get branch-specific sharing types
+    const result = await pgService.getSharingTypesForBranch(branchId);
+    return res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error('Error getting branch sharing types:', error);
     return res.status(500).json({
@@ -774,7 +761,7 @@ router.get('/branch/:branchId/sharing-types', authenticate, adminOrSuperadmin, a
  * @desc    Configure branch sharing types
  * @access  Private (Admin only)
  */
-router.post('/branch/:branchId/configure-sharing-types', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/branch/:branchId/configure-sharing-types', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { branchId } = req.params;
     const { sharingTypes } = req.body;
@@ -804,9 +791,8 @@ router.post('/branch/:branchId/configure-sharing-types', authenticate, adminOrSu
       });
     }
 
-    // For now, we'll store sharing types at PG level since that's how the current model works
-    // In a future enhancement, we could add branch-specific sharing types
-    const result = await pgService.configureSharingTypes(req.user.pgId, sharingTypes, req.user);
+    // Configure branch-specific sharing types
+    const result = await pgService.configureSharingTypesForBranch(branchId, sharingTypes, req.user);
 
     // Return result
     return res.status(result.success ? 200 : 400).json(result);
@@ -847,24 +833,6 @@ router.post('/', authenticate, validatePG, async (req, res) => {
     }
 
     const result = await pgService.createPG(req.body, req.user._id);
-    try {
-      if (result?.success && result?.data) {
-        await activityService.recordActivity({
-          type: 'pg_create',
-          title: 'PG Created',
-          description: `PG "${result.data.name || req.body.name || ''}" created`,
-          userId: req.user._id,
-          userEmail: req.user.email,
-          userRole: req.user.role,
-          entityType: 'pg',
-          entityId: result.data._id,
-          entityName: result.data.name,
-          category: 'management',
-          priority: 'high',
-          status: 'success'
-        });
-      }
-    } catch (_) {}
     res.status(result.statusCode || 201).json(result);
   } catch (error) {
     console.error('Error creating PG:', error);
@@ -897,27 +865,6 @@ router.post('/sales-create', authenticate, validatePG, async (req, res) => {
 
     // Use the sales-specific PG creation method (but same data structure as regular PGs)
     const result = await pgService.createSalesPG(pgData, req.user._id);
-    try {
-      if (result?.success && result?.data) {
-        await activityService.recordActivity({
-          type: 'pg_create',
-          title: 'PG Created by Sales',
-          description: `PG "${result.data.name || req.body.name || ''}" created by ${req.userType}`,
-          userId: req.user._id,
-          userEmail: req.user.email,
-          userRole: req.user.role || req.userType,
-          entityType: 'pg',
-          entityId: result.data._id,
-          entityName: result.data.name,
-          category: 'sales',
-          priority: 'high',
-          status: 'success'
-        });
-      }
-    } catch (activityError) {
-      console.error('Failed to record PG creation activity:', activityError);
-    }
-
     res.status(201).json(result);
   } catch (error) {
     console.error('PG creation error:', error);
@@ -930,27 +877,9 @@ router.post('/sales-create', authenticate, validatePG, async (req, res) => {
 });
 
 // Update PG
-router.put('/:pgId', authenticate, adminOrSuperadmin, validatePG, async (req, res) => {
+router.put('/:pgId', authenticate, adminOrSuperadmin, validatePG, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.updatePG(req.params.pgId, req.body, req.user._id);
-    try {
-      if (result?.success && result?.data) {
-        await activityService.recordActivity({
-          type: 'pg_update',
-          title: 'PG Updated',
-          description: `PG "${result.data.name || ''}" updated`,
-          userId: req.user._id,
-          userEmail: req.user.email,
-          userRole: req.user.role,
-          entityType: 'pg',
-          entityId: result.data._id,
-          entityName: result.data.name,
-          category: 'management',
-          priority: 'normal',
-          status: 'success'
-        });
-      }
-    } catch (_) {}
     res.json(result);
   } catch (error) {
     console.error('Error updating PG:', error);
@@ -963,26 +892,9 @@ router.put('/:pgId', authenticate, adminOrSuperadmin, validatePG, async (req, re
 });
 
 // Delete PG
-router.delete('/:pgId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/:pgId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.deletePG(req.params.pgId, req.user._id);
-    try {
-      if (result?.success) {
-        await activityService.recordActivity({
-          type: 'pg_delete',
-          title: 'PG Deleted',
-          description: `PG deleted (ID: ${req.params.pgId})`,
-          userId: req.user._id,
-          userEmail: req.user.email,
-          userRole: req.user.role,
-          entityType: 'pg',
-          entityId: req.params.pgId,
-          category: 'management',
-          priority: 'high',
-          status: 'success'
-        });
-      }
-    } catch (_) {}
     res.json(result);
   } catch (error) {
     console.error('Error deleting PG:', error);
@@ -1041,7 +953,7 @@ router.get('/:pgId/dashboard', authenticate, async (req, res) => {
 });
 
 // Export PG data
-router.get('/:pgId/export', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/:pgId/export', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { format = 'pdf' } = req.query;
     const result = await pgService.exportPGData(req.params.pgId, format);
@@ -1057,7 +969,7 @@ router.get('/:pgId/export', authenticate, adminOrSuperadmin, async (req, res) =>
 });
 
 // Upload PG images
-router.post('/:pgId/images', authenticate, adminOrSuperadmin, uploadPGImages, async (req, res) => {
+router.post('/:pgId/images', authenticate, adminOrSuperadmin, uploadPGImages, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.uploadPGImages(req.params.pgId, req.files, req.user._id);
     res.json(result);
@@ -1072,7 +984,7 @@ router.post('/:pgId/images', authenticate, adminOrSuperadmin, uploadPGImages, as
 });
 
 // Delete PG image
-router.delete('/:pgId/images/:imageId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/:pgId/images/:imageId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.deletePGImage(req.params.pgId, req.params.imageId, req.user._id);
     res.json(result);
@@ -1087,7 +999,7 @@ router.delete('/:pgId/images/:imageId', authenticate, adminOrSuperadmin, async (
 });
 
 // Bulk upload route for images
-router.post('/bulk-upload-images', authenticate, adminOrSuperadmin, uploadPGImages, async (req, res) => {
+router.post('/bulk-upload-images', authenticate, adminOrSuperadmin, uploadPGImages, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.bulkUploadPGImages(req.params.pgId, req.files, req.user._id);
     res.json(result);
@@ -1102,7 +1014,7 @@ router.post('/bulk-upload-images', authenticate, adminOrSuperadmin, uploadPGImag
 });
 
 // Bulk upload route for floors and rooms
-router.post('/bulk-upload', authenticate, adminOrSuperadmin, uploadExcelFile, handleExcelUploadError, async (req, res) => {
+router.post('/bulk-upload', authenticate, adminOrSuperadmin, uploadExcelFile, handleExcelUploadError, trackAdminActivity(), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -1130,7 +1042,7 @@ router.post('/bulk-upload', authenticate, adminOrSuperadmin, uploadExcelFile, ha
 });
 
 // Sample data endpoints
-router.post('/sample/add', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/sample/add', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     // This would be implemented in PGService
     res.json({
@@ -1147,7 +1059,7 @@ router.post('/sample/add', authenticate, adminOrSuperadmin, async (req, res) => 
   }
 });
 
-router.delete('/sample/clear', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/sample/clear', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     // This would be implemented in PGService
     res.json({

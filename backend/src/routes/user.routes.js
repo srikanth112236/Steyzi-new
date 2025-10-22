@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticate, superadminOnly, adminOnly } = require('../middleware/auth.middleware');
 const { checkTrialExpiration } = require('../middleware/subscription.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const AuthService = require('../services/auth.service');
 const UserService = require('../services/user.service');
 const { validateRequest, schemas } = require('../middleware/validation.middleware');
@@ -101,7 +102,7 @@ router.put('/change-password', authenticate, validateRequest(schemas.changePassw
  * @desc    Get PG information for admin user
  * @access  Private (Admin)
  */
-router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, async (req, res) => {
+router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.getPGInfo(req.user.pgId);
     return res.status(result.statusCode).json(result);
@@ -120,7 +121,7 @@ router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, async (req
  * @desc    Update PG information (admin only)
  * @access  Private (Admin)
  */
-router.put('/pg-info', authenticate, adminOnly, checkTrialExpiration, validateRequest(schemas.updatePG), async (req, res) => {
+router.put('/pg-info', authenticate, adminOnly, checkTrialExpiration, validateRequest(schemas.updatePG), trackAdminActivity(), async (req, res) => {
   try {
     console.log('🔍 PG Update Request:', {
       userId: req.user.id,
@@ -195,7 +196,7 @@ router.put('/notifications', authenticate, validateRequest(schemas.notificationP
  * @desc    Get all users with lock status (superadmin only)
  * @access  Private (Superadmin)
  */
-router.get('/', authenticate, superadminOnly, async (req, res) => {
+router.get('/', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const result = await AuthService.getUsersWithLockStatus();
     return res.status(result.statusCode).json(result);
@@ -214,7 +215,7 @@ router.get('/', authenticate, superadminOnly, async (req, res) => {
  * @desc    Unlock user account (superadmin only)
  * @access  Private (Superadmin)
  */
-router.post('/:userId/unlock', authenticate, superadminOnly, async (req, res) => {
+router.post('/:userId/unlock', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await AuthService.unlockUserAccount(userId);

@@ -508,15 +508,16 @@ const validateFloor = (req, res, next) => {
         'string.empty': 'Floor name is required',
         'string.max': 'Floor name cannot exceed 50 characters'
       }),
-    floorNumber: Joi.number().integer().min(0).max(100).required()
+    totalRooms: Joi.number().integer().min(1).max(100).required()
       .messages({
-        'number.base': 'Floor number must be a number',
-        'number.min': 'Floor number cannot be negative',
-        'number.max': 'Floor number cannot exceed 100'
+        'number.base': 'Total rooms must be a number',
+        'number.min': 'Total rooms must be at least 1',
+        'number.max': 'Total rooms cannot exceed 100',
+        'any.required': 'Total rooms is required'
       }),
-    branchId: Joi.string().required()
+    branchId: Joi.string().optional()
       .messages({
-        'string.empty': 'Branch ID is required'
+        'string.empty': 'Branch ID cannot be empty'
       }),
     description: Joi.string().trim().max(200).optional()
       .messages({

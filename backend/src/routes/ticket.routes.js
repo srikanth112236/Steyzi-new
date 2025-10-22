@@ -3,6 +3,7 @@ const router = express.Router();
 const TicketService = require('../services/ticket.service');
 const { authenticate, adminOrSuperadmin } = require('../middleware/auth.middleware');
 const { uploadTicketAttachments } = require('../middleware/fileUpload.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const activityService = require('../services/activity.service');
 const notificationService = require('../services/notification.service');
 
@@ -194,7 +195,7 @@ router.get('/statuses', authenticate, (req, res) => {
 });
 
 // Create new ticket (admin only)
-router.post('/', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await TicketService.createTicket(req.body, req.user._id);
     try {
@@ -273,7 +274,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Update ticket
-router.put('/:id', authenticate, adminOrSuperadmin, async (req, res) => {
+router.put('/:id', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await TicketService.updateTicket(req.params.id, req.body, req.user._id, req.user.role);
     try {
@@ -306,7 +307,7 @@ router.put('/:id', authenticate, adminOrSuperadmin, async (req, res) => {
 });
 
 // Delete ticket
-router.delete('/:id', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/:id', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await TicketService.deleteTicket(req.params.id, req.user._id, req.user.role);
     res.json(result);

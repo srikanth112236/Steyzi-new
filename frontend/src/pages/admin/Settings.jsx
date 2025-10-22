@@ -373,7 +373,7 @@ const Settings = () => {
   }
 
   const renderProfileTab = () => (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-full mx-auto space-y-6">
       {/* Enhanced Header */}
       {/* <div className="text-center sm:text-left bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 border border-blue-100">
         <div className="flex items-center justify-center sm:justify-start mb-4">
@@ -575,7 +575,7 @@ const Settings = () => {
   const renderSecurityTab = () => (
     <div className="space-y-8">
       
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <div className="flex items-center mb-8">
             <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mr-4">
@@ -671,7 +671,7 @@ const Settings = () => {
         <p className="text-gray-600 text-lg">Configure your email and notification preferences.</p>
       </div>
       
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <div className="flex items-center mb-8">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mr-4">
@@ -918,7 +918,7 @@ const Settings = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-auto">
-          <div className={`p-4 sm:p-6 ${activeTab === 'maintainers' ? 'w-full' : 'max-w-6xl mx-auto'}`}>
+          <div className={`p-4 sm:p-6 ${activeTab === 'maintainers' ? 'w-full' : 'max-w-full mx-auto'}`}>
             {renderTabContent()}
           </div>
         </div>

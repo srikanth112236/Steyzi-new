@@ -4,6 +4,7 @@ const SecurityMonitoringService = require('../services/securityMonitoring.servic
 const SubscriptionActivity = require('../models/subscriptionActivity.model');
 const User = require('../models/user.model');
 const { authenticate, authorize, superadminOnly } = require('../middleware/auth.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const logger = require('../utils/logger');
 
 /**
@@ -16,7 +17,7 @@ const logger = require('../utils/logger');
  * @route GET /api/security/dashboard
  * @access Superadmin only
  */
-router.get('/dashboard', authenticate, superadminOnly, async (req, res) => {
+router.get('/dashboard', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { timeRange = '24h' } = req.query;
 
@@ -48,7 +49,7 @@ router.get('/dashboard', authenticate, superadminOnly, async (req, res) => {
  * @route GET /api/security/alerts
  * @access Superadmin only
  */
-router.get('/alerts', authenticate, superadminOnly, async (req, res) => {
+router.get('/alerts', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { timeRange = '24h', page = 1, limit = 50 } = req.query;
 
@@ -79,7 +80,7 @@ router.get('/alerts', authenticate, superadminOnly, async (req, res) => {
  * @route GET /api/security/users/:userId/profile
  * @access Superadmin only
  */
-router.get('/users/:userId/profile', authenticate, superadminOnly, async (req, res) => {
+router.get('/users/:userId/profile', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -140,7 +141,7 @@ router.get('/users/:userId/profile', authenticate, superadminOnly, async (req, r
  * @route POST /api/security/users/:userId/check
  * @access Superadmin only
  */
-router.post('/users/:userId/check', authenticate, superadminOnly, async (req, res) => {
+router.post('/users/:userId/check', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { userId } = req.params;
     const { reason = 'manual_admin_check' } = req.body;
@@ -166,7 +167,7 @@ router.post('/users/:userId/check', authenticate, superadminOnly, async (req, re
  * @route GET /api/security/activity-logs
  * @access Superadmin only
  */
-router.get('/activity-logs', authenticate, superadminOnly, async (req, res) => {
+router.get('/activity-logs', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const {
       page = 1,
@@ -230,7 +231,7 @@ router.get('/activity-logs', authenticate, superadminOnly, async (req, res) => {
  * @route GET /api/security/metrics
  * @access Superadmin only
  */
-router.get('/metrics', authenticate, superadminOnly, async (req, res) => {
+router.get('/metrics', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { timeRange = '24h' } = req.query;
 
@@ -330,7 +331,7 @@ router.get('/metrics', authenticate, superadminOnly, async (req, res) => {
  * @route GET /api/security/trends
  * @access Superadmin only
  */
-router.get('/trends', authenticate, superadminOnly, async (req, res) => {
+router.get('/trends', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { period = '7d' } = req.query;
 

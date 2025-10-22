@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const QRCodeService = require('../services/qrCode.service');
 const { authenticate, adminOrSuperadmin } = require('../middleware/auth.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const activityService = require('../services/activity.service');
 
 // Generate QR code for PG (Admin only)
-router.post('/generate/:pgId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/generate/:pgId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     console.log('🔍 QR Routes: Generating QR code for PG:', req.params.pgId);
     console.log('👤 User:', req.user._id, req.user.email);
@@ -49,7 +50,7 @@ router.post('/generate/:pgId', authenticate, adminOrSuperadmin, async (req, res)
 });
 
 // Get QR code for PG (Admin only)
-router.get('/pg/:pgId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/pg/:pgId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await QRCodeService.getQRCodeByPG(req.params.pgId);
     return res.status(result.statusCode).json(result);
@@ -79,7 +80,7 @@ router.get('/code/:qrCode', async (req, res) => {
 });
 
 // Deactivate QR code (Admin only)
-router.put('/deactivate/:pgId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.put('/deactivate/:pgId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await QRCodeService.deactivateQRCode(req.params.pgId);
     try {
@@ -111,7 +112,7 @@ router.put('/deactivate/:pgId', authenticate, adminOrSuperadmin, async (req, res
 });
 
 // Get QR code statistics (Admin only)
-router.get('/stats/:pgId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/stats/:pgId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await QRCodeService.getQRCodeStats(req.params.pgId);
     return res.status(result.statusCode).json(result);

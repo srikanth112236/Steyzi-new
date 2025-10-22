@@ -357,11 +357,6 @@ const AdminLayout = () => {
       icon: BarChart3
     },
     {
-      name: 'Self-Service Portal',
-      href: '/admin/self-service',
-      icon: Shield
-    },
-    {
       name: 'Settings',
       href: '/admin/settings',
       icon: Settings

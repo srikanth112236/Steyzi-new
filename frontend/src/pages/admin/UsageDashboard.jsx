@@ -103,39 +103,33 @@ const usageService = {
     }
   },
 
-  // Fetch subscription details
-  getSubscriptionDetails: async () => {
+  // Get subscription details from Redux state
+  getSubscriptionDetails: () => {
     try {
-      // Check cache first
-      const cachedData = dashboardCache.get('subscriptionDetails');
-      if (cachedData) return cachedData;
+      // Get subscription from Redux store
+      const subscription = store.getState().auth.subscription;
 
-      const response = await axios.get('/api/advanced/subscription/self-service', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        }
-      });
+      if (!subscription) {
+        throw new Error('No subscription data available');
+      }
 
       const processedData = {
         success: true,
         data: {
-          planName: response.data.data.currentSubscription.plan.planName,
-          status: response.data.data.currentSubscription.status,
-          endDate: response.data.data.currentSubscription.endDate,
+          planName: subscription.plan?.planName || 'Unknown Plan',
+          status: subscription.status || 'unknown',
+          endDate: subscription.endDate,
           limits: {
-            beds: response.data.data.currentSubscription.totalBeds,
-            branches: response.data.data.currentSubscription.totalBranches
+            beds: subscription.totalBeds || 0,
+            branches: subscription.totalBranches || 0
           }
         }
       };
 
-      // Cache the response
-      dashboardCache.set('subscriptionDetails', processedData);
       return processedData;
     } catch (error) {
-      console.error('Failed to fetch subscription details:', error);
+      console.error('Failed to get subscription details:', error);
       throw new Error(
-        error.response?.data?.message || 
         'Unable to retrieve subscription details. Please try again later.'
       );
     }

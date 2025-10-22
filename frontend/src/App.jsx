@@ -91,7 +91,6 @@ import SecurityDashboard from './pages/superadmin/SecurityDashboard';
 import RevenueDashboard from './pages/superadmin/RevenueDashboard';
 import UsageDashboard from './pages/admin/UsageDashboard';
 import CostCalculator from './pages/admin/CostCalculator';
-import SelfServicePortal from './pages/admin/SelfServicePortal';
 
 // Import Sales Pages
 import SalesDashboard from './pages/sales/Dashboard';
@@ -327,11 +326,6 @@ const App = () => {
         <Route path="cost-calculator" element={
           <ProtectedRoute requireOnboarding={false}>
             <CostCalculator />
-          </ProtectedRoute>
-        } />
-        <Route path="self-service" element={
-          <ProtectedRoute requireOnboarding={false}>
-            <SelfServicePortal />
           </ProtectedRoute>
         } />
       </Route>

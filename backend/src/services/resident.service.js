@@ -463,6 +463,7 @@ class ResidentService {
       }
 
       // Soft delete
+      const residentName = `${resident.firstName} ${resident.lastName}`;
       resident.isActive = false;
       resident.updatedBy = userId;
       await resident.save();
@@ -472,6 +473,10 @@ class ResidentService {
       return {
         success: true,
         message: 'Resident deleted successfully',
+        data: {
+          _id: resident._id,
+          name: residentName
+        },
         statusCode: 200
       };
     } catch (error) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const { validateBranchCreation } = require('../middleware/validation.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const branchController = require('../controllers/branch.controller');
 const Branch = require('../models/branch.model'); // Added missing import
 
@@ -9,6 +10,7 @@ const Branch = require('../models/branch.model'); // Added missing import
 router.post('/',
   authenticate,
   validateBranchCreation,
+  trackAdminActivity(),
   (req, res) => {
     branchController.createBranch(req, res);
   }
@@ -17,6 +19,7 @@ router.post('/',
 // Modify the GET '/' route
 router.get('/',
   authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       let branches;
@@ -69,8 +72,9 @@ router.get('/',
 );
 
 // Get branches by PG ID
-router.get('/pg/:pgId', 
-  authenticate, 
+router.get('/pg/:pgId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { pgId } = req.params;
@@ -159,8 +163,9 @@ router.patch('/:branchId/default',
 );
 
 // Update a branch
-router.put('/:branchId', 
-  authenticate, 
+router.put('/:branchId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { branchId } = req.params;
@@ -212,8 +217,9 @@ router.put('/:branchId',
 );
 
 // Delete a branch
-router.delete('/:branchId', 
-  authenticate, 
+router.delete('/:branchId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { branchId } = req.params;
@@ -258,16 +264,18 @@ router.delete('/:branchId',
 );
 
 // Assign maintainer to a branch
-router.post('/assign-maintainer', 
-  authenticate, 
+router.post('/assign-maintainer',
+  authenticate,
+  trackAdminActivity(),
   (req, res) => {
     branchController.assignMaintainerToBranch(req, res);
   }
 );
 
 // Get branches with their assigned maintainers
-router.get('/with-maintainers', 
-  authenticate, 
+router.get('/with-maintainers',
+  authenticate,
+  trackAdminActivity(),
   (req, res) => {
     branchController.getBranchesWithMaintainers(req, res);
   }

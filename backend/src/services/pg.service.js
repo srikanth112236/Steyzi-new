@@ -1437,6 +1437,92 @@ class PGService {
       }
     ];
   }
+
+  // Get sharing types for a specific branch
+  async getSharingTypesForBranch(branchId) {
+    try {
+      const Branch = require('../models/branch.model');
+
+      const branch = await Branch.findById(branchId).select('sharingTypes name');
+
+      if (!branch) {
+        throw new Error('Branch not found');
+      }
+
+      return {
+        success: true,
+        data: branch.sharingTypes || [],
+        message: 'Branch sharing types retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Error getting branch sharing types:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error.message
+      };
+    }
+  }
+
+  // Configure sharing types for a specific branch
+  async configureSharingTypesForBranch(branchId, sharingTypes, user = null) {
+    try {
+      const Branch = require('../models/branch.model');
+
+      // Validate input
+      if (!branchId) {
+        throw new Error('Branch ID is required');
+      }
+
+      // Validate sharing types
+      const validatedSharingTypes = sharingTypes.map(type => {
+        // Validate required fields
+        if (!type.type || !type.name || type.cost === undefined || type.cost <= 0) {
+          throw new Error('Invalid sharing type: Missing or invalid required fields');
+        }
+
+        // Ensure type is one of the predefined or custom
+        const validTypes = ['1-sharing', '2-sharing', '3-sharing', '4-sharing'];
+        if (!validTypes.includes(type.type) && !type.isCustom) {
+          throw new Error(`Invalid sharing type: ${type.type}`);
+        }
+
+        return {
+          type: type.type,
+          name: type.name,
+          description: type.description || '',
+          cost: type.cost,
+          isCustom: type.isCustom || false
+        };
+      });
+
+      // Find and update branch
+      const branch = await Branch.findByIdAndUpdate(
+        branchId,
+        { sharingTypes: validatedSharingTypes },
+        { new: true }
+      );
+
+      if (!branch) {
+        throw new Error('Branch not found');
+      }
+
+      console.log(`Branch ${branch.name} sharing types configured successfully`);
+
+      return {
+        success: true,
+        message: 'Branch sharing types configured successfully',
+        data: branch.sharingTypes
+      };
+    } catch (error) {
+      console.error('Error configuring branch sharing types:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error.message
+      };
+    }
+  }
 }
 
 module.exports = new PGService(); 

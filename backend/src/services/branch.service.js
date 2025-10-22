@@ -219,12 +219,17 @@ class BranchService {
       }
 
       // Soft delete the branch
+      const branchName = branch.name;
       branch.isActive = false;
       await branch.save();
 
       return {
         success: true,
         message: 'Branch deleted successfully',
+        data: {
+          _id: branch._id,
+          name: branchName
+        },
         statusCode: 200
       };
     } catch (error) {
