@@ -1,7 +1,8 @@
-# Root .gitignore for Steyzi project
+# Root level .gitignore for Steyzi project
+# This file contains common ignores for the entire monorepo
 
-# Dependencies (if any at root level)
-node_modules/
+# Dependencies (each sub-project has its own node_modules)
+**/node_modules/
 
 # Environment variables
 .env
@@ -9,15 +10,15 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # Logs
-logs/
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 # Runtime data
 pids
@@ -32,58 +33,11 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional stylelint cache
-.stylelintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-out
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
-.cache/
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# Editor directories and files
+# IDE and Editor files
 .vscode/
 .idea/
+.cursor/
+.cursorignore
 *.swp
 *.swo
 *~
@@ -96,41 +50,137 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
 
-# Database files (if any)
+# Temporary folders
+tmp/
+temp/
+
+# Build outputs
+build/
+dist/
+
+# Database files
 *.sqlite
 *.sqlite3
 *.db
 
-# SSL certificates
+# Certificates and keys
 *.pem
 *.key
 *.crt
+*.cer
+*.keystore
+*.jks
 
-# Testing
-test-results/
-playwright-report/
-playwright/.cache/
+# Package manager lock files (optional - uncomment if you want to ignore)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Docker
+.dockerignore
 
-# OS specific
-.DS_Store
-Thumbs.db
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
 
-# Project specific
-# Add any project-specific files to ignore here
+# Documentation builds
+docs/build/
+docs/.vuepress/dist/
+
+# Local development files
+debug-*.js
+serve-*.js
+test-*.js
+check-*.js
 
 # Backup files
 *.bak
 *.backup
 *.old
 
-# Configuration files that might contain sensitive data
-config/local.json
-config/production.json
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Microsoft Office temp files
+~$*
+
+# Windows executables (specific to this project)
+*.exe
+
+# PM2
+ecosystem.config.js
+.pm2/
+
+# Redis dump
+dump.rdb
+
+# Session files
+sessions/
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Storybook
+storybook-static/
+.out
+.storybook-out
+
+# Testing
+test-results/
+playwright-report/
+playwright/.cache/
+.coverage/
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettiercache
+
+# Husky
+.husky/_
+
+# Local Netlify folder
+.netlify
+
+# Vercel
+.vercel
+
+# Expo (mobile specific)
+.expo/
+.expo-shared/
+
+# React Native specific
+.metro-health-check*
+
+# EAS Build
+.eas/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# CodePush
+.codepush/
+
+# React Native Debugger
+.rndebugger
+
+# Flipper
+.flipper/
+
+# Android specific
+*.apk
+*.aab
+
+# iOS specific
+*.ipa
