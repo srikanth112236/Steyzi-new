@@ -27,6 +27,20 @@ export {
   PopoverContent,
   PopoverTrigger
 } from './popover';
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from './card';
+export {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from './tabs';
 
 // Import and export StatCard components
 import StatCard from '../common/StatCard';

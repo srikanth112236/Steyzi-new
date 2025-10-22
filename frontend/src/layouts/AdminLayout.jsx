@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,13 +41,14 @@ import { useTokenExpiry } from '../hooks/useTokenExpiry';
 import BranchSelector from '../components/common/BranchSelector';
 import { selectSelectedBranch } from '../store/slices/branch.slice';
 import HeaderNotifications from '../components/common/HeaderNotifications';
-import SubscriptionStatusBanner from '../components/common/SubscriptionStatusBanner';
+// import SubscriptionStatusBanner from '../components/common/SubscriptionStatusBanner';
 import { useSubscription } from '../utils/subscriptionUtils';
 import { selectUser, selectSubscription, updateAuthState, selectPgConfigured, selectDefaultBranch, selectPgId } from '../store/slices/authSlice';
 import FreeTrialModal from '../components/common/FreeTrialModal';
 import { Package } from 'lucide-react';
 import PGConfigurationModal from '../components/admin/PGConfigurationModal';
 import DefaultBranchModal from '../components/admin/DefaultBranchModal';
+import PaymentHistory from '../components/admin/PaymentHistory';
 
 // Module to submodule mapping for navigation filtering
 const MODULE_NAV_MAPPING = {
@@ -84,7 +85,7 @@ const AdminLayout = () => {
   // Free trial modal state
   const [showTrialModal, setShowTrialModal] = useState(false);
 
-  // State for configuration modals
+  // State for configuration modals - now controlled by individual pages
   const [showDefaultBranchModal, setShowDefaultBranchModal] = useState(false);
   const [showPGConfigModal, setShowPGConfigModal] = useState(false);
 
@@ -98,59 +99,35 @@ const AdminLayout = () => {
     (subscription?.status === 'active' && 
      subscription?.billingCycle !== 'trial') || false;
 
-  // Debug logging for subscription status
+  // Debug logging for subscription status - Only log when subscription changes significantly
   useEffect(() => {
-    console.log('🔍 Subscription Status Debug:', {
-      subscription,
-      hasActivePaidSubscription
-    });
-  }, [subscription, hasActivePaidSubscription]);
-
-  // Debug logging for configuration status
-  useEffect(() => {
-    console.log('🔍 Configuration Status Debug:', {
-      user: {
-        default_branch: user?.default_branch,
-        pg_configured: user?.pg_configured
-      },
-      reduxState: {
-        defaultBranch,
-        pgConfigured
-      }
-    });
-  }, [user, defaultBranch, pgConfigured, pgId]);
-
-  // Automatically show configuration modals if not set up
-  useEffect(() => {
-    // Check configuration status with fallback to user object
-    const isDefaultBranchNotSet = 
-      (user && user.default_branch === false) || 
-      defaultBranch === false;
-
-    const isPgNotConfigured = 
-      (user && user.pg_configured === false) || 
-      pgConfigured === false;
-
-    // Determine which modal to show based on configuration status
-    if (!pgId) {
-      console.log('🚨 User has no PG associated', {
-        pgId: pgId
+    if (subscription) {
+      console.log('🔍 Subscription Status Debug:', {
+        status: subscription.status,
+        billingCycle: subscription.billingCycle,
+        hasActivePaidSubscription
       });
-      toast.error('No PG associated with your account. Please contact support to get a PG assigned.');
-    } else if (isDefaultBranchNotSet) {
-      console.log('🚨 Showing Default Branch Modal', {
-        userDefaultBranch: user?.default_branch,
-        defaultBranch
-      });
-      setShowDefaultBranchModal(true);
-    } else if (isPgNotConfigured) {
-      console.log('🚨 Showing PG Configuration Modal', {
-        userPgConfigured: user?.pg_configured,
-        pgConfigured
-      });
-      setShowPGConfigModal(true);
     }
-  }, [user, defaultBranch, pgConfigured, pgId]);
+  }, [subscription?.status, subscription?.billingCycle, hasActivePaidSubscription]);
+
+  // Debug logging for configuration status - Only log when user config changes
+  useEffect(() => {
+    if (user) {
+      console.log('🔍 Configuration Status Debug:', {
+        user: {
+          default_branch: user?.default_branch,
+          pg_configured: user?.pg_configured
+        },
+        reduxState: {
+          defaultBranch,
+          pgConfigured
+        }
+      });
+    }
+  }, [user?.default_branch, user?.pg_configured, defaultBranch, pgConfigured, pgId]);
+
+  // Configuration modals are now handled by individual pages (like Dashboard)
+  // Removed automatic modal showing on page load
 
   // Callback for branch creation
   const handleBranchCreated = (branchData) => {
@@ -185,6 +162,8 @@ const AdminLayout = () => {
   useEffect(() => {
     if ((subscription?.billingCycle === 'trial' || subscription?.isTrialActive) && subscription?.trialEndDate) {
       console.log('✅ Setting up trial countdown');
+      let countdownInterval;
+
       const updateCountdown = () => {
         const now = new Date();
         const trialStart = new Date(subscription.startDate);
@@ -229,14 +208,18 @@ const AdminLayout = () => {
       };
 
       updateCountdown();
-      const interval = setInterval(updateCountdown, 60000); // Update every minute
+      countdownInterval = setInterval(updateCountdown, 60000); // Update every minute
 
-      return () => clearInterval(interval);
+      return () => {
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+        }
+      };
     } else {
       setTrialTimeLeft(null);
       setTrialInfo(null);
     }
-  }, [subscription]);
+  }, [subscription?.trialEndDate, subscription?.startDate]); // Only depend on trial dates
 
   // Check for trial modal flag on component mount
   useEffect(() => {
@@ -275,7 +258,7 @@ const AdminLayout = () => {
   const navigationItems = [
     {
       name: 'Dashboard',
-      href: '/admin',
+      href: '/admin/dashboard',
       icon: LayoutGrid
     },
     {
@@ -317,8 +300,20 @@ const AdminLayout = () => {
     },
     {
       name: 'Payments',
-      href: '/admin/payments',
-      icon: PaymentIcon
+      icon: PaymentIcon,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          name: 'Manage Payments',
+          href: '/admin/payments',
+          icon: PaymentIcon
+        },
+        {
+          name: 'Payment History',
+          href: '/admin/payment-history',
+          icon: CreditCard
+        }
+      ]
     },
     {
       name: 'Tickets',
@@ -489,7 +484,7 @@ const AdminLayout = () => {
       });
   };
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await dispatch(logout()).unwrap();
       toast.success('Logged out successfully');
@@ -497,7 +492,7 @@ const AdminLayout = () => {
     } catch (error) {
       toast.error('Logout failed');
     }
-  };
+  }, [dispatch, navigate]);
 
   const handleTrialActivated = async () => {
     // Close modal
@@ -574,10 +569,7 @@ const AdminLayout = () => {
         }`}>
           <div className="space-y-1">
             {getFilteredNavigationItems().map((item) => {
-              if (item.name === 'Settings' && !selectedBranch?.isDefault) {
-                return null;
-              }
-              const isActive = item.hasDropdown 
+              const isActive = item.hasDropdown
                 ? isAnyDropdownItemActive(item.dropdownItems)
                 : isActiveRoute(item.href);
               
@@ -901,13 +893,8 @@ const AdminLayout = () => {
                       </Link>
                       <Link
                         to="/admin/settings"
-                        className={`flex items-center px-4 py-2 text-sm transition-colors ${selectedBranch?.isDefault ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-600' : 'text-gray-400 cursor-not-allowed'}`}
-                        onClick={(e) => {
-                          if (!selectedBranch?.isDefault) {
-                            e.preventDefault();
-                          }
-                          setShowUserMenu(false);
-                        }}
+                        className="flex items-center px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                        onClick={() => setShowUserMenu(false)}
                       >
                         <Settings className="h-4 w-4 mr-3 text-gray-400" />
                         Settings
@@ -936,7 +923,7 @@ const AdminLayout = () => {
           <div className="py-6">
             <div className="max-w-full mx-auto px-6">
               {/* Subscription Status Banner */}
-              <SubscriptionStatusBanner />
+              {/* <SubscriptionStatusBanner /> */}
               <Outlet />
             </div>
           </div>

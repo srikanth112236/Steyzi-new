@@ -502,3 +502,232 @@ exports.respondToUpgradeRequest = async (req, res) => {
       });
     }
 };
+
+/**
+ * Create payment order
+ * @route POST /api/subscriptions/payments/create-order
+ * @access Authenticated users
+ */
+exports.createOrder = async (req, res) => {
+    try {
+      const { subscriptionId, bedCount, branchCount = 1 } = req.body;
+
+      if (!subscriptionId || !bedCount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subscription ID and bed count are required'
+        });
+      }
+
+      const result = await subscriptionService.createPaymentOrder(
+        subscriptionId,
+        req.user._id,
+        parseInt(bedCount),
+        parseInt(branchCount)
+      );
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(201).json(result);
+    } catch (error) {
+      logger.error('Error in createOrder controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Verify payment
+ * @route POST /api/subscriptions/payments/verify
+ * @access Authenticated users
+ */
+exports.verifyPayment = async (req, res) => {
+    try {
+      const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+
+      if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment verification details are required'
+        });
+      }
+
+      const result = await subscriptionService.verifyPayment({
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        signature: razorpay_signature,
+        userId: req.user._id
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('Error in verifyPayment controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Get payment history
+ * @route GET /api/subscriptions/payments/history
+ * @access Authenticated users
+ */
+exports.getPaymentHistory = async (req, res) => {
+    try {
+      const result = await subscriptionService.getPaymentHistory(req.user._id);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('Error in getPaymentHistory controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Add beds to subscription
+ * @route POST /api/subscriptions/payments/add-beds
+ * @access Authenticated users
+ */
+exports.addBeds = async (req, res) => {
+    try {
+      const { subscriptionId, additionalBeds } = req.body;
+
+      if (!subscriptionId || !additionalBeds || additionalBeds <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subscription ID and valid additional beds count are required'
+        });
+      }
+
+      const result = await subscriptionService.addBeds(
+        subscriptionId,
+        req.user._id,
+        parseInt(additionalBeds)
+      );
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('Error in addBeds controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Add branches to subscription
+ * @route POST /api/subscriptions/payments/add-branches
+ * @access Authenticated users
+ */
+exports.addBranches = async (req, res) => {
+    try {
+      const { subscriptionId, additionalBranches } = req.body;
+
+      if (!subscriptionId || !additionalBranches || additionalBranches <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subscription ID and valid additional branches count are required'
+        });
+      }
+
+      const result = await subscriptionService.addBranches(
+        subscriptionId,
+        req.user._id,
+        parseInt(additionalBranches)
+      );
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('Error in addBranches controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Get payment status
+ * @route GET /api/subscriptions/payments/:paymentId
+ * @access Authenticated users
+ */
+exports.getPaymentStatus = async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+
+      const result = await subscriptionService.getPaymentStatus(paymentId, req.user._id);
+
+      if (!result.success) {
+        return res.status(404).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('Error in getPaymentStatus controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};
+
+/**
+ * Handle payment webhook
+ * @route POST /api/subscriptions/payments/webhook
+ * @access Public (webhook endpoint)
+ */
+exports.handleWebhook = async (req, res) => {
+    try {
+      const webhookData = req.body;
+
+      logger.info('Payment webhook received:', { event: webhookData.event });
+
+      const result = await subscriptionService.handlePaymentWebhook(webhookData);
+
+      if (!result.success) {
+        logger.error('Webhook processing failed:', result);
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json({ success: true, message: 'Webhook processed successfully' });
+    } catch (error) {
+      logger.error('Error in handleWebhook controller:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+};

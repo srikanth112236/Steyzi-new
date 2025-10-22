@@ -209,15 +209,19 @@ const subscriptionSlice = createSlice({
       .addCase(fetchAvailablePlans.pending, (state) => {
         state.plansLoading = true;
         state.error = null;
+        console.log('⏳ Starting to fetch plans...');
       })
       .addCase(fetchAvailablePlans.fulfilled, (state, action) => {
         state.plansLoading = false;
         state.availablePlans = action.payload;
         state.plansCacheTime = Date.now(); // Cache timestamp
+        console.log('✅ Plans loaded successfully:', action.payload?.length || 0, 'plans');
+        console.log('📋 Plans data:', action.payload);
       })
       .addCase(fetchAvailablePlans.rejected, (state, action) => {
         state.plansLoading = false;
         state.error = action.payload;
+        console.log('❌ Plans fetch failed:', action.payload);
       });
   },
 });
@@ -232,35 +236,35 @@ export const {
 } = subscriptionSlice.actions;
 
 // Selectors
-export const selectCurrentPlan = (state) => state.subscription.currentPlan;
-export const selectSubscriptionStatus = (state) => state.subscription.subscriptionStatus;
-export const selectRestrictions = (state) => state.subscription.restrictions;
-export const selectCurrentUsage = (state) => state.subscription.currentUsage;
-export const selectAvailablePlans = (state) => state.subscription.availablePlans;
-export const selectSubscriptionLoading = (state) => state.subscription.loading;
-export const selectPlansLoading = (state) => state.subscription.plansLoading;
+export const selectCurrentPlan = (state) => state.subscription?.currentPlan || null;
+export const selectSubscriptionStatus = (state) => state.subscription?.subscriptionStatus || 'free';
+export const selectRestrictions = (state) => state.subscription?.restrictions || { maxBeds: 0, enabledModules: [], enabledFeatures: [] };
+export const selectCurrentUsage = (state) => state.subscription?.currentUsage || { bedsUsed: 0, branchesUsed: 0 };
+export const selectAvailablePlans = (state) => state.subscription?.availablePlans || [];
+export const selectSubscriptionLoading = (state) => state.subscription?.loading || false;
+export const selectPlansLoading = (state) => state.subscription?.plansLoading || false;
 
 // Check if a module is enabled (memoized)
 export const selectIsModuleEnabled = (state, moduleName) => {
-  return state.subscription.restrictions.enabledModules.includes(moduleName);
+  return (state.subscription?.restrictions?.enabledModules || []).includes(moduleName);
 };
 
 // Check if a feature is enabled (memoized)
 export const selectIsFeatureEnabled = (state, featureName) => {
-  return state.subscription.restrictions.enabledFeatures.includes(featureName);
+  return (state.subscription?.restrictions?.enabledFeatures || []).includes(featureName);
 };
 
 // Check if can add more beds
 export const selectCanAddBeds = (state) => {
-  const { maxBeds } = state.subscription.restrictions;
-  const { bedsUsed } = state.subscription.currentUsage;
+  const maxBeds = state.subscription?.restrictions?.maxBeds || 0;
+  const bedsUsed = state.subscription?.currentUsage?.bedsUsed || 0;
   return maxBeds === null || bedsUsed < maxBeds;
 };
 
 // Get remaining beds
 export const selectRemainingBeds = (state) => {
-  const { maxBeds } = state.subscription.restrictions;
-  const { bedsUsed } = state.subscription.currentUsage;
+  const maxBeds = state.subscription?.restrictions?.maxBeds || 0;
+  const bedsUsed = state.subscription?.currentUsage?.bedsUsed || 0;
   if (maxBeds === null) return 'Unlimited';
   return Math.max(0, maxBeds - bedsUsed);
 };

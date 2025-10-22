@@ -96,8 +96,8 @@ const SubscriptionForm = ({ isOpen, onClose, subscription, onSuccess }) => {
         const currentUser = await authService.getCurrentUser();
         
         const response = await subscriptionService.getPGsForCustomPlans('', {
-          role: currentUser.role,
-          userPGId: currentUser.pgId
+          role: currentUser.user?.role || currentUser.role,
+          userPGId: currentUser.user?.pgId || currentUser.pgId
         });
         
         if (response.success) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   MapPin,
@@ -19,22 +19,29 @@ import {
   Refrigerator,
   Droplets,
   Sofa,
-  Check
+  Check,
+  UserCheck,
+  ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import branchService from '../../services/branch.service';
+import maintainerService from '../../services/maintainer.service';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateAuthState } from '../../store/slices/authSlice';
 import { setBranches } from '../../store/slices/branch.slice';
 
-const DefaultBranchModal = ({ 
-  isOpen, 
-  onClose, 
-  onBranchCreated, 
-  pgId 
+const DefaultBranchModal = ({
+  isOpen,
+  onClose,
+  onBranchCreated,
+  pgId
 }) => {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
+  const [maintainers, setMaintainers] = useState([]);
+  const [maintainersLoading, setMaintainersLoading] = useState(false);
+  const [showMaintainerDropdown, setShowMaintainerDropdown] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     address: {
@@ -49,11 +56,7 @@ const DefaultBranchModal = ({
       email: '',
       alternatePhone: ''
     },
-    maintainer: {
-      name: '',
-      mobile: '',
-      email: ''
-    },
+    maintainerId: '', // Changed from maintainer object to maintainerId
     capacity: {
       totalRooms: 0,
       totalBeds: 0,
@@ -78,6 +81,62 @@ const DefaultBranchModal = ({
     { name: 'Furnished', icon: Sofa, color: 'brown' }
   ];
 
+  // Fetch maintainers when modal opens
+  useEffect(() => {
+    if (isOpen && pgId) {
+      fetchMaintainers();
+    }
+  }, [isOpen, pgId]);
+
+  // Fetch maintainers from API
+  const fetchMaintainers = async () => {
+    try {
+      setMaintainersLoading(true);
+      const response = await maintainerService.getAllMaintainers();
+      if (response.success && response.data && Array.isArray(response.data.maintainers)) {
+        setMaintainers(response.data.maintainers);
+      } else {
+        console.warn('Invalid maintainers response:', response);
+        setMaintainers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching maintainers:', error);
+      toast.error('Failed to load maintainers');
+      setMaintainers([]);
+    } finally {
+      setMaintainersLoading(false);
+    }
+  };
+
+  // Handle maintainer selection
+  const handleMaintainerSelect = (maintainer) => {
+    setFormData(prev => ({
+      ...prev,
+      maintainerId: maintainer._id
+    }));
+    setShowMaintainerDropdown(false);
+  };
+
+  // Get selected maintainer details
+  const getSelectedMaintainer = () => {
+    if (!Array.isArray(maintainers)) {
+      return null;
+    }
+    return maintainers.find(m => m._id === formData.maintainerId);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMaintainerDropdown && !event.target.closest('.maintainer-dropdown')) {
+        setShowMaintainerDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMaintainerDropdown]);
+
   const handleInputChange = (section, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -98,32 +157,32 @@ const DefaultBranchModal = ({
   };
 
   const validateForm = () => {
-    const { name, address, contact, maintainer } = formData;
-    
+    const { name, address, contact, maintainerId } = formData;
+
     // Validate name
     if (!name || name.trim() === '') {
       toast.error('Branch name is required');
       return false;
     }
-    
+
     // Validate address
     if (!address.street || !address.city || !address.state || !address.pincode) {
       toast.error('Please fill in all address fields (street, city, state, pincode)');
       return false;
     }
-    
+
     // Validate contact
     if (!contact.phone || !contact.email) {
       toast.error('Contact phone and email are required');
       return false;
     }
-    
-    // Validate maintainer
-    if (!maintainer.name || !maintainer.mobile || !maintainer.email) {
-      toast.error('Maintainer details (name, mobile, email) are required');
+
+    // Validate maintainer selection
+    if (!maintainerId) {
+      toast.error('Please select a maintainer for this branch');
       return false;
     }
-    
+
     return true;
   };
 
@@ -142,6 +201,15 @@ const DefaultBranchModal = ({
     try {
       setLoading(true);
       
+      // Validate maintainer selection
+      if (!formData.maintainerId) {
+        toast.error('Please select a maintainer for this branch');
+        return;
+      }
+
+      console.log('DefaultBranchModal: Creating branch with maintainerId:', formData.maintainerId);
+      console.log('DefaultBranchModal: Using pgId:', pgId);
+
       // Prepare branch data to match backend requirements
       const branchData = {
         pgId: pgId,
@@ -153,11 +221,7 @@ const DefaultBranchModal = ({
           pincode: formData.address.pincode.trim(),
           landmark: (formData.address.landmark || '').trim()
         },
-        maintainer: {
-          name: formData.maintainer.name.trim(),
-          mobile: formData.maintainer.mobile.trim(),
-          email: formData.maintainer.email.trim()
-        },
+        maintainerId: formData.maintainerId, // Use maintainerId instead of maintainer details
         contact: {
           phone: formData.contact.phone.trim(),
           email: formData.contact.email.trim(),
@@ -194,6 +258,8 @@ const DefaultBranchModal = ({
 
         // Update branches state to include the new branch
         dispatch(setBranches([response.data.branch]));
+
+        console.log('DefaultBranchModal: Branch created successfully:', response.data);
 
         // Call onBranchCreated callback if provided
         onBranchCreated && onBranchCreated(response.data);
@@ -385,47 +451,107 @@ const DefaultBranchModal = ({
             </div>
           </div>
 
-          {/* Maintainer Information */}
+          {/* Maintainer Selection */}
           <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4">
             <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-              <Users className="h-4 w-4 mr-2 text-orange-600" />
-              Maintainer Information
+              <UserCheck className="h-4 w-4 mr-2 text-orange-600" />
+              Select Maintainer
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                <input
-                  type="text"
-                  value={formData.maintainer.name}
-                  onChange={(e) => handleInputChange('maintainer', 'name', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter maintainer name"
-                  required
-                />
+
+            {/* Maintainer Dropdown */}
+            <div className="relative maintainer-dropdown">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Branch Maintainer *
+              </label>
+              <div className="relative maintainer-dropdown">
+                <button
+                  type="button"
+                  onClick={() => setShowMaintainerDropdown(!showMaintainerDropdown)}
+                  className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between ${
+                    formData.maintainerId ? 'border-gray-300' : 'border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    {getSelectedMaintainer() ? (
+                      <>
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <UserCheck className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {(getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'Unknown')} {(getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {getSelectedMaintainer().user?.email || getSelectedMaintainer().email} • {getSelectedMaintainer().user?.phone || getSelectedMaintainer().mobile || getSelectedMaintainer().phone}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">Select a maintainer for this branch</span>
+                    )}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showMaintainerDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown Options */}
+                {showMaintainerDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {maintainersLoading ? (
+                      <div className="px-4 py-3 text-center text-gray-500">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        Loading maintainers...
+                      </div>
+                    ) : (Array.isArray(maintainers) && maintainers.length > 0) ? (
+                      maintainers.map((maintainer) => (
+                        <button
+                          key={maintainer._id}
+                          type="button"
+                          onClick={() => handleMaintainerSelect(maintainer)}
+                          className="w-full px-4 py-3 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none flex items-center"
+                        >
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <UserCheck className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {(maintainer.user?.firstName || maintainer.firstName || 'Unknown')} {(maintainer.user?.lastName || maintainer.lastName || '')}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {maintainer.user?.email || maintainer.email} • {maintainer.user?.phone || maintainer.mobile || maintainer.phone}
+                            </div>
+                          </div>
+                          {formData.maintainerId === maintainer._id && (
+                            <div className="ml-auto">
+                              <Check className="h-4 w-4 text-blue-600" />
+                            </div>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-center text-gray-500">
+                        No maintainers found. Please add maintainers first.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mobile *</label>
-                <input
-                  type="tel"
-                  value={formData.maintainer.mobile}
-                  onChange={(e) => handleInputChange('maintainer', 'mobile', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter mobile number"
-                  pattern="[0-9]{10}"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                <input
-                  type="email"
-                  value={formData.maintainer.email}
-                  onChange={(e) => handleInputChange('maintainer', 'email', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter maintainer email"
-                  required
-                />
-              </div>
+
+              {/* Selected maintainer info */}
+              {getSelectedMaintainer() && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <UserCheck className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <div className="text-sm font-medium text-blue-900">
+                        {(getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'Unknown')} {(getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '')}
+                      </div>
+                      <div className="text-xs text-blue-700">
+                        {getSelectedMaintainer().user?.email || getSelectedMaintainer().email} • {getSelectedMaintainer().user?.phone || getSelectedMaintainer().mobile || getSelectedMaintainer().phone}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

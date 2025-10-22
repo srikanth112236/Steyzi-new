@@ -6,6 +6,11 @@ const branchSchema = new mongoose.Schema({
     ref: 'PG',
     required: true
   },
+  maintainerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Maintainer',
+    default: null
+  },
   name: {
     type: String,
     required: true,
@@ -37,26 +42,6 @@ const branchSchema = new mongoose.Schema({
     landmark: {
       type: String,
       trim: true
-    }
-  },
-  maintainer: {
-    name: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    mobile: {
-      type: String,
-      required: true,
-      trim: true,
-      match: [/^\d{10}$/, 'Mobile number must be 10 digits']
-    },
-    email: {
-      type: String,
-      required: true,
-      trim: true,
-      lowercase: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
     }
   },
   contact: {
@@ -127,6 +112,7 @@ branchSchema.index({ pgId: 1, isActive: 1 });
 branchSchema.index({ pgId: 1, isDefault: 1, isActive: 1 });
 branchSchema.index({ createdBy: 1 });
 branchSchema.index({ status: 1 });
+branchSchema.index({ maintainerId: 1 });
 
 // Virtual for full address
 branchSchema.virtual('fullAddress').get(function() {

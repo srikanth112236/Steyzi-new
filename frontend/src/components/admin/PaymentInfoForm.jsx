@@ -332,6 +332,20 @@ const PaymentInfoForm = () => {
     );
   }
 
+  if (!selectedBranch) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+        <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Building2 className="h-6 w-6 text-yellow-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-yellow-800 mb-2">Branch Required</h3>
+        <p className="text-yellow-700">
+          Please select a branch from the top navigation to manage payment information.
+        </p>
+      </div>
+    );
+  }
+
   const handleSubmitSuccess = async (response) => {
     if (response.success) {
       toast.success('Payment information saved successfully');

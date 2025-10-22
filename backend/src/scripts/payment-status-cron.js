@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const ResidentService = require('../services/resident.service');
+const SubscriptionManagementService = require('../services/subscriptionManagement.service');
 const logger = require('../utils/logger');
 
 /**
@@ -16,9 +17,11 @@ const setupPaymentStatusCron = () => {
       // Get all PGs and update payment status for each
       const Pg = require('../models/pg.model');
       const pgs = await Pg.find({ isActive: true });
-      
+
       let totalUpdated = 0;
-      
+      let subscriptionsRenewed = 0;
+      let subscriptionsExpired = 0;
+
       for (const pg of pgs) {
         try {
           const result = await ResidentService.updateAllResidentsPaymentStatus(pg._id);
@@ -31,6 +34,57 @@ const setupPaymentStatusCron = () => {
           console.error(`❌ Error updating residents in PG ${pg.name}:`, error.message);
           logger.log('error', `Error updating residents in PG ${pg.name}: ${error.message}`);
         }
+      }
+
+      // Handle subscription renewals and expirations
+      try {
+        console.log('🔄 Processing subscription renewals and expirations...');
+
+        // Check for subscriptions expiring today and attempt auto-renewal
+        const subscriptionsToRenew = await SubscriptionManagementService.getSubscriptionsDueForRenewal();
+        console.log(`📋 Found ${subscriptionsToRenew.length} subscriptions due for renewal`);
+
+        for (const subscription of subscriptionsToRenew) {
+          try {
+            // Only auto-renew if payment succeeds (this would integrate with Razorpay)
+            const renewalResult = await SubscriptionManagementService.processSubscriptionRenewal(subscription);
+
+            if (renewalResult.success) {
+              subscriptionsRenewed++;
+              console.log(`✅ Renewed subscription ${subscription._id} for user ${subscription.userId}`);
+              logger.log('info', `Renewed subscription ${subscription._id} for user ${subscription.userId}`);
+            } else {
+              console.log(`❌ Failed to renew subscription ${subscription._id}: ${renewalResult.message}`);
+              logger.log('warn', `Failed to renew subscription ${subscription._id}: ${renewalResult.message}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error processing subscription renewal ${subscription._id}:`, error.message);
+            logger.log('error', `Error processing subscription renewal ${subscription._id}: ${error.message}`);
+          }
+        }
+
+        // Check for expired subscriptions
+        const expiredSubscriptions = await SubscriptionManagementService.getExpiredSubscriptions();
+        console.log(`📋 Found ${expiredSubscriptions.length} expired subscriptions`);
+
+        for (const subscription of expiredSubscriptions) {
+          try {
+            await SubscriptionManagementService.expireSubscription(subscription._id, 'Auto-expired by cron job');
+            subscriptionsExpired++;
+            console.log(`✅ Expired subscription ${subscription._id} for user ${subscription.userId}`);
+            logger.log('info', `Expired subscription ${subscription._id} for user ${subscription.userId}`);
+          } catch (error) {
+            console.error(`❌ Error expiring subscription ${subscription._id}:`, error.message);
+            logger.log('error', `Error expiring subscription ${subscription._id}: ${error.message}`);
+          }
+        }
+
+        console.log(`🎉 Subscription Cron: Completed! Renewed: ${subscriptionsRenewed}, Expired: ${subscriptionsExpired}`);
+        logger.log('info', `Subscription Cron: Completed! Renewed: ${subscriptionsRenewed}, Expired: ${subscriptionsExpired}`);
+
+      } catch (error) {
+        console.error('❌ Subscription Cron: Error in subscription processing:', error);
+        logger.log('error', `Subscription Cron: Error in subscription processing: ${error.message}`);
       }
       
       console.log(`🎉 Payment Status Cron: Completed! Total updated: ${totalUpdated} residents`);

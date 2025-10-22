@@ -2,12 +2,15 @@
 
 # dependencies
 node_modules/
+.pnp
+.pnp.js
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.expo-shared/
 
 # Native
 .kotlin/
@@ -25,19 +28,184 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.log*
 
 # macOS
 .DS_Store
-*.pem
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
 
 # local env files
 .env*.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts
 
-app-example
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+.cursorignore
 
-# generated native folders
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Testing
+/coverage
+.nyc_output/
+
+# Temporary folders
+tmp/
+temp/
+
+# Build outputs
+build/
+dist/
+
+# React Native
+.expo
+.expo-shared
+
+# Android
+/android/app/build
+/android/build/
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/app/src/main/assets/index.android.bundle
+/android/app/src/main/res/drawable-*
+/android/app/src/main/res/raw/
+
+# iOS
+/ios/build/
+/ios/Pods/
+/ios/.symlinks/
+/ios/expo-env.d.ts
+
+# Generated native folders
 /ios
 /android
+
+# EAS Build
+.eas/
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Local development files
+debug-*.js
+serve-*.js
+test-*.js
+
+# Storybook
+storybook-static/
+
+# Prettier cache
+.prettiercache
+
+# Husky
+.husky/_
+
+# Local development databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+
+# App signing
+*.keystore
+*.jks
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# CodePush
+.codepush/
+
+# React Native Debugger
+.rndebugger
+
+# Flipper
+.flipper/

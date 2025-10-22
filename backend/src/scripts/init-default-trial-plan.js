@@ -146,24 +146,13 @@ async function initDefaultTrialPlan() {
           ])
         },
         {
-          moduleName: 'admin_management',
+          moduleName: 'advanced_analytics',
           enabled: true,
           limit: null,
           permissions: new Map([
-            ['admin_routes', { create: true, read: true, update: true, delete: true }],
-            ['user_management', { create: true, read: true, update: true, delete: true }],
-            ['settings', { create: true, read: true, update: true, delete: true }],
-            ['subscription_management', { create: true, read: true, update: true, delete: true }]
-          ])
-        },
-        {
-          moduleName: 'security_management',
-          enabled: true,
-          limit: null,
-          permissions: new Map([
-            ['audit_logs', { create: true, read: true, update: true, delete: true }],
-            ['security_settings', { create: true, read: true, update: true, delete: true }],
-            ['access_control', { create: true, read: true, update: true, delete: true }]
+            ['advanced_charts', { create: true, read: true, update: true, delete: true }],
+            ['predictive_analytics', { create: true, read: true, update: true, delete: true }],
+            ['data_insights', { create: true, read: true, update: true, delete: true }]
           ])
         }
       ];
@@ -180,8 +169,7 @@ async function initDefaultTrialPlan() {
         { name: 'Bulk Upload', description: 'Import and manage bulk data', enabled: true },
         { name: 'Email & SMS Notifications', description: 'Full communication tools', enabled: true },
         { name: 'Multi-Branch Management', description: 'Manage up to 10 branches', enabled: true },
-        { name: 'Admin Management', description: 'Full administrative access and user management', enabled: true },
-        { name: 'Security Management', description: 'Complete security settings and audit logs', enabled: true },
+        { name: 'Advanced Analytics', description: 'Advanced charts and predictive analytics', enabled: true },
         { name: 'Custom Reports', description: 'Build custom reports and queries', enabled: true },
         { name: 'Settings', description: 'Access to all system configuration', enabled: true },
         { name: 'Subscription Management', description: 'Manage subscriptions and billing', enabled: true }
@@ -319,24 +307,13 @@ async function initDefaultTrialPlan() {
           ])
         },
         {
-          moduleName: 'admin_management',
+          moduleName: 'advanced_analytics',
           enabled: true,
           limit: null,
           permissions: new Map([
-            ['admin_routes', { create: true, read: true, update: true, delete: true }],
-            ['user_management', { create: true, read: true, update: true, delete: true }],
-            ['settings', { create: true, read: true, update: true, delete: true }],
-            ['subscription_management', { create: true, read: true, update: true, delete: true }]
-          ])
-        },
-        {
-          moduleName: 'security_management',
-          enabled: true,
-          limit: null,
-          permissions: new Map([
-            ['audit_logs', { create: true, read: true, update: true, delete: true }],
-            ['security_settings', { create: true, read: true, update: true, delete: true }],
-            ['access_control', { create: true, read: true, update: true, delete: true }]
+            ['advanced_charts', { create: true, read: true, update: true, delete: true }],
+            ['predictive_analytics', { create: true, read: true, update: true, delete: true }],
+            ['data_insights', { create: true, read: true, update: true, delete: true }]
           ])
         }
       ],
@@ -351,8 +328,7 @@ async function initDefaultTrialPlan() {
         { name: 'Bulk Upload', description: 'Import and manage bulk data', enabled: true },
         { name: 'Email & SMS Notifications', description: 'Full communication tools', enabled: true },
         { name: 'Multi-Branch Management', description: 'Manage up to 10 branches', enabled: true },
-        { name: 'Admin Management', description: 'Full administrative access and user management', enabled: true },
-        { name: 'Security Management', description: 'Complete security settings and audit logs', enabled: true },
+        { name: 'Advanced Analytics', description: 'Advanced charts and predictive analytics', enabled: true },
         { name: 'Custom Reports', description: 'Build custom reports and queries', enabled: true },
         { name: 'Settings', description: 'Access to all system configuration', enabled: true },
         { name: 'Subscription Management', description: 'Manage subscriptions and billing', enabled: true }

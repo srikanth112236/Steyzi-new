@@ -23,10 +23,13 @@ router.put('/admin/:branchId',
   paymentInfoController.createOrUpdatePaymentInfo
 );
 
-router.delete('/admin/:branchId', 
-  authenticate, 
-  adminOnly, 
+router.delete('/admin/:branchId',
+  authenticate,
+  adminOnly,
   paymentInfoController.deletePaymentInfo
 );
+
+// Public route to get payment info by ID
+router.get('/:id', paymentInfoController.getPaymentInfoById);
 
 module.exports = router; 

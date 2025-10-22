@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
+// Configure Mongoose to suppress deprecation warnings and prepare for Mongoose 7
+mongoose.set('strictQuery', true);
+
 /**
  * Connect to MongoDB database
  * @returns {Promise<void>}

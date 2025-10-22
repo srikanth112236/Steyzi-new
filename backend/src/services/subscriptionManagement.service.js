@@ -120,10 +120,13 @@ class SubscriptionManagementService {
         endDate
       });
 
+      // Transform subscription data to ensure it's JSON serializable
+      const transformedSubscription = this.transformSubscriptionData(newSubscription, subscriptionPlan);
+
       return {
         success: true,
         message: `${billingCycle === 'trial' ? 'Free trial' : 'Subscription'} activated successfully`,
-        data: { userSubscription: newSubscription }
+        data: { userSubscription: transformedSubscription }
       };
     } catch (error) {
       // Log the error
@@ -376,6 +379,14 @@ class SubscriptionManagementService {
         totalBranches: 2 // Allow 2 branches during trial
       }, activatedBy || userId);
 
+      // Transform the result data to ensure JSON serializability
+      if (result.success && result.data) {
+        result.data = {
+          ...result.data,
+          userSubscription: this.transformSubscriptionData(result.data.userSubscription, trialPlan)
+        };
+      }
+
       return result;
     } catch (error) {
       console.error('Error activating free trial:', error);
@@ -611,10 +622,16 @@ class SubscriptionManagementService {
 
       logger.info(`User ${userId} subscription changed from ${currentSubscription.subscriptionPlanId} to ${subscriptionPlanId}`);
 
+      // Transform the subscription data for JSON serializability
+      const transformedData = {
+        ...subscribeResult.data,
+        userSubscription: this.transformSubscriptionData(subscribeResult.data.userSubscription, newPlan)
+      };
+
       return {
         success: true,
         message: 'Subscription changed successfully',
-        data: subscribeResult.data
+        data: transformedData
       };
     } catch (error) {
       logger.error('Error changing user subscription:', error);
@@ -1281,24 +1298,10 @@ class SubscriptionManagementService {
         };
       }
 
-      // Process and return subscription data
-      const plan = activeSubscription.subscriptionPlanId;
-      const processedModules = (plan.modules || []).map(module => ({
-        ...module.toObject(),
-        permissions: module.permissions instanceof Map
-          ? Object.fromEntries(module.permissions)
-          : module.permissions || {}
-      }));
-
+      // Process and return subscription data using the transformation method
       return {
         success: true,
-        data: {
-          ...activeSubscription.toObject(),
-          plan: {
-            ...plan.toObject(),
-            modules: processedModules
-          }
-        }
+        data: this.transformSubscriptionData(activeSubscription, activeSubscription.subscriptionPlanId)
       };
     } catch (error) {
       logger.log('error', 'Error fetching active subscription', { 
@@ -1310,6 +1313,199 @@ class SubscriptionManagementService {
         success: false,
         message: 'Failed to fetch active subscription',
         error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get subscriptions due for renewal
+   */
+  async getSubscriptionsDueForRenewal() {
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+    return await UserSubscription.find({
+      status: 'active',
+      autoRenew: true,
+      endDate: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    }).populate('userId', 'firstName lastName email')
+      .populate('subscriptionPlanId');
+  }
+
+  /**
+   * Get expired subscriptions
+   */
+  async getExpiredSubscriptions() {
+    const today = new Date();
+
+    return await UserSubscription.find({
+      status: 'active',
+      endDate: { $lt: today }
+    }).populate('userId', 'firstName lastName email')
+      .populate('subscriptionPlanId');
+  }
+
+  /**
+   * Process subscription renewal
+   */
+  async processSubscriptionRenewal(subscription) {
+    try {
+      // TODO: Integrate with Razorpay to process payment
+      // For now, we'll simulate successful renewal
+
+      // Calculate new end date based on billing cycle
+      const newEndDate = new Date(subscription.endDate);
+      if (subscription.billingCycle === 'monthly') {
+        newEndDate.setMonth(newEndDate.getMonth() + 1);
+      } else if (subscription.billingCycle === 'annual') {
+        newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+      }
+
+      // Update subscription
+      subscription.endDate = newEndDate;
+      subscription.updatedAt = new Date();
+
+      await subscription.save();
+
+      logger.info('Subscription renewed successfully:', {
+        subscriptionId: subscription._id,
+        userId: subscription.userId,
+        newEndDate
+      });
+
+      return {
+        success: true,
+        message: 'Subscription renewed successfully',
+        data: { subscriptionId: subscription._id, newEndDate }
+      };
+    } catch (error) {
+      logger.error('Error processing subscription renewal:', error);
+      return {
+        success: false,
+        message: 'Failed to process subscription renewal',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Expire subscription
+   */
+  async expireSubscription(subscriptionId, reason = 'Subscription expired') {
+    try {
+      const subscription = await UserSubscription.findById(subscriptionId);
+      if (!subscription) {
+        throw new Error('Subscription not found');
+      }
+
+      subscription.status = 'expired';
+      subscription.updatedAt = new Date();
+
+      await subscription.save();
+
+      // TODO: Send notification to user about expiration
+
+      logger.info('Subscription expired:', {
+        subscriptionId,
+        userId: subscription.userId,
+        reason
+      });
+
+      return {
+        success: true,
+        message: 'Subscription expired successfully'
+      };
+    } catch (error) {
+      logger.error('Error expiring subscription:', error);
+      return {
+        success: false,
+        message: 'Failed to expire subscription',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Transform subscription data to ensure JSON serializability
+   * Converts Map objects to plain objects for React compatibility
+   */
+  transformSubscriptionData(subscription, plan) {
+    try {
+      const subscriptionObj = subscription.toObject ? subscription.toObject() : subscription;
+
+      // Transform the plan data if provided
+      if (plan) {
+        const planObj = plan.toObject ? plan.toObject() : plan;
+
+        // Transform modules to convert Map objects to plain objects
+        if (planObj.modules && Array.isArray(planObj.modules)) {
+          planObj.modules = planObj.modules.map(module => {
+            const moduleObj = { ...module };
+
+            // Convert permissions Map to plain object
+            if (module.permissions instanceof Map) {
+              moduleObj.permissions = Object.fromEntries(module.permissions);
+            } else if (module.permissions && typeof module.permissions === 'object') {
+              moduleObj.permissions = module.permissions;
+            } else {
+              moduleObj.permissions = {};
+            }
+
+            // Ensure other fields are serializable
+            if (moduleObj._id) {
+              moduleObj._id = moduleObj._id.toString();
+            }
+
+            return moduleObj;
+          });
+        }
+
+        // Transform features if they exist
+        if (planObj.features && Array.isArray(planObj.features)) {
+          planObj.features = planObj.features.map(feature => {
+            const featureObj = { ...feature };
+            if (featureObj._id) {
+              featureObj._id = featureObj._id.toString();
+            }
+            return featureObj;
+          });
+        }
+
+        subscriptionObj.plan = planObj;
+      }
+
+      // Transform subscription fields
+      if (subscriptionObj._id) {
+        subscriptionObj._id = subscriptionObj._id.toString();
+      }
+      if (subscriptionObj.userId) {
+        subscriptionObj.userId = subscriptionObj.userId.toString();
+      }
+      if (subscriptionObj.subscriptionPlanId) {
+        subscriptionObj.subscriptionPlanId = subscriptionObj.subscriptionPlanId.toString();
+      }
+      if (subscriptionObj.createdBy) {
+        subscriptionObj.createdBy = subscriptionObj.createdBy.toString();
+      }
+
+      return subscriptionObj;
+    } catch (error) {
+      logger.error('Error transforming subscription data:', error);
+      // Return basic subscription data if transformation fails
+      return {
+        _id: subscription._id?.toString(),
+        userId: subscription.userId?.toString(),
+        subscriptionPlanId: subscription.subscriptionPlanId?.toString(),
+        status: subscription.status,
+        billingCycle: subscription.billingCycle,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        totalBeds: subscription.totalBeds,
+        totalBranches: subscription.totalBranches,
+        totalPrice: subscription.totalPrice
       };
     }
   }

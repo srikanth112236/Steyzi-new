@@ -36,16 +36,18 @@ const superadminRoutes = require('./routes/superadmin.routes');
 const activityRoutes = require('./routes/activity.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const subscriptionManagementRoutes = require('./routes/subscriptionManagement.routes');
+const subscriptionPaymentRoutes = require('./routes/subscriptionPayment.routes');
 const salesRoutes = require('./routes/sales.routes');
 const salesManagerRoutes = require('./routes/salesManager.routes');
 const securityRoutes = require('./routes/security.routes');
 const advancedFeaturesRoutes = require('./routes/advancedFeatures.routes');
 const onboardingRoutes = require('./routes/onboarding.routes');
 const logsRoutes = require('./routes/logs.routes');
-
+const maintainerRoutes = require('./routes/maintainer.routes');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
 const { apiRateLimit, noRateLimit } = require('./middleware/rateLimit.middleware');
+const { optionalAuthenticate } = require('./middleware/auth.middleware');
 
 // Import cron job setups
 const { setupVacationCron } = require('./scripts/setup-vacation-cron');
@@ -184,15 +186,20 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/subscription-management', subscriptionManagementRoutes);
+app.use('/api/subscription-payments', subscriptionPaymentRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/sales-managers', salesManagerRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/advanced', advancedFeaturesRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/maintainers', maintainerRoutes);
 
 // Add subscription routes
 app.use('/api/subscriptions', subscriptionRoutes);
+
+// Optional authentication middleware for all routes
+app.use(optionalAuthenticate);
 
 // 404 handler
 app.use('*', (req, res) => {

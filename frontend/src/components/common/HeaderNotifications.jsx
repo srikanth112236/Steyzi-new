@@ -26,7 +26,10 @@ const HeaderNotifications = () => {
       const s = io(base, { withCredentials: true });
       setSocket(s);
 
-      s.on('connect', () => {});
+      s.on('connect', () => {
+        console.log('WebSocket connected for notifications');
+      });
+
       s.on('ticket_status_updated', (payload) => {
         // convert payload to notification-like item
         const n = {
@@ -41,8 +44,17 @@ const HeaderNotifications = () => {
         dispatch(pushNotification(n));
       });
 
-      return () => { try { s.close(); } catch (_) {} };
-    } catch (_) {}
+      return () => {
+        try {
+          s.close();
+          console.log('WebSocket disconnected');
+        } catch (error) {
+          console.error('Error closing WebSocket:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing WebSocket:', error);
+    }
   }, [dispatch]);
 
   const unreadItems = items.filter(n => !n.isRead);

@@ -8,6 +8,8 @@ import {
   Award,
   Bed,
   TrendingUp,
+  TrendingDown,
+  ArrowRight,
   Calendar,
   DollarSign,
   Loader,
@@ -37,6 +39,7 @@ import { getCurrentUser, selectUser } from '../../store/slices/authSlice';
 import subscriptionService from '../../services/subscription.service';
 import SubscriptionPlanPreview from '../common/SubscriptionPlanPreview';
 import authService from '../../services/auth.service';
+import razorpayPaymentService from '../../services/razorpayPayment.service';
 
 const SubscriptionSelection = () => {
   const dispatch = useDispatch();
@@ -50,7 +53,7 @@ const SubscriptionSelection = () => {
   const loading = useSelector(selectSubscriptionLoading);
 
   // Filter out system plans (trial-related plans) that shouldn't be user-selectable
-  const availablePlans = allAvailablePlans.filter(plan =>
+  const availablePlans = (allAvailablePlans || []).filter(plan =>
     plan.planName !== 'Free Trial Plan' &&
     plan.planName !== 'Trial Expired Plan'
   );
@@ -85,17 +88,25 @@ const SubscriptionSelection = () => {
     // Fetch available plans with current user context
     const fetchPlans = async () => {
       try {
+        console.log('🔄 Starting to fetch subscription plans...');
+
         // Get current user details
         const currentUser = await authService.getCurrentUser();
-        
+        console.log('👤 Current user data:', currentUser);
+
+        const userContext = {
+          role: currentUser.user?.role || currentUser.role,
+          pgId: currentUser.user?.pgId || currentUser.pgId,
+          email: currentUser.user?.email || currentUser.email
+        };
+
+        console.log('📋 User context for plans API:', userContext);
+
         // Dispatch with user context
-        await dispatch(fetchAvailablePlans({
-          role: currentUser.role,
-          pgId: currentUser.pgId,
-          email: currentUser.email
-        }));
+        const result = await dispatch(fetchAvailablePlans(userContext));
+        console.log('📦 Plans fetch result:', result);
       } catch (error) {
-        console.error('Error fetching available plans:', error);
+        console.error('❌ Error fetching available plans:', error);
         toast.error('Failed to fetch available plans');
       }
     };
@@ -154,22 +165,13 @@ const SubscriptionSelection = () => {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/subscription/add-beds`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: JSON.stringify({
-          additionalBeds: additionalBeds,
-          newMaxBeds: (restrictions.maxBeds || currentPlan.baseBedCount) + additionalBeds
-        })
-      });
+      const newMaxBeds = (restrictions.maxBeds || currentPlan.baseBedCount) + additionalBeds;
 
-      const result = await response.json();
+      // Process bed addition payment using Razorpay
+      const paymentResult = await razorpayPaymentService.processBedAddition(additionalBeds, newMaxBeds);
 
-      if (result.success) {
-        toast.success(result.message || 'Beds added successfully!');
+      if (paymentResult.success) {
+        toast.success(`Successfully added ${additionalBeds} beds to your subscription!`);
 
         // Refresh user data and subscription
         await dispatch(getCurrentUser());
@@ -179,8 +181,10 @@ const SubscriptionSelection = () => {
         setShowAddBedsModal(false);
         setSelectedPlanForBedAddition(null);
         setAdditionalBeds(1);
+      } else if (paymentResult.cancelled) {
+        toast.info('Payment cancelled by user');
       } else {
-        toast.error(result.message || 'Failed to add beds');
+        toast.error(paymentResult.message || 'Failed to add beds');
       }
     } catch (error) {
       console.error('Error adding beds:', error);
@@ -195,14 +199,13 @@ const SubscriptionSelection = () => {
     }
 
     try {
-      // Use direct API for adding branches (similar to adding beds)
-      const result = await subscriptionService.addBranchesToSubscription(
-        additionalBranches,
-        (restrictions.maxBranches || 1) + additionalBranches
-      );
+      const newMaxBranches = (restrictions.maxBranches || 1) + additionalBranches;
 
-      if (result.success) {
-        toast.success(result.message || 'Branches added successfully!');
+      // Process branch addition payment using Razorpay
+      const paymentResult = await razorpayPaymentService.processBranchAddition(additionalBranches, newMaxBranches);
+
+      if (paymentResult.success) {
+        toast.success(`Successfully added ${additionalBranches} branches to your subscription!`);
 
         // Refresh user data and subscription
         await dispatch(getCurrentUser());
@@ -212,8 +215,10 @@ const SubscriptionSelection = () => {
         setShowAddBranchesModal(false);
         setSelectedPlanForBranchAddition(null);
         setAdditionalBranches(1);
+      } else if (paymentResult.cancelled) {
+        toast.info('Payment cancelled by user');
       } else {
-        toast.error(result.message || 'Failed to add branches');
+        toast.error(paymentResult.message || 'Failed to add branches');
       }
     } catch (error) {
       console.error('Error adding branches:', error);
@@ -402,16 +407,61 @@ const SubscriptionSelection = () => {
         branchCount: config.branchCount
       };
 
-      const result = await dispatch(selectSubscriptionPlan(planData)).unwrap();
-      toast.success(result.message || 'Subscription plan updated successfully!');
+      // Check if this is a paid plan (not free trial)
+      if (confirmPlan.basePrice > 0) {
+        setShowConfirmation(false);
 
-      // Refresh user data to update subscription information
-      await dispatch(getCurrentUser());
+        // Calculate the total amount on frontend (dynamic calculation)
+        const calculatedAmount = calculatePlanCost(confirmPlan, config.bedCount, config.branchCount);
 
-      setShowConfirmation(false);
-      setSelectedPlanId(confirmPlan._id);
+        // Create payment link instead of modal payment
+        const paymentLinkData = {
+          subscriptionPlanId: confirmPlan._id,
+          bedCount: config.bedCount,
+          branchCount: config.branchCount,
+          billingCycle: confirmPlan.billingCycle,
+          amount: Math.round(calculatedAmount * 100), // Convert to paise for Razorpay
+          callback_url: `${window.location.origin}/payment/callback`
+        };
+
+        console.log('Frontend calculated amount:', calculatedAmount, '₹');
+        console.log('Sending to backend (paise):', paymentLinkData.amount);
+
+        const paymentLinkResult = await razorpayPaymentService.createPaymentLink(paymentLinkData);
+
+        if (paymentLinkResult.success && paymentLinkResult.data.payment_url) {
+          // Console log the payment URL for debugging
+          console.log('Frontend: Redirecting to payment URL:', paymentLinkResult.data.payment_url);
+
+          // Redirect to payment URL
+          window.location.href = paymentLinkResult.data.payment_url;
+
+          toast.success('Redirecting to payment page...');
+
+          // Refresh user data to update subscription information (payment will be verified via webhook)
+          setTimeout(async () => {
+            await dispatch(getCurrentUser());
+          }, 2000);
+
+          setSelectedPlanId(confirmPlan._id);
+        } else {
+          console.error('Payment link creation failed or missing payment_url:', paymentLinkResult);
+          toast.error(paymentLinkResult.message || 'Failed to create payment link - missing payment URL');
+        }
+      } else {
+        // Free plan or trial - use existing flow
+        const result = await dispatch(selectSubscriptionPlan(planData)).unwrap();
+        toast.success(result.message || 'Subscription plan updated successfully!');
+
+        // Refresh user data to update subscription information
+        await dispatch(getCurrentUser());
+
+        setShowConfirmation(false);
+        setSelectedPlanId(confirmPlan._id);
+      }
     } catch (error) {
-      toast.error(error || 'Failed to select subscription plan');
+      console.error('Error in confirmSelection:', error);
+      toast.error(error.message || 'Failed to select subscription plan');
     }
   };
 
@@ -438,112 +488,95 @@ const SubscriptionSelection = () => {
 
   return (
     <div className="space-y-6">
-      {/* Current Subscription Overview */}
+      {/* Ultra-Compact Current Subscription Overview */}
       {currentPlan && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <Package className="h-6 w-6 text-blue-600" />
-                <h3 className="text-xl font-bold text-gray-900">Current Plan</h3>
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-3 border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Package className="h-4 w-4 text-white" />
               </div>
-              <p className="text-gray-600">Your active subscription</p>
+            <div>
+                <h3 className="text-base font-bold text-gray-900">Current Plan</h3>
+                <p className="text-xs text-gray-600">{currentPlan.planName}</p>
+              </div>
             </div>
-            <span className={`px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(subscriptionStatus)}`}>
+            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(subscriptionStatus)}`}>
               {subscriptionStatus.toUpperCase()}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Plan Name</span>
-                <Star className="h-4 w-4 text-yellow-500" />
-              </div>
-              <p className="text-lg font-bold text-gray-900">{currentPlan.planName}</p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Beds Limit</span>
-                <Bed className="h-4 w-4 text-purple-500" />
-              </div>
-              <p className="text-lg font-bold text-gray-900">
-                {currentUsage.bedsUsed || 0} / {restrictions.maxBeds || 'Unlimited'}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-lg p-2 shadow-sm text-center">
+              <Bed className="h-3 w-3 text-purple-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500 mb-0.5">Beds</p>
+              <p className="text-xs font-bold text-gray-900">
+                {currentUsage.bedsUsed || 0} / {restrictions.maxBeds || '∞'}
               </p>
-              {restrictions.maxBeds && (
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-purple-600 h-2 rounded-full transition-all"
-                    style={{
-                      width: `${Math.min(100, ((currentUsage.bedsUsed || 0) / restrictions.maxBeds) * 100)}%`
-                    }}
-                  />
-                </div>
-              )}
             </div>
 
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Billing</span>
-                <Calendar className="h-4 w-4 text-green-500" />
+            <div className="bg-white rounded-lg p-2 shadow-sm text-center">
+              <Building2 className="h-3 w-3 text-blue-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500 mb-0.5">Branches</p>
+              <p className="text-xs font-bold text-gray-900">{restrictions.maxBranches || 1}</p>
               </div>
-              <p className="text-lg font-bold text-gray-900">
+
+            <div className="bg-white rounded-lg p-2 shadow-sm text-center">
+              <Calendar className="h-3 w-3 text-green-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500 mb-0.5">Billing</p>
+              <p className="text-xs font-bold text-gray-900">
                 {currentPlan.billingCycle === 'monthly' ? 'Monthly' : 'Annual'}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                {subscriptionService.formatCurrency(currentPlan.basePrice)}
               </p>
             </div>
           </div>
 
-          {/* Enabled Modules */}
+          {/* Compact Enabled Modules */}
           {restrictions.enabledModules.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Enabled Modules:</p>
-              <div className="flex flex-wrap gap-2">
-                {restrictions.enabledModules.slice(0, 6).map((module, idx) => (
+            <div className="mt-3">
+              <p className="text-xs font-medium text-gray-600 mb-1.5">Enabled Modules:</p>
+              <div className="flex flex-wrap gap-1">
+                {restrictions.enabledModules.slice(0, 4).map((module, idx) => (
                   <span
                     key={idx}
-                    className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+                    className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded"
                   >
-                    {module.replace(/_/g, ' ').toUpperCase()}
+                    {module.replace(/_/g, ' ')}
                   </span>
                 ))}
-                {restrictions.enabledModules.length > 6 && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded">
-                    +{restrictions.enabledModules.length - 6} more
+                {restrictions.enabledModules.length > 4 && (
+                  <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                    +{restrictions.enabledModules.length - 4}
                   </span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="mt-6 pt-4 border-t border-blue-200">
-            <div className="flex flex-wrap gap-3">
+          {/* Compact Action Buttons */}
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
               <button
                 onClick={() => handlePreviewPlan(currentPlan)}
-                className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-xs font-medium"
               >
-                <Eye className="h-4 w-4" />
+                <Eye className="h-3 w-3" />
                 <span>Preview</span>
               </button>
 
               <button
                 onClick={() => handleAddBeds(currentPlan)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 hover:border-blue-700 transition-colors"
+                className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3 w-3" />
                 <span>Add Beds</span>
               </button>
 
               {currentPlan?.allowMultipleBranches && (
                 <button
                   onClick={() => handleAddBranches(currentPlan)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 border border-purple-600 text-white rounded-lg hover:bg-purple-700 hover:border-purple-700 transition-colors"
+                  className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-purple-600 border border-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs font-medium"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3 w-3" />
                   <span>Add Branches</span>
                 </button>
               )}
@@ -552,19 +585,19 @@ const SubscriptionSelection = () => {
               {currentPlan?.isCustomPlan && (
                 <button
                   onClick={() => handleUpgradeRequest(currentPlan)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-orange-600 border border-orange-600 text-white rounded-lg hover:bg-orange-700 hover:border-orange-700 transition-colors"
+                  className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-orange-600 border border-orange-600 text-white rounded-lg hover:bg-orange-700 text-xs font-medium"
                 >
-                  <TrendingUp className="h-4 w-4" />
-                  <span>Request Upgrade</span>
+                  <TrendingUp className="h-3 w-3" />
+                  <span>Upgrade</span>
                 </button>
               )}
 
               <button
                 onClick={() => handleChangePlan(currentPlan)}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 border border-green-600 text-white rounded-lg hover:bg-green-700 hover:border-green-700 transition-colors"
+                className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-green-600 border border-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-medium"
               >
-                <TrendingUp className="h-4 w-4" />
-                <span>Change Plan</span>
+                <TrendingUp className="h-3 w-3" />
+                <span>Change</span>
               </button>
             </div>
           </div>
@@ -603,14 +636,19 @@ const SubscriptionSelection = () => {
           </div>
         </div>
 
-        {availablePlans.length === 0 ? (
+        {plansLoading ? (
+          <div className="flex items-center justify-center p-12">
+            <Loader className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-3 text-gray-600">Loading subscription plans...</span>
+          </div>
+        ) : availablePlans.length === 0 ? (
           <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
             <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Plans Available</h3>
             <p className="text-gray-600">No subscription plans are currently available.</p>
           </div>
         ) : useModernPreview ? (
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {availablePlans.map((plan) => (
               <SubscriptionPlanPreview
                 key={plan._id}
@@ -618,24 +656,22 @@ const SubscriptionSelection = () => {
                 isSelected={selectedPlanId === plan._id}
                 onSelect={handleSelectPlan}
                 showSelectButton={true}
-                compact={false}
+                compact={true}
               />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {availablePlans.map((plan) => (
               <motion.div
                 key={plan._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`relative bg-white rounded-xl shadow-sm border-2 transition-all duration-200 hover:shadow-lg overflow-hidden ${
+                className={`relative bg-white rounded-2xl shadow-sm border transition-all duration-300 hover:shadow-lg overflow-hidden ${
                   selectedPlanId === plan._id
-                    ? 'border-blue-500 ring-2 ring-blue-200 shadow-blue-100'
-                    : 'border-gray-200 hover:border-blue-300'
-                } ${plan.isRecommended ? 'ring-2 ring-purple-200 shadow-purple-100' : ''} ${
-                  plan.isPopular ? 'shadow-yellow-100' : ''
-                }`}
+                    ? 'border-blue-500 ring-1 ring-blue-200 shadow-blue-100'
+                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                } ${plan.isRecommended ? 'ring-1 ring-purple-200' : ''}`}
               >
                 {/* Enhanced Badges */}
                 <div className="absolute top-4 right-4 flex flex-col space-y-2">
@@ -668,24 +704,29 @@ const SubscriptionSelection = () => {
                   </div>
                 )}
 
-                <div className="p-6">
-                  {/* Enhanced Plan Header */}
-                  <div className="mb-6">
-                    <div className="flex items-start justify-between mb-3">
+                <div className="p-3">
+                  {/* Professional Plan Header */}
+                  <div className="mb-3">
+                    <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h4 className="text-xl font-bold text-gray-900 mb-1">{plan.planName}</h4>
+                        <h4 className="text-base font-bold text-gray-900 leading-tight">{plan.planName}</h4>
                     {plan.planDescription && (
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                         {plan.planDescription}
                       </p>
                     )}
                       </div>
+                      {plan.isPopular && (
+                        <span className="ml-2 px-2 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full flex-shrink-0">
+                          POPULAR
+                        </span>
+                      )}
                     </div>
 
-                    {/* Price Display */}
-                    <div className="mb-4">
-                      <div className="flex items-baseline space-x-2">
-                        <span className="text-3xl font-bold text-gray-900">
+                    {/* Professional Price Display */}
+                    <div className="mb-3">
+                      <div className="flex items-baseline space-x-1">
+                        <span className="text-xl font-bold text-gray-900">
                           ₹{plan.basePrice.toLocaleString()}
                         </span>
                         <span className="text-sm text-gray-500">
@@ -693,302 +734,201 @@ const SubscriptionSelection = () => {
                         </span>
                       </div>
                       {plan.billingCycle === 'annual' && plan.annualDiscount > 0 && (
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-sm text-green-600 font-medium">
+                        <div className="mt-1">
+                          <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded">
                             Save {plan.annualDiscount}%
-                          </span>
-                          <span className="text-xs text-gray-500 line-through">
-                            ₹{(plan.basePrice * 12).toLocaleString()}/year
                           </span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Configuration Options */}
+                  {/* Ultra-Compact Configuration */}
                   {(plan.maxBedsAllowed > plan.baseBedCount || plan.allowMultipleBranches) && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Configure Your Plan</h5>
-                      <div className="space-y-3">
+                    <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <div className="space-y-2">
                         {/* Bed Count Selection */}
                         {plan.maxBedsAllowed > plan.baseBedCount && (
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Number of Beds: {getPlanConfiguration(plan).bedCount}
-                            </label>
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Beds: {getPlanConfiguration(plan).bedCount}</span>
+                              <span>{plan.baseBedCount}-{plan.maxBedsAllowed}</span>
+                            </div>
                             <input
                               type="range"
                               min={plan.baseBedCount}
                               max={plan.maxBedsAllowed}
                               value={getPlanConfiguration(plan).bedCount}
                               onChange={(e) => updatePlanConfiguration(plan._id, { bedCount: parseInt(e.target.value) })}
-                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                              onClick={(e) => e.stopPropagation()}
                             />
-                            <div className="flex justify-between text-xs text-gray-500 mt-1">
-                              <span>{plan.baseBedCount} beds</span>
-                              <span>{plan.maxBedsAllowed} beds</span>
-                            </div>
                           </div>
                         )}
 
                         {/* Branch Count Selection */}
                         {plan.allowMultipleBranches && plan.branchCount > 1 && (
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Number of Branches: {getPlanConfiguration(plan).branchCount}
-                            </label>
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Branches: {getPlanConfiguration(plan).branchCount}</span>
+                              <span>1-{plan.branchCount}</span>
+                            </div>
                             <input
                               type="range"
                               min="1"
                               max={plan.branchCount}
                               value={getPlanConfiguration(plan).branchCount}
                               onChange={(e) => updatePlanConfiguration(plan._id, { branchCount: parseInt(e.target.value) })}
-                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                              onClick={(e) => e.stopPropagation()}
                             />
-                            <div className="flex justify-between text-xs text-gray-500 mt-1">
-                              <span>1 branch</span>
-                              <span>{plan.branchCount} branches</span>
-                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Pricing */}
-                  <div className="mb-6 pb-6 border-b border-gray-200">
-                    {(() => {
-                      const config = getPlanConfiguration(plan);
-                      const costBreakdown = calculatePlanCost(plan, config.bedCount, config.branchCount);
-
-                      return (
-                        <div>
-                          <div className="flex items-baseline space-x-2">
-                            <span className="text-3xl font-bold text-gray-900">
-                              {subscriptionService.formatCurrency(costBreakdown.monthlyPrice)}
-                            </span>
-                            <span className="text-gray-600">
-                              /{plan.billingCycle === 'monthly' ? 'month' : 'year'}
-                            </span>
-                          </div>
-
-                          {plan.billingCycle === 'annual' && plan.annualDiscount > 0 && (
-                            <p className="text-sm text-green-600 font-medium mt-1">
-                              Save {plan.annualDiscount}% with annual billing
-                            </p>
-                          )}
-
-                          {/* Cost Breakdown */}
-                          {(costBreakdown.extraBeds > 0 || costBreakdown.extraBranches > 0) && (
-                            <div className="mt-2 text-xs text-gray-600 space-y-1">
-                              {costBreakdown.extraBeds > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Base ({plan.baseBedCount} beds):</span>
-                                  <span>{subscriptionService.formatCurrency(costBreakdown.basePrice)}</span>
-                                </div>
-                              )}
-                              {costBreakdown.extraBeds > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Extra beds ({costBreakdown.extraBeds}):</span>
-                                  <span>{subscriptionService.formatCurrency(costBreakdown.topUpCost)}</span>
-                                </div>
-                              )}
-                              {costBreakdown.extraBranches > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Extra branches ({costBreakdown.extraBranches}):</span>
-                                  <span>{subscriptionService.formatCurrency(costBreakdown.branchCost)}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Features */}
-                  <div className="space-y-3 mb-6">
+                  {/* Ultra-Compact Features */}
+                  <div className="space-y-1.5 mb-3">
                     {(() => {
                       const config = getPlanConfiguration(plan);
                       return (
                         <>
-                          <div className="flex items-center space-x-2">
-                            <Bed className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                            <span className="text-sm text-gray-700">
-                              <strong>{config.bedCount}</strong> beds configured
-                              {config.bedCount > plan.baseBedCount && (
-                                <span className="text-green-600 ml-1">
-                                  (+{config.bedCount - plan.baseBedCount} extra)
-                                </span>
-                              )}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-1.5">
+                              <Bed className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                              <span className="text-gray-700">
+                                <strong>{config.bedCount}</strong> beds
                             </span>
                           </div>
                           {plan.maxBedsAllowed > plan.baseBedCount && (
-                            <div className="flex items-center space-x-2">
-                              <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0" />
-                              <span className="text-sm text-gray-700">
-                                {subscriptionService.formatCurrency(plan.topUpPricePerBed)}/bed top-up
+                              <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                +{config.bedCount - plan.baseBedCount}
                               </span>
-                            </div>
                           )}
+                          </div>
+
                           {plan.allowMultipleBranches && (
-                            <div className="flex items-center space-x-2">
-                              <Building2 className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                              <span className="text-sm text-gray-700">
-                                <strong>{config.branchCount}</strong> branch{config.branchCount !== 1 ? 'es' : ''} configured
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center space-x-1.5">
+                                <Building2 className="h-3 w-3 text-purple-600 flex-shrink-0" />
+                                <span className="text-gray-700">
+                                  <strong>{config.branchCount}</strong> branch{config.branchCount !== 1 ? 'es' : ''}
+                                </span>
+                              </div>
                                 {config.branchCount > 1 && (
-                                  <span className="text-green-600 ml-1">
-                                    (+{config.branchCount - 1} extra)
+                                <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                  +{config.branchCount - 1}
                                   </span>
                                 )}
-                              </span>
                             </div>
                           )}
-                          {plan.allowMultipleBranches && plan.costPerBranch > 0 && config.branchCount > 1 && (
-                            <div className="flex items-center space-x-2">
-                              <DollarSign className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                              <span className="text-sm text-gray-700">
-                                {subscriptionService.formatCurrency(plan.costPerBranch)}/additional branch
-                              </span>
-                            </div>
+
+                          {/* Feature Pills */}
+                          {plan.features && plan.features.slice(0, 2).map((feature, idx) => (
+                            <div key={idx} className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-xs ${
+                              feature.enabled
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-500 line-through'
+                            }`}>
+                        {feature.enabled ? (
+                                <CheckCircle className="h-2.5 w-2.5" />
+                        ) : (
+                                <XCircle className="h-2.5 w-2.5" />
+                        )}
+                              <span>{feature.name}</span>
+                      </div>
+                    ))}
+                          {plan.features && plan.features.length > 2 && (
+                            <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                              +{plan.features.length - 2}
+                            </span>
                           )}
                         </>
                       );
                     })()}
-                    {plan.features && plan.features.slice(0, 3).map((feature, idx) => (
-                      <div key={idx} className="flex items-start space-x-2">
-                        {feature.enabled ? (
-                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                        )}
-                        <span className={`text-sm ${feature.enabled ? 'text-gray-700' : 'text-gray-400 line-through'}`}>
-                          {feature.name}
-                        </span>
-                      </div>
-                    ))}
-                    {plan.features && plan.features.length > 3 && (
-                      <p className="text-xs text-blue-600 font-medium">
-                        +{plan.features.length - 3} more features
-                      </p>
-                    )}
                   </div>
 
-                  {/* Enhanced Action Buttons */}
-                  <div className="space-y-3">
+
+                  {/* Professional Action Buttons */}
+                  <div className="pt-2 border-t border-gray-100">
+                    {/* Plan Status Badge */}
                     {(() => {
                       const isCurrentPlan = currentPlan && currentPlan._id === plan._id;
                       const isUpgrade = currentPlan && plan.basePrice > currentPlan.basePrice;
                       const isDowngrade = currentPlan && plan.basePrice < currentPlan.basePrice;
-                      const isSamePrice = currentPlan && plan.basePrice === currentPlan.basePrice;
 
+                      if (isCurrentPlan) {
                       return (
-                        <>
-                          {/* Plan Change Indicator */}
-                          {currentPlan && !isCurrentPlan && (
-                            <div className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                              isUpgrade ? 'bg-green-50 text-green-700 border border-green-200' :
-                              isDowngrade ? 'bg-orange-50 text-orange-700 border border-orange-200' :
-                              'bg-blue-50 text-blue-700 border border-blue-200'
-                            }`}>
-                              {isUpgrade && (
-                                <>
-                                  <TrendingUp className="h-4 w-4" />
-                                  <span>Upgrade Plan</span>
-                                  <span className="text-xs bg-green-100 px-2 py-0.5 rounded">
-                                    +₹{(plan.basePrice - currentPlan.basePrice).toLocaleString()}
-                                  </span>
-                                </>
-                              )}
-                              {isDowngrade && (
-                                <>
-                                  <TrendingDown className="h-4 w-4" />
-                                  <span>Downgrade Plan</span>
-                                  <span className="text-xs bg-orange-100 px-2 py-0.5 rounded">
-                                    -₹{(currentPlan.basePrice - plan.basePrice).toLocaleString()}
-                                  </span>
-                                </>
-                              )}
-                              {isSamePrice && (
-                                <>
-                                  <ArrowRight className="h-4 w-4" />
-                                  <span>Switch Plan</span>
-                                  <span className="text-xs bg-blue-100 px-2 py-0.5 rounded">
-                                    Same Price
-                                  </span>
-                                </>
-                              )}
+                          <div className="flex items-center justify-center space-x-1.5 px-2 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-medium mb-2">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Current Plan</span>
+                          </div>
+                        );
+                      } else if (currentPlan && (isUpgrade || isDowngrade)) {
+                        return (
+                          <div className={`flex items-center justify-center space-x-1.5 px-2 py-1.5 rounded-lg text-xs font-medium mb-2 ${
+                            isUpgrade ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-orange-50 text-orange-700 border border-orange-200'
+                          }`}>
+                            {isUpgrade ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            <span>{isUpgrade ? 'Upgrade' : 'Downgrade'}</span>
                             </div>
-                          )}
+                        );
+                      }
+                      return null;
+                    })()}
 
                           {/* Action Buttons */}
-                          <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-1.5">
                             {/* Preview Button */}
                             <button
-                              onClick={() => handlePreviewPlan(plan)}
-                              className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-lg hover:from-gray-200 hover:to-gray-300 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 font-medium"
-                            >
-                              <Eye className="h-4 w-4" />
-                              <span className="text-sm">Preview</span>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewPlan(plan);
+                        }}
+                        className="flex items-center justify-center space-x-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 text-xs font-medium"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Preview</span>
                             </button>
 
                             {/* Select Plan Button */}
                   <button
-                    onClick={() => handleSelectPlan(plan)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectPlan(plan);
+                        }}
                     disabled={selectedPlanId === plan._id || loading}
-                              className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 ${
+                        className={`flex items-center justify-center space-x-1 px-2 py-1.5 rounded-lg font-semibold transition-all duration-200 text-xs ${
                       selectedPlanId === plan._id
-                        ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-not-allowed'
-                                  : isCurrentPlan
-                                  ? 'bg-gray-100 text-gray-600 cursor-not-allowed border-2 border-gray-300'
+                            ? 'bg-green-100 text-green-700 border border-green-300 cursor-not-allowed'
+                            : currentPlan && currentPlan._id === plan._id
+                            ? 'bg-gray-100 text-gray-600 cursor-not-allowed border border-gray-300'
                                   : currentPlan
-                                  ? isUpgrade
-                                    ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800'
-                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
                                   : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800'
                     }`}
                   >
                     {loading ? (
-                                <Loader className="h-4 w-4 animate-spin" />
+                          <Loader className="h-3 w-3 animate-spin" />
                     ) : selectedPlanId === plan._id ? (
                                 <>
-                                  <Check className="h-4 w-4" />
-                                  <span className="text-sm">Selected</span>
-                                </>
-                              ) : isCurrentPlan ? (
-                                <>
-                                  <CheckCircle className="h-4 w-4" />
-                                  <span className="text-sm">Current</span>
-                                </>
-                    ) : currentPlan ? (
-                                <>
-                                  <ArrowRight className="h-4 w-4" />
-                                  <span className="text-sm">
-                                    {isUpgrade ? 'Upgrade' :
-                                     isDowngrade ? 'Downgrade' :
-                                     'Switch'}
-                                  </span>
+                            <Check className="h-3 w-3" />
+                            <span>Selected</span>
+                          </>
+                        ) : currentPlan && currentPlan._id === plan._id ? (
+                          <>
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Current</span>
                                 </>
                               ) : (
                                 <>
-                                  <Check className="h-4 w-4" />
-                                  <span className="text-sm">Start</span>
+                            <Check className="h-3 w-3" />
+                            <span>Start</span>
                                 </>
                     )}
                   </button>
                           </div>
-
-                          {/* Additional Info */}
-                          {selectedPlanId === plan._id && (
-                            <div className="text-center">
-                              <p className="text-sm text-blue-600 font-medium">
-                                Click "Confirm Selection" below to proceed
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
                   </div>
                 </div>
               </motion.div>

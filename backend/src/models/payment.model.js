@@ -81,9 +81,6 @@ paymentSchema.index({ pgId: 1, status: 1 });
 paymentSchema.index({ paymentDate: 1 });
 paymentSchema.index({ markedBy: 1 });
 
-// Ensure no paymentId field exists to prevent duplicate key errors
-paymentSchema.index({ _id: 1 }, { unique: true });
-
 // Virtual for formatted payment date
 paymentSchema.virtual('formattedPaymentDate').get(function() {
   return this.paymentDate.toLocaleDateString('en-IN');

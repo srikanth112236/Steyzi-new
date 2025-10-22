@@ -1,88 +1,58 @@
-const { authorize } = require('./auth.middleware');
+const User = require('../models/user.model');
 
 /**
- * RBAC (Role-Based Access Control) middleware
- * @param {Array} roles - Array of allowed roles
- * @returns {Function} - Middleware function
+ * Role-Based Access Control Middleware
+ * @param {string[]} allowedRoles - Array of roles allowed to access the route
+ * @returns {Function} Express middleware function
  */
-const rbacMiddleware = (roles) => {
-  if (Array.isArray(roles)) {
-    return authorize(...roles);
-  }
-  return authorize(roles);
-};
+const rbacMiddleware = (allowedRoles = []) => {
+  console.log('RBAC Middleware Called', {
+    allowedRoles,
+    middlewareType: typeof rbacMiddleware,
+    functionExists: typeof rbacMiddleware === 'function'
+  });
 
-/**
- * Check specific permission for a resource
- * @param {string} resource - Resource name
- * @param {string} action - Action type (read, write, update, delete)
- * @param {string} permission - Permission type
- * @returns {Function} - Middleware function
- */
-rbacMiddleware.checkPermission = (resource, action, permission) => {
   return async (req, res, next) => {
+    console.log('RBAC Middleware Inner Function Called', {
+      user: req.user,
+      allowedRoles
+    });
+
     try {
-      // If no user, deny access
+      // Check if user is authenticated
       if (!req.user) {
+        console.log('RBAC: No user in request');
         return res.status(401).json({
           success: false,
-          message: 'Unauthorized: No user found'
+          message: 'Authentication required'
         });
       }
 
-      // Check user's role and permissions
-      const userRole = req.user.role;
-      const hasPermission = checkUserPermission(userRole, resource, action, permission);
-
-      if (hasPermission) {
-        next();
-      } else {
+      // Check if user's role is in the allowed roles
+      if (!allowedRoles.includes(req.user.role)) {
+        console.log('RBAC: Role not allowed', {
+          userRole: req.user.role,
+          allowedRoles
+        });
         return res.status(403).json({
           success: false,
-          message: `Forbidden: Insufficient permissions for ${resource} ${action}`
+          message: 'Access denied. Insufficient permissions.',
+          requiredRoles: allowedRoles,
+          userRole: req.user.role
         });
       }
+
+      // User has required role, proceed to next middleware
+      console.log('RBAC: Access granted');
+      next();
     } catch (error) {
-      console.error('Permission Check Error:', error);
-      return res.status(500).json({
+      console.error('RBAC Middleware Error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Internal server error during permission check'
+        message: 'Internal server error during role verification'
       });
     }
   };
 };
 
-/**
- * Utility function to check user permissions
- * @param {string} userRole - User's role
- * @param {string} resource - Resource name
- * @param {string} action - Action type
- * @param {string} permission - Permission type
- * @returns {boolean} - Whether user has permission
- */
-function checkUserPermission(userRole, resource, action, permission) {
-  // Define role-based permissions
-  const rolePermissions = {
-    'superadmin': {
-      sales: { 
-        analytics: ['read', 'write', 'update', 'delete'] 
-      }
-    },
-    'sales_manager': {
-      sales: { 
-        analytics: ['read'] 
-      }
-    },
-    'sub_sales': {
-      sales: { 
-        analytics: [] 
-      }
-    }
-  };
-
-  // Check if role exists and has the specific permission
-  const resourcePermissions = rolePermissions[userRole]?.[resource]?.[action] || [];
-  return resourcePermissions.includes(permission);
-}
-
-module.exports = rbacMiddleware;
+module.exports = { rbacMiddleware };

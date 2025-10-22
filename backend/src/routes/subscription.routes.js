@@ -209,4 +209,45 @@ router.get('/updates', authenticate, async (req, res) => {
   }
 });
 
+// Subscription Payment Routes (Admin/Superadmin)
+router.post('/payments/create-order',
+  authenticate,
+  subscriptionController.createOrder
+);
+
+router.post('/payments/verify',
+  authenticate,
+  subscriptionController.verifyPayment
+);
+
+router.get('/payments/history',
+  authenticate,
+  subscriptionController.getPaymentHistory
+);
+
+router.post('/payments/add-beds',
+  authenticate,
+  subscriptionController.addBeds
+);
+
+router.post('/payments/add-branches',
+  authenticate,
+  subscriptionController.addBranches
+);
+
+router.get('/payments/:paymentId',
+  authenticate,
+  subscriptionController.getPaymentStatus
+);
+
+router.post('/payments/request-upgrade',
+  authenticate,
+  subscriptionController.requestUpgrade
+);
+
+// Webhook endpoint (public - for Razorpay)
+router.post('/payments/webhook',
+  subscriptionController.handleWebhook
+);
+
 module.exports = router;

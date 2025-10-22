@@ -85,6 +85,59 @@ const userSubscriptionSchema = new mongoose.Schema({
     default: null
   },
 
+  // Payment History (for subscription payments)
+  paymentHistory: [{
+    razorpayOrderId: {
+      type: String,
+      required: true
+    },
+    razorpayPaymentId: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    currency: {
+      type: String,
+      default: 'INR'
+    },
+    status: {
+      type: String,
+      enum: ['created', 'paid', 'failed', 'refunded'],
+      default: 'created'
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['card', 'netbanking', 'wallet', 'upi'],
+      required: true
+    },
+    billingCycle: {
+      type: String,
+      enum: ['monthly', 'annual'],
+      required: true
+    },
+    planDetails: {
+      planId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Subscription'
+      },
+      planName: String,
+      bedCount: Number,
+      branchCount: Number
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+
   // Auto-renewal
   autoRenew: {
     type: Boolean,

@@ -292,6 +292,69 @@ class PGService {
   }
 
   /**
+   * Get PG Details
+   * @param {string} pgId - PG ID to fetch details for
+   * @returns {Promise<Object>} - PG details
+   */
+  async getPGDetails(pgId) {
+    try {
+      const response = await this.api.get(`/${pgId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching PG details:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get PG Sharing Types
+   * @param {string} pgId - PG ID to fetch sharing types for
+   * @returns {Promise<Object>} - Sharing types data
+   */
+  async getSharingTypes(pgId) {
+    try {
+      const response = await this.api.get(`/${pgId}/sharing-types`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching PG sharing types:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get Branch Sharing Types
+   * @param {string} branchId - Branch ID to fetch sharing types for
+   * @returns {Promise<Object>} - Sharing types data for the branch
+   */
+  async getSharingTypesForBranch(branchId) {
+    try {
+      const response = await this.api.get(`/branch/${branchId}/sharing-types`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching branch sharing types:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Configure Branch Sharing Types
+   * @param {string} branchId - Branch ID to configure
+   * @param {Array} sharingTypes - Array of sharing types to configure
+   * @returns {Promise<Object>} - Configuration result
+   */
+  async configureSharingTypesForBranch(branchId, sharingTypes) {
+    try {
+      const response = await this.api.post(`/branch/${branchId}/configure-sharing-types`, {
+        sharingTypes
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error configuring branch sharing types:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Configure PG Sharing Types
    * @param {string} pgId - PG ID to configure
    * @param {Array} sharingTypes - Array of sharing types to configure
@@ -310,6 +373,7 @@ class PGService {
       throw error;
     }
   }
+
 
   /**
    * Get default sharing types

@@ -715,6 +715,111 @@ router.post('/configure-sharing-types', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/pg/branch/:branchId/sharing-types
+ * @desc    Get branch sharing types
+ * @access  Private (Admin only)
+ */
+router.get('/branch/:branchId/sharing-types', authenticate, adminOrSuperadmin, async (req, res) => {
+  try {
+    const { branchId } = req.params;
+
+    if (!branchId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Branch ID is required'
+      });
+    }
+
+    // Verify branch belongs to user's PG
+    const Branch = require('../models/branch.model');
+    const branch = await Branch.findOne({ _id: branchId, pgId: req.user.pgId, isActive: true });
+
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        message: 'Branch not found or not associated with your PG'
+      });
+    }
+
+    // Get branch sharing types (currently stored at PG level)
+    const pgData = await pgService.getPGById(req.user.pgId);
+
+    if (!pgData.success || !pgData.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'PG not found'
+      });
+    }
+
+    const sharingTypes = pgData.data.sharingTypes || [];
+
+    return res.status(200).json({
+      success: true,
+      data: sharingTypes,
+      message: 'Branch sharing types retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Error getting branch sharing types:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get branch sharing types',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/pg/branch/:branchId/configure-sharing-types
+ * @desc    Configure branch sharing types
+ * @access  Private (Admin only)
+ */
+router.post('/branch/:branchId/configure-sharing-types', authenticate, adminOrSuperadmin, async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    const { sharingTypes } = req.body;
+
+    if (!branchId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Branch ID is required'
+      });
+    }
+
+    if (!sharingTypes || !Array.isArray(sharingTypes) || sharingTypes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or empty sharing types'
+      });
+    }
+
+    // Verify branch belongs to user's PG
+    const Branch = require('../models/branch.model');
+    const branch = await Branch.findOne({ _id: branchId, pgId: req.user.pgId, isActive: true });
+
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        message: 'Branch not found or not associated with your PG'
+      });
+    }
+
+    // For now, we'll store sharing types at PG level since that's how the current model works
+    // In a future enhancement, we could add branch-specific sharing types
+    const result = await pgService.configureSharingTypes(req.user.pgId, sharingTypes, req.user);
+
+    // Return result
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    console.error('Error configuring branch sharing types:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to configure branch sharing types',
+      error: error.message
+    });
+  }
+});
+
 // Get PG by ID - MUST COME AFTER SPECIFIC ROUTES
 router.get('/:pgId', authenticate, async (req, res) => {
   try {

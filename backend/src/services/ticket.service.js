@@ -689,42 +689,14 @@ class TicketService {
         isActive: true
       }).select('firstName lastName email _id');
 
-      // If no support staff found, create some test support staff
+      // If no support staff found, return empty array - support staff should be created through proper admin interface
       if (supportStaff.length === 0) {
-        console.log('No support staff found in database, creating test support staff...');
-
-        const testSupportStaff = [
-          {
-            firstName: 'John',
-            lastName: 'Support',
-            email: 'john.support@steyzi.com',
-            password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password: password123
-            role: 'support',
-            isActive: true
-          },
-          {
-            firstName: 'Jane',
-            lastName: 'Helpdesk',
-            email: 'jane.helpdesk@steyzi.com',
-            password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password: password123
-            role: 'support',
-            isActive: true
-          }
-        ];
-
-        for (const staff of testSupportStaff) {
-          const existingUser = await User.findOne({ email: staff.email });
-          if (!existingUser) {
-            await User.create(staff);
-            console.log(`Created support staff: ${staff.firstName} ${staff.lastName}`);
-          }
-        }
-
-        // Re-fetch the support staff after creation
-        supportStaff = await User.find({
-          role: 'support',
-          isActive: true
-        }).select('firstName lastName email _id');
+        console.log('No support staff found in database. Please create support staff through the admin interface.');
+        return {
+          success: true,
+          data: [],
+          message: 'No support staff found. Please create support staff through the admin interface.'
+        };
       }
 
       return {

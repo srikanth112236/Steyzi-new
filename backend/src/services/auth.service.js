@@ -197,25 +197,39 @@ class AuthService {
       const isPasswordValid = await user.comparePassword(credentials.password);
       
       if (!isPasswordValid) {
-        console.log('❌ AuthService: Invalid password');
-        
+        console.log('❌ AuthService: Invalid password', {
+          inputPassword: credentials.password,
+          storedPasswordHash: user.password ? 'HASH_EXISTS' : 'NO_PASSWORD',
+          userEmail: user.email,
+          userId: user._id
+        });
+
+        // Additional debugging: log the actual comparison result
+        try {
+          const bcrypt = require('bcryptjs');
+          const directCompareResult = await bcrypt.compare(credentials.password, user.password);
+          console.log('Direct Bcrypt Comparison:', directCompareResult);
+        } catch (compareError) {
+          console.error('Bcrypt Comparison Error:', compareError);
+        }
+
         // Increment login attempts
         user.loginAttempts += 1;
-        
+
         // Lock account after 5 failed attempts
         if (user.loginAttempts >= 5) {
           user.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
           await user.save();
-          
+
           return {
             success: false,
             message: 'Account is locked due to multiple failed login attempts. Please try again in 30 minutes.',
             statusCode: 423
           };
         }
-        
+
         await user.save();
-        
+
         return {
           success: false,
           message: 'Invalid credentials',
@@ -227,7 +241,8 @@ class AuthService {
       user.loginAttempts = 0;
       user.lockUntil = null;
       user.lastLoginAt = new Date();
-      await user.save();
+      // Save without validation to avoid salesRole validation issues
+      await user.save({ validateBeforeSave: false });
 
       // Generate tokens
       const accessToken = jwt.sign(
@@ -263,7 +278,7 @@ class AuthService {
       const pg_configured = pgConfigured ? pgConfigured.isConfigured : false;
 
       // Add PG configuration status to the response
-      const additionalUserInfo = {
+      let additionalUserInfo = {
         onboarding_completed: onboardingStatus.completed,
         default_branch: defaultBranch,
         default_branch_id: defaultBranchId,
@@ -271,6 +286,23 @@ class AuthService {
         pgConfigured: user.pgConfigured || pg_configured, // Ensure both are included
         pgId: user.pgId // Include the user's PG ID
       };
+
+      // Inside login method, add maintainer-specific logic
+      if (user.role === 'maintainer') {
+        // Fetch maintainer profile
+        const Maintainer = require('../models/maintainer.model');
+        const maintainer = await Maintainer.findById(user.maintainerProfile)
+          .populate('branches');
+
+        // Add maintainer-specific data to response
+        additionalUserInfo = {
+          ...additionalUserInfo,
+          role: 'maintainer',
+          assignedBranches: maintainer.branches.map(branch => branch._id),
+          specialization: maintainer.specialization,
+          maintainerStatus: maintainer.status
+        };
+      }
 
       // Get PG information for admin users
       let pgInfo = null;
@@ -613,7 +645,7 @@ class AuthService {
         }
         
         await user.save();
-        
+
         return {
           success: false,
           message: 'Invalid credentials',
@@ -625,7 +657,8 @@ class AuthService {
       user.loginAttempts = 0;
       user.lockUntil = null;
       user.lastLoginAt = new Date();
-      await user.save();
+      // Save without validation to avoid salesRole validation issues
+      await user.save({ validateBeforeSave: false });
 
       // Generate tokens
       const accessToken = jwt.sign(
@@ -1542,10 +1575,14 @@ class AuthService {
         id: user._id,
         email: user.email,
         role: userType, // 'sales_manager' or 'sub_sales'
-        salesRole: userType === 'sub_sales' ? 'sub_sales' : user.salesRole || userType,
-        salesUniqueId: user.salesUniqueId,
         forcePasswordChange: user.forcePasswordChange
       };
+
+      // Only include salesRole and salesUniqueId for actual sales users
+      if (userType === 'sub_sales' || userType === 'sales_manager') {
+        jwtPayload.salesRole = userType === 'sub_sales' ? 'sub_sales' : user.salesRole || userType;
+        jwtPayload.salesUniqueId = user.salesUniqueId;
+      }
 
       const accessToken = jwt.sign(
         jwtPayload,

@@ -81,7 +81,7 @@ class EmailService {
           console.log('  This is a fallback - configure EMAIL_USER and EMAIL_PASS for real emails');
           return {
             messageId: 'fallback-mock-' + Date.now(),
-            envelope: { from: 'fallback@pgmaintenance.com', to: [options.to] }
+            envelope: { from: process.env.FROM_EMAIL || 'noreply@pgmaintenance.com', to: [options.to] }
           };
         },
         options: { service: 'fallback-mock', mock: true }
@@ -144,7 +144,7 @@ class EmailService {
                     <div class="credentials">
                         <h3>🔑 Your Admin Login Credentials</h3>
                         <p><strong>Email:</strong> ${data.email || 'N/A'}</p>
-                        <p><strong>Password:</strong> ${data.password || 'Admin@123'}</p>
+                        <p><strong>Password:</strong> ${data.password || data.adminPassword || 'N/A'}</p>
                         <p><strong>Role:</strong> Admin</p>
                     </div>
                     
@@ -434,7 +434,7 @@ class EmailService {
             </div>
 
             <div class="footer">
-              <p><strong>Need Help?</strong> Contact our support team at support@pgmaintenance.com</p>
+              <p><strong>Need Help?</strong> Contact our support team at ${process.env.SUPPORT_EMAIL || 'support@pgmaintenance.com'}</p>
               <p>This is an automated message. Please do not reply to this email.</p>
               <p>&copy; 2025 PG Maintenance. All rights reserved.</p>
             </div>
@@ -560,7 +560,7 @@ class EmailService {
         5. Complete your profile with banking details
         6. Start adding PG properties and earning commissions!
 
-        Need Help? Contact your sales manager or support team at support@pgmaintenance.com
+        Need Help? Contact your sales manager or support team at ${process.env.SUPPORT_EMAIL || 'support@pgmaintenance.com'}
 
         This is an automated message. Please do not reply to this email.
 

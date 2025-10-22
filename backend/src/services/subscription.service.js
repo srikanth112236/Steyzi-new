@@ -113,6 +113,8 @@ class SubscriptionService {
     try {
       const { role, userPGId, userEmail } = userContext;
 
+      console.log('🔍 getActivePlans called with:', { role, userPGId, userEmail });
+
       // Different filtering logic based on user role
       let query = { status: 'active' };
       
@@ -121,32 +123,53 @@ class SubscriptionService {
         query = { status: 'active' };
       } else if (role === 'admin') {
         // Admin sees global plans and custom plans for their PG
+        const customPlanConditions = [{ assignedPGEmail: userEmail }]; // Plans created for their email
+
+        // Only add PG condition if userPGId exists
+        if (userPGId) {
+          customPlanConditions.push({ assignedPG: mongoose.Types.ObjectId(userPGId) });
+        }
+
         query = {
           $or: [
             { isCustomPlan: false }, // Global plans
-            { 
+            {
               isCustomPlan: true,
-              $or: [
-                { assignedPG: mongoose.Types.ObjectId(userPGId) }, // Plans for their PG
-                { assignedPGEmail: userEmail } // Plans created for their PG's email
-              ]
+              $or: customPlanConditions
             }
           ],
           status: 'active'
         };
       } else {
         // Other roles see only global and their specific custom plans
-        query = {
-          $or: [
-            { isCustomPlan: false },
-            { 
-              isCustomPlan: true,
-              assignedPGEmail: userEmail 
-            }
-          ],
-          status: 'active'
-        };
+        const customPlanConditions = [];
+
+        // Only add email condition if userEmail exists
+        if (userEmail) {
+          customPlanConditions.push({ assignedPGEmail: userEmail });
+        }
+
+        // If no custom plan conditions, only show global plans
+        if (customPlanConditions.length === 0) {
+          query = {
+            isCustomPlan: false,
+            status: 'active'
+          };
+        } else {
+          query = {
+            $or: [
+              { isCustomPlan: false },
+              {
+                isCustomPlan: true,
+                $or: customPlanConditions
+              }
+            ],
+            status: 'active'
+          };
+        }
       }
+
+      console.log('🔍 Query being executed:', JSON.stringify(query, null, 2));
 
       let plans = await Subscription.aggregate([
         { $match: query },
@@ -174,10 +197,20 @@ class SubscriptionService {
         }
       ]);
 
+      console.log('📋 Found plans:', plans.length);
+      plans.forEach(plan => {
+        console.log(`   - ${plan.planName} (${plan.isCustomPlan ? 'Custom' : 'Global'})`);
+      });
+
       // Filter out system plans that shouldn't be user-selectable (except for trial plans)
       plans = plans.filter(plan =>
         plan.planName !== 'Trial Expired Plan'
       );
+
+      console.log('📤 Returning plans to frontend:', plans.length, 'plans');
+      plans.forEach(plan => {
+        console.log(`   ↳ ${plan.planName}: ₹${plan.basePrice}/${plan.billingCycle}`);
+      });
 
       return {
         success: true,
@@ -776,6 +809,248 @@ class SubscriptionService {
       return {
         success: false,
         message: 'Failed to duplicate subscription plan'
+      };
+    }
+  }
+
+  /**
+   * Create payment order
+   */
+  async createPaymentOrder(subscriptionId, userId, bedCount, branchCount = 1) {
+    try {
+      const subscription = await Subscription.findById(subscriptionId);
+      if (!subscription) {
+        return {
+          success: false,
+          message: 'Subscription plan not found'
+        };
+      }
+
+      // Use the model's calculateTotalCost method to get accurate pricing
+      const costCalculation = subscription.calculateTotalCost(bedCount, branchCount);
+
+      // Here you would integrate with Razorpay or your payment gateway
+      // For now, we'll return a mock response structure
+      const orderData = {
+        subscriptionId,
+        userId,
+        bedCount,
+        branchCount,
+        amount: costCalculation.totalMonthlyPrice,
+        currency: 'INR',
+        status: 'created',
+        createdAt: new Date(),
+        costBreakdown: costCalculation
+      };
+
+      logger.info(`Payment order created for subscription ${subscriptionId} by user ${userId}`);
+
+      return {
+        success: true,
+        message: 'Payment order created successfully',
+        data: orderData
+      };
+    } catch (error) {
+      logger.error('Error creating payment order:', error);
+      return {
+        success: false,
+        message: 'Failed to create payment order'
+      };
+    }
+  }
+
+  /**
+   * Verify payment
+   */
+  async verifyPayment(paymentData) {
+    try {
+      const { paymentId, orderId, signature, userId } = paymentData;
+
+      // Here you would verify the payment signature with Razorpay
+      // For now, we'll return a mock successful verification
+      const verificationResult = {
+        paymentId,
+        orderId,
+        userId,
+        status: 'paid',
+        verifiedAt: new Date()
+      };
+
+      logger.info(`Payment verified for user ${userId}: ${paymentId}`);
+
+      return {
+        success: true,
+        message: 'Payment verified successfully',
+        data: verificationResult
+      };
+    } catch (error) {
+      logger.error('Error verifying payment:', error);
+      return {
+        success: false,
+        message: 'Payment verification failed'
+      };
+    }
+  }
+
+  /**
+   * Get payment history
+   */
+  async getPaymentHistory(userId) {
+    try {
+      // Mock payment history - in real implementation, this would query a payments collection
+      const paymentHistory = [
+        {
+          _id: 'mock_payment_1',
+          subscriptionId: 'mock_sub_1',
+          userId,
+          amount: 1000,
+          currency: 'INR',
+          status: 'paid',
+          createdAt: new Date('2024-01-01')
+        }
+      ];
+
+      return {
+        success: true,
+        data: paymentHistory,
+        count: paymentHistory.length
+      };
+    } catch (error) {
+      logger.error('Error fetching payment history:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch payment history'
+      };
+    }
+  }
+
+  /**
+   * Add beds to subscription
+   */
+  async addBeds(subscriptionId, userId, additionalBeds) {
+    try {
+      const subscription = await Subscription.findById(subscriptionId);
+      if (!subscription) {
+        return {
+          success: false,
+          message: 'Subscription plan not found'
+        };
+      }
+
+      // Here you would implement the logic to add beds and create payment order
+      const additionalCost = subscription.topUpPricePerBed * additionalBeds;
+
+      logger.info(`Beds addition requested for subscription ${subscriptionId} by user ${userId}`);
+
+      return {
+        success: true,
+        message: `Payment order created for ${additionalBeds} additional beds`,
+        data: {
+          subscriptionId,
+          additionalBeds,
+          additionalCost,
+          orderId: 'mock_order_id'
+        }
+      };
+    } catch (error) {
+      logger.error('Error adding beds:', error);
+      return {
+        success: false,
+        message: 'Failed to add beds'
+      };
+    }
+  }
+
+  /**
+   * Add branches to subscription
+   */
+  async addBranches(subscriptionId, userId, additionalBranches) {
+    try {
+      const subscription = await Subscription.findById(subscriptionId);
+      if (!subscription) {
+        return {
+          success: false,
+          message: 'Subscription plan not found'
+        };
+      }
+
+      // Here you would implement the logic to add branches and create payment order
+      const additionalCost = subscription.costPerBranch * additionalBranches || 0;
+
+      logger.info(`Branches addition requested for subscription ${subscriptionId} by user ${userId}`);
+
+      return {
+        success: true,
+        message: `Payment order created for ${additionalBranches} additional branches`,
+        data: {
+          subscriptionId,
+          additionalBranches,
+          additionalCost,
+          orderId: 'mock_order_id'
+        }
+      };
+    } catch (error) {
+      logger.error('Error adding branches:', error);
+      return {
+        success: false,
+        message: 'Failed to add branches'
+      };
+    }
+  }
+
+  /**
+   * Get payment status
+   */
+  async getPaymentStatus(paymentId, userId) {
+    try {
+      // Mock payment status - in real implementation, this would query the payment record
+      const paymentStatus = {
+        _id: paymentId,
+        userId,
+        status: 'paid',
+        amount: 1000,
+        currency: 'INR',
+        createdAt: new Date(),
+        subscriptionId: 'mock_sub_id'
+      };
+
+      return {
+        success: true,
+        data: paymentStatus
+      };
+    } catch (error) {
+      logger.error('Error fetching payment status:', error);
+      return {
+        success: false,
+        message: 'Payment not found'
+      };
+    }
+  }
+
+  /**
+   * Handle payment webhook
+   */
+  async handlePaymentWebhook(webhookData) {
+    try {
+      logger.info('Processing payment webhook:', webhookData);
+
+      // Here you would process the webhook data based on the payment gateway
+      // For now, we'll just log it and return success
+      const processedData = {
+        event: webhookData.event,
+        processedAt: new Date(),
+        status: 'processed'
+      };
+
+      return {
+        success: true,
+        data: processedData
+      };
+    } catch (error) {
+      logger.error('Error processing payment webhook:', error);
+      return {
+        success: false,
+        message: 'Webhook processing failed'
       };
     }
   }

@@ -6,7 +6,7 @@ const {
   authorize,
   optionalAuthenticate
 } = require('../middleware/auth.middleware');
-const rbacMiddleware = require('../middleware/rbac.middleware');
+// Removed commented-out rbacMiddleware import
 
 const router = express.Router();
 
@@ -288,7 +288,7 @@ router.get('/my-financials',
 // Sales Analytics Route
 router.get('/analytics', 
   authenticate,
-  rbacMiddleware.checkPermission('sales', 'analytics', 'read'),
+  authorize('sales_manager', 'admin', 'superadmin'),
   SalesController.getSalesAnalytics
 );
 

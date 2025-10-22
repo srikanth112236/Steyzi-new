@@ -100,6 +100,7 @@ logs
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # Vercel
 .vercel
@@ -145,6 +146,45 @@ coverage/
 .env.test.local
 .env.production.local
 .env.local
+
+# IDE and Editor files
+.cursor/
+.cursorignore
+
+# Local development files
+debug-*.js
+serve-*.js
+test-*.js
+
+# Build artifacts
+*.tgz
+*.tar.gz
+
+# Browser cache
+.chrome/
+.firefox/
+
+# IDE workspace files
+*.code-workspace
+
+# Local development certificates
+*.pem
+*.key
+*.crt
+
+# Storybook
+storybook-static/
+
+# Prettier cache
+.prettiercache
+
+# Husky
+.husky/_
+
+# Local development databases
+*.db
+*.sqlite
+*.sqlite3
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

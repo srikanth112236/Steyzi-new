@@ -125,7 +125,7 @@ class InvoiceService {
         doc.fontSize(12).font('Helvetica-Bold').text('PG MAINTENANCE SYSTEM');
         doc.font('Helvetica').text('123 Tech Street, Bangalore, Karnataka 560001');
         doc.text('GSTIN: 29ABCDE1234F2Z5');
-        doc.text('Phone: +91-9876543210 | Email: support@pgmaintenance.com');
+        doc.text(`Phone: ${process.env.COMPANY_PHONE || '+91-9876543210'} | Email: ${process.env.COMPANY_EMAIL || 'support@pgmaintenance.com'}`);
         doc.moveDown();
 
         // Invoice Details
@@ -231,7 +231,7 @@ class InvoiceService {
         // Footer
         doc.font('Helvetica').fontSize(8);
         doc.text('Thank you for choosing PG Maintenance System!', 50, doc.page.height - 100);
-        doc.text('For any queries, contact us at support@pgmaintenance.com', 50, doc.page.height - 80);
+        doc.text(`For any queries, contact us at ${process.env.COMPANY_EMAIL || 'support@pgmaintenance.com'}`, 50, doc.page.height - 80);
 
         doc.end();
 

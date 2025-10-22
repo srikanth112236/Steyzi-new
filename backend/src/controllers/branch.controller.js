@@ -1,8 +1,128 @@
 const Branch = require('../models/branch.model');
 const User = require('../models/user.model');
 const activityService = require('../services/activity.service');
+const Maintainer = require('../models/maintainer.model');
 
 class BranchController {
+  /**
+   * Assign a maintainer to a branch
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @returns {Object} - Updated branch with maintainer
+   */
+  async assignMaintainerToBranch(req, res) {
+    try {
+      const { branchId, maintainerId } = req.body;
+
+      // Validate inputs
+      if (!branchId || !maintainerId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Branch ID and Maintainer ID are required'
+        });
+      }
+
+      // Find the branch and maintainer
+      const branch = await Branch.findOne({ 
+        _id: branchId, 
+        pgId: req.user.pgId 
+      });
+      const maintainer = await Maintainer.findOne({ 
+        _id: maintainerId, 
+        pgId: req.user.pgId 
+      });
+
+      // Validate branch and maintainer
+      if (!branch) {
+        return res.status(404).json({
+          success: false,
+          message: 'Branch not found'
+        });
+      }
+      if (!maintainer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Maintainer not found'
+        });
+      }
+
+      // Update branch with maintainer
+      branch.maintainerId = maintainerId;
+      const updatedBranch = await branch.save();
+
+      // Update maintainer's branches
+      await Maintainer.findByIdAndUpdate(
+        maintainerId,
+        { $addToSet: { branches: branchId } },
+        { new: true }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Maintainer assigned to branch successfully',
+        data: {
+          branch: updatedBranch,
+          maintainer: {
+            _id: maintainer._id,
+            name: maintainer.user.firstName + ' ' + maintainer.user.lastName
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error assigning maintainer to branch:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to assign maintainer to branch',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get branches with their assigned maintainers
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @returns {Object} - Branches with maintainer details
+   */
+  async getBranchesWithMaintainers(req, res) {
+    try {
+      const branches = await Branch.find({ 
+        pgId: req.user.pgId, 
+        status: 'active' 
+      })
+      .populate({
+        path: 'maintainerId',
+        populate: {
+          path: 'user',
+          select: 'firstName lastName email phone'
+        }
+      })
+      .select('-__v');
+
+      res.status(200).json({
+        success: true,
+        data: {
+          branches: branches.map(branch => ({
+            ...branch.toObject(),
+            maintainer: branch.maintainerId ? {
+              _id: branch.maintainerId._id,
+              name: `${branch.maintainerId.user.firstName} ${branch.maintainerId.user.lastName}`,
+              email: branch.maintainerId.user.email,
+              phone: branch.maintainerId.user.phone
+            } : null
+          }))
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching branches with maintainers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch branches',
+        error: error.message
+      });
+    }
+  }
+
   /**
    * Create a new branch
    * @param {Object} req - Express request object
@@ -16,7 +136,7 @@ class BranchController {
         pgId,
         name,
         address,
-        maintainer,
+        maintainerId, // Add this to support direct maintainer assignment
         contact,
         capacity,
         amenities,
@@ -25,11 +145,11 @@ class BranchController {
       } = req.body;
 
       // Validate required fields
-      if (!pgId || !name || !address || !maintainer || !contact) {
+      if (!pgId || !name || !address || !contact) {
         return res.status(400).json({
           success: false,
           message: 'Missing required fields',
-          error: 'PG ID, name, address, maintainer, and contact are required'
+          error: 'PG ID, name, address, and contact are required'
         });
       }
 
@@ -44,11 +164,6 @@ class BranchController {
           pincode: address.pincode || '',
           landmark: address.landmark || ''
         },
-        maintainer: {
-          name: maintainer.name || '',
-          mobile: maintainer.mobile || '',
-          email: maintainer.email || ''
-        },
         contact: {
           phone: contact.phone || '',
           email: contact.email || '',
@@ -62,12 +177,22 @@ class BranchController {
         amenities: amenities || [],
         status: status || 'active',
         isDefault: isDefault || false,
-        createdBy: req.user._id
+        createdBy: req.user._id,
+        maintainerId: maintainerId || null // Add maintainer ID if provided
       };
 
       // Create new branch
       const newBranch = new Branch(branchData);
       const savedBranch = await newBranch.save();
+
+      // If a maintainer is assigned, update their branches
+      if (maintainerId) {
+        await Maintainer.findByIdAndUpdate(
+          maintainerId,
+          { $addToSet: { branches: savedBranch._id } },
+          { new: true }
+        );
+      }
 
       // If this is set as default, update other branches
       if (savedBranch.isDefault) {
@@ -113,7 +238,8 @@ class BranchController {
           user: {
             defaultBranch: true,
             defaultBranchId: savedBranch._id
-          }
+          },
+          maintainer: maintainerId ? { _id: maintainerId } : null
         }
       });
     } catch (error) {

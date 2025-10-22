@@ -155,12 +155,38 @@ const getPaymentInfoByQRCode = async (qrCode) => {
 };
 
 /**
+ * Get payment info by ID
+ */
+const getPaymentInfoById = async (paymentInfoId) => {
+  try {
+    if (!paymentInfoId) {
+      throw new Error('Payment info ID is required');
+    }
+
+    const paymentInfo = await PaymentInfo.findById(paymentInfoId)
+      .populate('pgId', 'name')
+      .populate('branchId', 'name')
+      .populate('createdBy', 'firstName lastName')
+      .populate('updatedBy', 'firstName lastName');
+
+    if (!paymentInfo) {
+      throw new Error('Payment info not found');
+    }
+
+    return paymentInfo;
+  } catch (error) {
+    logger.error('Error getting payment info by ID:', error);
+    throw error;
+  }
+};
+
+/**
  * Get all payment info for admin
  */
 const getAllPaymentInfo = async (pgId, filters = {}) => {
   try {
     const query = { pgId, isActive: true };
-    
+
     if (filters.branchId) {
       query.branchId = filters.branchId;
     }
@@ -184,5 +210,6 @@ module.exports = {
   createOrUpdatePaymentInfo,
   deletePaymentInfo,
   getPaymentInfoByQRCode,
+  getPaymentInfoById,
   getAllPaymentInfo
 }; 

@@ -44,10 +44,12 @@ import RoomSwitching from './pages/admin/RoomSwitching';
 import MovedOut from './pages/admin/MovedOut';
 import ResidentProfile from './pages/admin/ResidentProfile';
 import Payments from './pages/admin/Payments';
+import PaymentHistory from './components/admin/PaymentHistory';
 import QRCodeManagement from './pages/admin/QRCodeManagement';
 import RoomAvailability from './pages/admin/RoomAvailability';
 import QRInterface from './pages/public/QRInterface';
 import Settings from './pages/admin/Settings';
+import PaymentCallback from './pages/admin/PaymentCallback';
 import Tickets from './pages/admin/Tickets';
 import Reports from './pages/admin/Reports';
 import TicketManagement from './pages/superadmin/TicketManagement';
@@ -116,24 +118,27 @@ const App = () => {
 
   useEffect(() => {
     console.log('🎬 App render state:', { user: !!user, loading, hasCheckedAuth });
-    
-    const timer = setTimeout(() => {
-      setShowFallback(true);
-    }, 3000);
 
-    // Force render after 8 seconds if still loading
-    const forceTimer = setTimeout(() => {
-      if (loading) {
-        console.log('🚨 Force rendering app due to prolonged loading');
-        setForceRender(true);
-      }
-    }, 8000);
+    // Only set timers if we're actually loading
+    if (loading && !forceRender) {
+      const timer = setTimeout(() => {
+        setShowFallback(true);
+      }, 3000);
 
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(forceTimer);
-    };
-  }, [user, loading, hasCheckedAuth]);
+      // Force render after 8 seconds if still loading
+      const forceTimer = setTimeout(() => {
+        if (loading) {
+          console.log('🚨 Force rendering app due to prolonged loading');
+          setForceRender(true);
+        }
+      }, 8000);
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(forceTimer);
+      };
+    }
+  }, [loading, forceRender]); // Remove user and hasCheckedAuth dependencies
 
   // Show loading screen while checking authentication (unless forced to render)
   if (loading && !forceRender) {
@@ -227,6 +232,7 @@ const App = () => {
             <PGManagement />
           </ProtectedRoute>
         } />
+        <Route path="payment/callback" element={<PaymentCallback />} />
         <Route path="settings" element={
           <ProtectedRoute requireOnboarding={false}>
             <Settings />
@@ -265,6 +271,11 @@ const App = () => {
         <Route path="payments" element={
           <ProtectedRoute requireOnboarding={false}>
             <Payments />
+          </ProtectedRoute>
+        } />
+        <Route path="payment-history" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <PaymentHistory />
           </ProtectedRoute>
         } />
         <Route path="notifications" element={

@@ -63,9 +63,9 @@ const authenticate = async (req, res, next) => {
     console.log('Auth middleware - JWT decoded:', {
       userId,
       role: decoded.role,
-      salesRole: decoded.salesRole,
+      salesRole: decoded.salesRole || 'not set',
       email: decoded.email,
-      salesUniqueId: decoded.salesUniqueId
+      salesUniqueId: decoded.salesUniqueId || 'not set'
     });
 
     // First try to find in SalesManager model if role indicates sales_manager
@@ -90,7 +90,12 @@ const authenticate = async (req, res, next) => {
     else {
       user = await User.findById(userId);
       if (user) {
-        userType = user.salesRole === 'sub_sales' ? 'sub_sales' : 'user';
+        // Check if user has a valid salesRole
+        if (user.salesRole && user.salesRole === 'sub_sales') {
+          userType = 'sub_sales';
+        } else {
+          userType = 'user';
+        }
       }
       console.log('Checked User model for regular user:', {
         userFound: !!user,
@@ -216,7 +221,7 @@ const optionalAuthenticate = async (req, res, next) => {
         userType = 'sales_manager';
       } else if (decoded.role === 'sub_sales') {
         user = await User.findById(decoded.id);
-        if (user && user.salesRole === 'sub_sales') {
+        if (user && user.salesRole && user.salesRole === 'sub_sales') {
           userType = 'sub_sales';
         } else {
           user = null; // Not a valid sub_sales user
@@ -225,7 +230,12 @@ const optionalAuthenticate = async (req, res, next) => {
         // Regular user
         user = await User.findById(decoded.id);
         if (user) {
-          userType = user.salesRole === 'sub_sales' ? 'sub_sales' : 'user';
+          // Check if user has a valid salesRole
+          if (user.salesRole && user.salesRole === 'sub_sales') {
+            userType = 'sub_sales';
+          } else {
+            userType = 'user';
+          }
         }
       }
 

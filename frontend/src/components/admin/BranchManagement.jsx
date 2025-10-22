@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Star, MapPin, Phone, Mail, Users, Settings, X, Check, Wifi, Snowflake, Utensils, Sparkles, Shield, Car, Dumbbell, Tv, Refrigerator, Droplets, Sofa } from 'lucide-react';
+import { Building2, Plus, Edit, Star, MapPin, Phone, Mail, Users, X, Check, Wifi, Snowflake, Utensils, Sparkles, Shield, Car, Dumbbell, Tv, Refrigerator, Droplets, Sofa ,Trash2, CheckCircle, Settings} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 import branchService from '../../services/branch.service';
+import maintainerService from '../../services/maintainer.service';
 
 const BranchManagement = () => {
   const { user } = useSelector((state) => state.auth);
   const [branches, setBranches] = useState([]);
+  const [maintainers, setMaintainers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
@@ -19,11 +21,7 @@ const BranchManagement = () => {
       pincode: '',
       landmark: ''
     },
-    maintainer: {
-      name: '',
-      mobile: '',
-      email: ''
-    },
+    maintainerId: null, // Keep this for branch assignment
     contact: {
       phone: '',
       email: '',
@@ -54,61 +52,66 @@ const BranchManagement = () => {
     { name: 'Furnished', icon: Sofa, color: 'brown' }
   ];
 
+  // Fetch branches and maintainers on component mount
   useEffect(() => {
-    fetchBranches();
+    fetchBranchesAndMaintainers();
   }, []);
 
-  const fetchBranches = async () => {
+  // Fetch branches and maintainers
+  const fetchBranchesAndMaintainers = async () => {
     try {
-      // Add timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/branches?t=${timestamp}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('Fetched branches:', data.data);
-        
-        // Remove duplicates based on _id
-        const uniqueBranches = data.data.filter((branch, index, self) => 
-          index === self.findIndex(b => b._id === branch._id)
-        );
-        
-        // Ensure only one default branch
-        const defaultBranches = uniqueBranches.filter(b => b.isDefault);
-        if (defaultBranches.length > 1) {
-          console.warn('Multiple default branches found, keeping the first one');
-          // Keep the first default branch, mark others as non-default
-          const updatedBranches = uniqueBranches.map((branch, index) => {
-            if (branch.isDefault && index !== uniqueBranches.findIndex(b => b.isDefault)) {
-              return { ...branch, isDefault: false };
-            }
-            return branch;
-          });
-          setBranches(updatedBranches);
+      setLoading(true);
+
+      // Fetch branches
+      const branchesResponse = await branchService.getAllBranches();
+
+      // Fetch maintainers (optional - don't fail if this fails)
+      let maintainersResponse;
+      try {
+        maintainersResponse = await maintainerService.getAllMaintainers();
+      } catch (maintainerError) {
+        console.warn('Failed to fetch maintainers:', maintainerError);
+        maintainersResponse = null;
+      }
+
+      if (branchesResponse.success) {
+        // Handle different response formats for branches
+        const branches = Array.isArray(branchesResponse.data) ? branchesResponse.data : branchesResponse.data?.branches || [];
+
+        console.log('Branches API response:', branchesResponse);
+        console.log('Branches loaded:', branches.length, branches);
+
+        setBranches(branches);
+
+        // Try to fetch maintainers, but don't fail if they don't load
+        if (maintainersResponse && maintainersResponse.success) {
+          try {
+            const maintainers = Array.isArray(maintainersResponse.data) ? maintainersResponse.data : maintainersResponse.data?.maintainers || [];
+            console.log('Maintainers loaded:', maintainers.length, maintainers);
+            setMaintainers(maintainers);
+          } catch (maintainerError) {
+            console.warn('Failed to load maintainers, continuing with branches only:', maintainerError);
+            setMaintainers([]);
+          }
         } else {
-          setBranches(uniqueBranches);
+          console.warn('Maintainers API failed or returned no data');
+          setMaintainers([]);
         }
       } else {
-        toast.error(data.message || 'Failed to fetch branches');
+        console.error('Branches API Response failed:', branchesResponse);
+        toast.error('Failed to fetch branches');
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
-      toast.error('Failed to fetch branches');
+      console.error('Error fetching data:', error);
+      toast.error('An error occurred while fetching data');
     } finally {
       setLoading(false);
     }
   };
 
+  // Validate form before submission
   const validateForm = () => {
-    const { name, address, contact, maintainer } = formData;
+    const { name, address, contact } = formData;
     
     // Validate name
     if (!name || name.trim() === '') {
@@ -128,12 +131,6 @@ const BranchManagement = () => {
       return false;
     }
     
-    // Validate maintainer
-    if (!maintainer.name || !maintainer.mobile || !maintainer.email) {
-      toast.error('Maintainer details (name, mobile, email) are required');
-      return false;
-    }
-    
     // Validate PG ID
     if (!user?.pgId) {
       toast.error('PG ID is required. Please contact support.');
@@ -143,6 +140,7 @@ const BranchManagement = () => {
     return true;
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -153,8 +151,10 @@ const BranchManagement = () => {
       setLoading(true);
       
       // Prepare branch data to match backend requirements
+      const selectedMaintainer = maintainers.find(m => m._id === formData.maintainerId);
+      
       const branchData = {
-        pgId: user.pgId,  // Add PG ID from user context
+        pgId: user.pgId,
         name: formData.name.trim(),
         address: {
           street: formData.address.street.trim(),
@@ -162,11 +162,6 @@ const BranchManagement = () => {
           state: formData.address.state.trim(),
           pincode: formData.address.pincode.trim(),
           landmark: (formData.address.landmark || '').trim()
-        },
-        maintainer: {
-          name: formData.maintainer.name.trim(),
-          mobile: formData.maintainer.mobile.trim(),
-          email: formData.maintainer.email.trim()
         },
         contact: {
           phone: formData.contact.phone.trim(),
@@ -180,7 +175,19 @@ const BranchManagement = () => {
         },
         amenities: formData.amenities || [],
         status: formData.status || 'active',
-        isDefault: false  // Non-default branch by default
+        isDefault: false,
+        // Construct maintainer object exactly as backend expects
+        maintainer: formData.maintainerId ? {
+          name: selectedMaintainer?.name || 
+                selectedMaintainer?.user?.firstName || 
+                'Unnamed Maintainer',
+          mobile: selectedMaintainer?.mobile || 
+                  selectedMaintainer?.user?.phone || 
+                  'N/A',
+          email: selectedMaintainer?.email || 
+                 selectedMaintainer?.user?.email || 
+                 'N/A'
+        } : null
       };
       
       // Determine API method and endpoint
@@ -192,21 +199,55 @@ const BranchManagement = () => {
       const response = await apiCall();
       
       if (response.success) {
+        // Handle different response structures
+        let branchDataResponse;
+        let branchId;
+
+        if (response.data) {
+          // If response has data property
+          if (response.data._id) {
+            branchDataResponse = response.data;
+            branchId = response.data._id;
+          } else if (response.data.branch && response.data.branch._id) {
+            branchDataResponse = response.data.branch;
+            branchId = response.data.branch._id;
+          } else if (response.data.id) {
+            branchDataResponse = response.data;
+            branchId = response.data.id;
+          }
+        } else if (response._id || response.id) {
+          // If response is the branch object directly
+          branchDataResponse = response;
+          branchId = response._id || response.id;
+        }
+
+        // If a maintainer was assigned, update the maintainer's branches
+        if (branchData.maintainerId && branchId) {
+          try {
+            await branchService.assignMaintainerToBranch({
+              branchId: branchId,
+              maintainerId: branchData.maintainerId
+            });
+          } catch (assignError) {
+            console.warn('Failed to assign maintainer, but branch was saved:', assignError);
+          }
+        }
+
         toast.success(
-          editingBranch 
-            ? 'Branch updated successfully!' 
+          editingBranch
+            ? 'Branch updated successfully!'
             : 'Branch created successfully!'
         );
-        
+
         // Close form and reset
         setShowForm(false);
         setEditingBranch(null);
         resetForm();
-        
-        // Refresh branches list
-        fetchBranches();
+
+        // Refresh branches and maintainers list
+        fetchBranchesAndMaintainers();
       } else {
-        toast.error(response.message || 'Failed to save branch');
+        toast.error(response.message || response.error || 'Failed to save branch');
       }
     } catch (error) {
       console.error('Error saving branch:', error);
@@ -221,13 +262,14 @@ const BranchManagement = () => {
     setFormData({
       name: branch.name,
       address: branch.address,
-      maintainer: branch.maintainer,
+      maintainerId: branch.maintainerId, // Keep maintainer ID for assignment
       contact: branch.contact,
       capacity: branch.capacity,
       amenities: branch.amenities || [],
       status: branch.status,
-      isDefault: branch.isDefault // Ensure isDefault is set
+      isDefault: branch.isDefault
     });
+
     setShowForm(true);
   };
 
@@ -249,7 +291,7 @@ const BranchManagement = () => {
       
       if (data.success) {
         toast.success('Branch deleted successfully');
-        fetchBranches();
+        fetchBranchesAndMaintainers(); // Refresh both branches and maintainers
       } else {
         toast.error(data.message || 'Failed to delete branch');
       }
@@ -277,31 +319,20 @@ const BranchManagement = () => {
       toast.dismiss(loadingToast);
       
       if (data.success) {
-        console.log('Default branch set successfully:', data.data);
+        console.log('Default branch set successfully:', data);
         
         // Wait a bit for database operations to complete
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Force refresh the branches list with cache busting
         setLoading(true);
-        await fetchBranches();
+        await fetchBranchesAndMaintainers(); // Refresh both branches and maintainers
         
-        toast.success(`Default branch updated to "${data.data?.name || 'selected branch'}" successfully!`);
+        toast.success(`Default branch updated to "${data.data?.name || data.name || 'selected branch'}" successfully!`);
       } else {
         console.error('Failed to set default branch:', data);
         
-        // If it's an index constraint error, show option to fix it
-        if (data.error && data.error.includes('index constraint')) {
-          toast.error('Database index issue detected', {
-            duration: 5000,
-            action: {
-              label: 'Fix Now',
-              onClick: () => handleFixIndex()
-            }
-          });
-        } else {
-          toast.error(data.message || 'Failed to set default branch');
-        }
+        toast.error(data.message || 'Failed to set default branch');
       }
     } catch (error) {
       console.error('Error setting default branch:', error);
@@ -309,67 +340,8 @@ const BranchManagement = () => {
     }
   };
 
-  const handleFixIndex = async () => {
-    try {
-      const loadingToast = toast.loading('Fixing database index...');
-      
-      const response = await fetch('/api/branches/fix-index', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      
-      toast.dismiss(loadingToast);
-      
-      if (data.success) {
-        toast.success('Database index fixed successfully!');
-      } else {
-        toast.error(data.message || 'Failed to fix database index');
-      }
-    } catch (error) {
-      console.error('Error fixing index:', error);
-      toast.error('Failed to fix database index');
-    }
-  };
 
-  const handleCleanupDuplicates = async () => {
-    if (!window.confirm('Are you sure you want to clean up duplicate branches? This will mark duplicate branches as inactive.')) {
-      return;
-    }
-    
-    try {
-      const loadingToast = toast.loading('Cleaning up duplicate branches...');
-      
-      const response = await fetch('/api/branches/cleanup-duplicates', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      
-      toast.dismiss(loadingToast);
-      
-      if (data.success) {
-        toast.success(`Cleaned up ${data.duplicatesRemoved || 0} duplicate branches!`);
-        // Refresh the branches list
-        setLoading(true);
-        await fetchBranches();
-      } else {
-        toast.error(data.message || 'Failed to cleanup duplicate branches');
-      }
-    } catch (error) {
-      console.error('Error cleaning up duplicates:', error);
-      toast.error('Failed to cleanup duplicate branches');
-    }
-  };
-
+  // Reset form to initial state
   const resetForm = () => {
     setFormData({
       name: '',
@@ -380,11 +352,7 @@ const BranchManagement = () => {
         pincode: '',
         landmark: ''
       },
-      maintainer: {
-        name: '',
-        mobile: '',
-        email: ''
-      },
+      maintainerId: null, // Reset maintainer selection
       contact: {
         phone: '',
         email: '',
@@ -418,6 +386,56 @@ const BranchManagement = () => {
         ? prev.amenities.filter(a => a !== amenityName)
         : [...prev.amenities, amenityName]
     }));
+  };
+
+  // Render maintainer selection dropdown
+  const renderMaintainerDropdown = () => {
+    // Show all maintainers, not just unassigned
+    const availableMaintainers = maintainers;
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Assign Maintainer {maintainers.length === 0 ? '(Loading...)' : ''}
+        </label>
+        <select
+          value={formData.maintainerId || ''}
+          onChange={(e) => setFormData(prev => ({
+            ...prev,
+            maintainerId: e.target.value ? e.target.value : null
+          }))}
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={maintainers.length === 0}
+        >
+          <option value="">
+            {maintainers.length === 0 ? 'Loading maintainers...' : 'Select a Maintainer'}
+          </option>
+          {availableMaintainers.map(maintainer => {
+            // Extract name safely
+            const name = maintainer.name || 
+                         maintainer.user?.firstName || 
+                         maintainer.firstName || 
+                         'Unnamed Maintainer';
+            const contact = maintainer.mobile || 
+                            maintainer.user?.phone || 
+                            maintainer.phone || 
+                            'No Contact';
+
+            return (
+              <option
+                key={maintainer._id}
+                value={maintainer._id}
+              >
+                {name} ({contact})
+              </option>
+            );
+          })}
+        </select>
+        {maintainers.length === 0 && (
+          <p className="text-xs text-gray-500 mt-1">Maintainers will be loaded automatically</p>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -639,44 +657,9 @@ const BranchManagement = () => {
                    <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4">
                      <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
                        <Users className="h-4 w-4 mr-2 text-orange-600" />
-                       Maintainer Information
+                       Assign Maintainer
                      </h4>
-                     <div className="space-y-3">
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                         <input
-                           type="text"
-                           value={formData.maintainer.name}
-                           onChange={(e) => handleInputChange('maintainer', 'name', e.target.value)}
-                           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
-                           placeholder="Enter maintainer name"
-                           required
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Mobile *</label>
-                         <input
-                           type="tel"
-                           value={formData.maintainer.mobile}
-                           onChange={(e) => handleInputChange('maintainer', 'mobile', e.target.value)}
-                           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
-                           placeholder="Enter mobile number"
-                           pattern="[0-9]{10}"
-                           required
-                         />
-                       </div>
-            <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                         <input
-                           type="email"
-                           value={formData.maintainer.email}
-                           onChange={(e) => handleInputChange('maintainer', 'email', e.target.value)}
-                           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
-                           placeholder="Enter maintainer email"
-                           required
-                         />
-                       </div>
-                     </div>
+                     {renderMaintainerDropdown()}
                    </div>
                  </div>
 
@@ -813,59 +796,31 @@ const BranchManagement = () => {
               </div>
             )}
           </div>
-          {branches.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {
-                  setLoading(true);
-                  fetchBranches();
-                }}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors duration-200"
-                title="Refresh branches"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span>Refresh</span>
-              </button>
-              <button
-                onClick={handleFixIndex}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
-                title="Fix database index issues"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Fix Index</span>
-              </button>
-              <button
-                onClick={handleCleanupDuplicates}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-orange-600 bg-orange-100 hover:bg-orange-200 rounded-lg transition-colors duration-200"
-                title="Clean up duplicate branches"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Clean Duplicates</span>
-              </button>
-            </div>
-          )}
         </div>
           
-          {branches.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Building2 className="h-10 w-10 text-blue-400" />
+          {loading ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading branches...</p>
             </div>
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">No Branches Found</h4>
-            <p className="text-gray-600 mb-6">Create your first branch to get started with managing your PG locations.</p>
-            <button
-              onClick={() => {
-                setShowForm(true);
-                setEditingBranch(null);
-                resetForm();
-              }}
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Create First Branch</span>
-            </button>
+          ) : branches.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Building2 className="h-10 w-10 text-blue-400" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">No Branches Found</h4>
+              <p className="text-gray-600 mb-6">Create your first branch to get started with managing your PG locations.</p>
+              <button
+                onClick={() => {
+                  setShowForm(true);
+                  setEditingBranch(null);
+                  resetForm();
+                }}
+                className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                <Plus className="h-5 w-5" />
+                <span>Create First Branch</span>
+              </button>
             </div>
           ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

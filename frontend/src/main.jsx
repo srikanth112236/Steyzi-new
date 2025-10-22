@@ -8,6 +8,23 @@ import { PersistGate } from 'redux-persist/integration/react'
 import App from './App.jsx'
 import './index.css'
 
+// Load Razorpay script
+const loadRazorpay = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = resolve;
+    script.onerror = () => {
+      console.error('Failed to load Razorpay SDK');
+      resolve(); // Continue even if Razorpay fails to load
+    };
+    document.head.appendChild(script);
+  });
+};
+
+// Load Razorpay script on app start
+loadRazorpay();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Provider store={store}>

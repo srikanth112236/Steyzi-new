@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import api from '../../services/api';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -23,18 +25,665 @@ import {
   UserPlus,
   Building2,
   TrendingDown,
-  X
+  X,
+  MapPin,
+  Phone,
+  Mail,
+  Plus,
+  Settings
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import api from '../../services/api';
+
 import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { selectPgConfigured, updateAuthState } from '../../store/slices/authSlice';
+import DefaultBranchModal from '../../components/admin/DefaultBranchModal';
+import PGConfigurationModal from '../../components/admin/PGConfigurationModal';
+import maintainerService from '../../services/maintainer.service';
+
+const SetupWizard = ({ onComplete }) => {
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  console.log('SetupWizard: User data:', { userId: user?._id, pgId: user?.pgId, role: user?.role });
+  const [currentStep, setCurrentStep] = useState(1);
+  const [maintainers, setMaintainers] = useState([]);
+  const [showMaintainerModal, setShowMaintainerModal] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const totalSteps = 4;
+
+  const steps = [
+    { number: 1, title: "Welcome", description: "Getting Started" },
+    { number: 2, title: "Add Maintainers", description: "Create your team" },
+    { number: 3, title: "Create Branch", description: "Set up your first branch" },
+    { number: 4, title: "Configure PG", description: "Set sharing types" }
+  ];
+
+  // Fetch maintainers when component mounts
+  useEffect(() => {
+    fetchMaintainers();
+  }, []);
+
+  // Monitor maintainers state for debugging
+  useEffect(() => {
+    console.log('Maintainers state updated, count:', maintainers.length);
+  }, [maintainers]);
+
+  const fetchMaintainers = async () => {
+    try {
+      setLoading(true);
+      const response = await maintainerService.getAllMaintainers();
+
+      if (response.success && response.data && Array.isArray(response.data.maintainers)) {
+        setMaintainers(response.data.maintainers);
+    } else {
+        console.warn('Invalid maintainers response:', response);
+        setMaintainers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching maintainers:', error);
+      setMaintainers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleMaintainerAdded = async (maintainerData) => {
+    console.log('SetupWizard: handleMaintainerAdded called with:', maintainerData);
+    setShowMaintainerModal(false);
+
+    // Normalize maintainer data to match the API response structure
+    let normalizedMaintainer = maintainerData;
+
+    // If the maintainer data doesn't have a user object, create one
+    if (!normalizedMaintainer.user && (normalizedMaintainer.firstName || normalizedMaintainer.email)) {
+      normalizedMaintainer = {
+        ...normalizedMaintainer,
+        user: {
+          _id: normalizedMaintainer.userId || normalizedMaintainer._id,
+          firstName: normalizedMaintainer.firstName,
+          lastName: normalizedMaintainer.lastName || '',
+          email: normalizedMaintainer.email,
+          phone: normalizedMaintainer.phone || normalizedMaintainer.mobile
+        }
+      };
+    }
+
+    console.log('SetupWizard: Normalized maintainer:', normalizedMaintainer);
+
+    // Immediately add the new maintainer to the list for instant UI update
+    if (normalizedMaintainer && normalizedMaintainer._id) {
+      setMaintainers(prev => [...prev, normalizedMaintainer]);
+      console.log('SetupWizard: Added maintainer to local state, ID:', normalizedMaintainer._id);
+    } else {
+      console.error('SetupWizard: Maintainer data invalid, no _id found');
+    }
+
+    // Also refresh from server to ensure consistency
+    try {
+      await fetchMaintainers();
+    } catch (error) {
+      console.error('Failed to refresh maintainers after adding:', error);
+      // If refresh fails, at least we have the maintainer in local state
+    }
+  };
+
+  const handleBranchCreated = (branchData) => {
+    console.log('SetupWizard: handleBranchCreated called with:', branchData);
+    setShowBranchModal(false);
+    setCurrentStep(4);
+    setShowConfigModal(true);
+  };
+
+  const handleConfigurationComplete = async (configData) => {
+    console.log('Configuration completed:', configData);
+    setShowConfigModal(false);
+
+    try {
+      // Refresh PG data to get updated configuration status
+      const pgService = (await import('../../services/pg.service')).default;
+      const pgResponse = await pgService.getPGDetails(user.pgId);
+      console.log('PG details response in config complete:', pgResponse);
+
+      if (pgResponse.success && pgResponse.data) {
+        // Update auth state with fresh PG data
+        const isConfigured = pgResponse.data.isConfigured || false;
+        console.log('Setting PG configured to:', isConfigured);
+        dispatch(updateAuthState({
+          pgConfigured: isConfigured
+        }));
+      } else {
+        // Fallback: just mark as configured
+        console.log('PG response failed, setting configured to true as fallback');
+        dispatch(updateAuthState({ pgConfigured: true }));
+      }
+    } catch (error) {
+      console.error('Error refreshing PG data:', error);
+      // Fallback: just mark as configured
+      console.log('Error refreshing PG data, setting configured to true as fallback');
+      dispatch(updateAuthState({ pgConfigured: true }));
+    }
+
+    onComplete && onComplete();
+  };
+
+  const handleWizardClose = () => {
+    setShowMaintainerModal(false);
+    setShowBranchModal(false);
+    setShowConfigModal(false);
+    onComplete && onComplete();
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="text-center space-y-6 py-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
+              <Building2 className="h-10 w-10 text-white" />
+            </div>
+              <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">Welcome to PG Setup</h2>
+              <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
+                Let's get your PG management system up and running! We'll guide you through setting up your first branch and configuring sharing types.
+              </p>
+                </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-lg mx-auto">
+              <h3 className="font-semibold text-blue-900 mb-2">What we'll do:</h3>
+              <ul className="text-sm text-blue-800 space-y-1 text-left">
+                <li>• Add maintainers to manage your PG</li>
+                <li>• Create your default branch</li>
+                <li>• Configure sharing types and pricing</li>
+              </ul>
+              </div>
+                </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6 py-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Add Your Team</h2>
+              <p className="text-gray-600">Create maintainer accounts for your PG management team</p>
+              </div>
+              
+            {maintainers.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Maintainers Yet</h3>
+                <p className="text-gray-600 mb-6">You need at least one maintainer to manage your PG operations.</p>
+                <button
+                  onClick={() => setShowMaintainerModal(true)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Add Your First Maintainer
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Your Maintainers ({maintainers.length})</h3>
+                  <button
+                    onClick={() => setShowMaintainerModal(true)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    + Add Another
+                  </button>
+            </div>
+            
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                  {maintainers.map((maintainer) => (
+                    <div key={maintainer._id || maintainer.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-blue-600" />
+                </div>
+              <div>
+                        <div className="font-medium text-gray-900">
+                          {(maintainer.user?.firstName || maintainer.firstName || 'Unknown')} {(maintainer.user?.lastName || maintainer.lastName || '')}
+              </div>
+                        <div className="text-sm text-gray-500">{maintainer.user?.email || maintainer.email}</div>
+            </div>
+              </div>
+                  ))}
+              </div>
+            </div>
+            )}
+          </div>
+        );
+      
+      case 3:
+        return (
+          <div className="space-y-6 py-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Create Your Default Branch</h2>
+              <p className="text-gray-600">Set up your first PG branch with a maintainer</p>
+            </div>
+            
+            {maintainers.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-8 w-8 text-yellow-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Maintainers Required</h3>
+                <p className="text-gray-600 mb-6">Please add at least one maintainer before creating a branch.</p>
+                  <button
+                  onClick={() => setCurrentStep(2)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                  Go Back to Add Maintainers
+                  </button>
+                  </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-8 w-8 text-green-600" />
+                  </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Create Branch</h3>
+                <p className="text-gray-600 mb-6">You have {maintainers.length} maintainer{maintainers.length !== 1 ? 's' : ''} ready. Let's create your first branch!</p>
+                <button
+                  onClick={() => setShowBranchModal(true)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                >
+                  Create Default Branch
+                </button>
+                </div>
+            )}
+                  </div>
+        );
+
+      case 4:
+        return (
+          <div className="text-center space-y-6 py-8">
+            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto">
+              <Settings className="h-10 w-10 text-white" />
+                  </div>
+                  <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">Configure Your PG</h2>
+              <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
+                Set up sharing types and pricing for your PG. This will be used for room allocation and billing.
+              </p>
+                  </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 max-w-lg mx-auto">
+              <h3 className="font-semibold text-purple-900 mb-2">Configuration includes:</h3>
+              <ul className="text-sm text-purple-800 space-y-1 text-left">
+                <li>• Different sharing types (1-sharing, 2-sharing, etc.)</li>
+                <li>• Pricing for each sharing type</li>
+                <li>• Room allocation settings</li>
+              </ul>
+                  </div>
+            {showConfigModal ? (
+              <div className="flex items-center space-x-2 text-purple-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                <span className="font-medium">Opening Configuration...</span>
+                </div>
+            ) : (
+              <button
+                onClick={() => setShowConfigModal(true)}
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              >
+                Start Configuration
+              </button>
+            )}
+            </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  const canProceedToNext = () => {
+    switch (currentStep) {
+      case 1:
+        return true;
+      case 2:
+        return maintainers.length > 0;
+      case 3:
+        return maintainers.length > 0;
+      case 4:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+          {/* Header with close button */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+            <div>
+                <h2 className="text-xl font-bold text-gray-900">PG Setup Wizard</h2>
+                <p className="text-sm text-gray-600">Step {currentStep} of {totalSteps}</p>
+            </div>
+            </div>
+            <button
+              onClick={handleWizardClose}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition duration-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          {/* Progress Indicator */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              {steps.map((step, index) => (
+                <div key={step.number} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${
+                    step.number <= currentStep
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {step.number}
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`w-12 h-1 mx-2 transition-all duration-200 ${
+                      step.number < currentStep
+                        ? 'bg-blue-600'
+                        : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-center">
+              <h3 className="font-semibold text-gray-900">{steps[currentStep - 1]?.title}</h3>
+              <p className="text-sm text-gray-600">{steps[currentStep - 1]?.description}</p>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="max-h-[60vh] overflow-y-auto">
+            {renderStepContent()}
+          </div>
+
+          {/* Footer with navigation */}
+          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <button
+              onClick={handleWizardClose}
+              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200"
+            >
+              Cancel Setup
+            </button>
+
+            <div className="flex items-center space-x-3">
+              {currentStep > 1 && (
+                <button
+                  onClick={handlePrevious}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition duration-200"
+              >
+                Previous
+              </button>
+            )}
+            
+              {currentStep < totalSteps ? (
+              <button
+                  onClick={handleNext}
+                  disabled={!canProceedToNext()}
+                  className={`px-6 py-2 rounded-lg font-medium transition duration-200 ${
+                    canProceedToNext()
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                  onClick={() => setShowConfigModal(true)}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200 font-medium"
+              >
+                Complete Setup
+              </button>
+            )}
+            </div>
+          </div>
+          </div>
+        </div>
+        
+      {/* Modals */}
+      {/* We'll add the maintainer modal here */}
+      {showMaintainerModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Add New Maintainer</h2>
+              <p className="text-sm text-gray-600 mt-1">Create a maintainer account</p>
+            </div>
+            <div className="p-6">
+              {/* Simple maintainer form */}
+              <MaintainerQuickForm
+                onSubmit={(data) => {
+                  // Handle maintainer creation
+                  handleMaintainerAdded(data);
+                }}
+                onCancel={() => setShowMaintainerModal(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DefaultBranchModal
+        isOpen={showBranchModal}
+        onClose={() => setShowBranchModal(false)}
+        onBranchCreated={handleBranchCreated}
+        pgId={user?.pgId}
+      />
+
+      <PGConfigurationModal
+        isOpen={showConfigModal}
+        onClose={handleWizardClose}
+        onConfigured={handleConfigurationComplete}
+      />
+    </>
+  );
+};
+
+// Simple maintainer form component
+const MaintainerQuickForm = ({ onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+      const response = await maintainerService.createMaintainer({
+        ...formData,
+        pgId: null // Will be set by the service
+      });
+
+      if (response.success) {
+        toast.success('Maintainer added successfully!');
+
+        // Handle different response structures
+        let maintainerData = response.data;
+        if (response.data && response.data.maintainer) {
+          maintainerData = response.data.maintainer;
+        }
+
+        // Reset form
+        setFormData({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: ''
+        });
+        onSubmit(maintainerData);
+      } else {
+        toast.error(response.message || 'Failed to add maintainer');
+      }
+    } catch (error) {
+      console.error('Error adding maintainer:', error);
+      toast.error('Failed to add maintainer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+          <input
+            type="text"
+            required
+            value={formData.firstName}
+            onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="First name"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+          <input
+            type="text"
+            required
+            value={formData.lastName}
+            onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Last name"
+          />
+        </div>
+        </div>
+        
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+        <input
+          type="email"
+          required
+          value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Email address"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+        <input
+          type="tel"
+          required
+          value={formData.phone}
+          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Phone number"
+          pattern="[0-9]{10}"
+        />
+    </div>
+
+      <div className="flex justify-end space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 disabled:opacity-50"
+        >
+          {loading ? 'Adding...' : 'Add Maintainer'}
+        </button>
+      </div>
+    </form>
+  );
+};
 
 const Dashboard = () => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const selectedBranch = useSelector(selectSelectedBranch);
+  const pgConfigured = useSelector(selectPgConfigured);
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
-  
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [forceShowWizard, setForceShowWizard] = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [hasNoBranches, setHasNoBranches] = useState(false);
+  const [setupCompleted, setSetupCompleted] = useState(false);
+
+  // Fetch branches and determine setup state
+  const checkBranchesAndSetupState = async () => {
+    try {
+      console.log('Dashboard: Fetching branches for initial check...');
+      console.log('Dashboard: User data:', { userId: user?._id, pgId: user?.pgId, role: user?.role });
+      const response = await api.get('/branches');
+      console.log('Dashboard: Initial branches API response:', response);
+      const fetchedBranches = response.data.branches || [];
+      console.log('Dashboard: Initial branches fetched:', fetchedBranches.length, fetchedBranches);
+      setBranches(fetchedBranches);
+      setHasNoBranches(fetchedBranches.length === 0);
+
+      // Check PG configuration status if we have branches
+      if (fetchedBranches.length > 0 && user?.pgId) {
+        try {
+          const pgService = (await import('../../services/pg.service')).default;
+          const pgResponse = await pgService.getPGDetails(user.pgId);
+          if (pgResponse.success && pgResponse.data) {
+            const freshPgConfigured = pgResponse.data.isConfigured || false;
+            // Update auth state with fresh PG data
+            dispatch(updateAuthState({
+              pgConfigured: freshPgConfigured
+            }));
+          }
+        } catch (pgError) {
+          console.error('Error checking PG configuration:', pgError);
+        }
+      }
+
+      // TEMP: For testing - always show dashboard if user has pgConfigured OR has branches
+      console.log('Dashboard: Initial check - branches:', fetchedBranches.length, 'pgConfigured:', pgConfigured, 'willLoadDashboard:', pgConfigured || fetchedBranches.length > 0);
+
+      if (pgConfigured || fetchedBranches.length > 0) {
+        console.log('Loading dashboard because pgConfigured=true OR branches exist');
+        loadDashboardData();
+      } else {
+        setLoading(false);
+      }
+
+      // Reset first load after initial check
+      setIsFirstLoad(false);
+    } catch (error) {
+      console.error('Error checking branches:', error);
+      setLoading(false);
+      setHasNoBranches(true);
+      setIsFirstLoad(false);
+    }
+  };
+
   // Initialize state with default values to prevent undefined errors
   const [dashboardData, setDashboardData] = useState({
     residents: {
@@ -105,13 +754,89 @@ const Dashboard = () => {
       return;
     }
 
-    loadDashboardData();
-  }, [user, navigate, selectedBranch, refreshKey]);
+    checkBranchesAndSetupState();
+  }, [user, navigate]);
+
+  // Update setupCompleted when pgConfigured changes
+  useEffect(() => {
+    if (pgConfigured && !setupCompleted) {
+      console.log('pgConfigured became true, marking setup as completed');
+      setSetupCompleted(true);
+    }
+  }, [pgConfigured, setupCompleted]);
+
+  // Re-check setup state when pgConfigured changes
+  useEffect(() => {
+    console.log('pgConfigured changed to:', pgConfigured, 'isFirstLoad:', isFirstLoad, 'loading:', loading);
+    if (!isFirstLoad && !loading && pgConfigured && hasNoBranches) {
+      console.log('pgConfigured became true and hasNoBranches is true - should show dashboard now');
+      // If PG is configured but we still think there are no branches, re-check
+      checkBranchesAndSetupState();
+    }
+  }, [pgConfigured, isFirstLoad, loading, hasNoBranches]);
+
+  const handleSetupComplete = async () => {
+    console.log('Setup complete called, refreshing data...');
+    setShowSetupWizard(false);
+    setForceShowWizard(false);
+    setSetupCompleted(true); // Mark setup as completed
+    try {
+      // Fetch updated branches
+      console.log('SetupWizard: Fetching branches after setup completion...');
+      const response = await api.get('/branches');
+      console.log('SetupWizard: Branches API response:', response);
+      const fetchedBranches = response.data.branches || [];
+      console.log('Fetched branches after setup:', fetchedBranches.length, fetchedBranches);
+      setBranches(fetchedBranches);
+      setHasNoBranches(fetchedBranches.length === 0);
+
+      // Refresh PG configuration status
+      let isPgConfigured = false;
+      if (user?.pgId) {
+        const pgService = (await import('../../services/pg.service')).default;
+        const pgResponse = await pgService.getPGDetails(user.pgId);
+        console.log('PG response after setup:', pgResponse);
+
+        if (pgResponse.success && pgResponse.data) {
+          isPgConfigured = pgResponse.data.isConfigured || false;
+          console.log('PG configured status:', isPgConfigured);
+          dispatch(updateAuthState({
+            pgConfigured: isPgConfigured
+          }));
+        }
+      }
+
+      console.log('Setup complete - branches:', fetchedBranches.length, 'PG configured:', isPgConfigured);
+
+      // TEMP: If we have branches after setup, show dashboard
+      if (fetchedBranches.length > 0) {
+        console.log('Loading dashboard data after setup completion...');
+        loadDashboardData();
+      } else {
+        console.log('Setup completed but no branches found, staying on setup prompt');
+      }
+    } catch (error) {
+      console.error('Error fetching data after setup:', error);
+      toast.error('Failed to load data after setup');
+    }
+  };
+
+  const handleOpenSetupWizard = () => {
+    setForceShowWizard(true);
+    setShowSetupWizard(true);
+  };
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
+
+      // If no branches exist but PG is configured, show basic dashboard
+      if (branches.length === 0 && pgConfigured) {
+        console.log('No branches but PG configured - showing basic dashboard');
+        setLoading(false);
+        return;
+      }
+
       // If no branch is selected yet, wait (global selector will set it)
       if (!selectedBranch) {
         setLoading(false);
@@ -120,7 +845,7 @@ const Dashboard = () => {
 
       // Extract branch ID from selectedBranch object
       const branchId = selectedBranch._id || selectedBranch;
-      
+
       if (!branchId) {
         setLoading(false);
         toast.error('Invalid branch selected. Please select a valid branch.');
@@ -232,6 +957,47 @@ const Dashboard = () => {
     );
   }
 
+  // Debug: Show current state when not loading
+  if (!loading && !isFirstLoad) {
+    console.log('Dashboard state - branches:', branches.length, 'pgConfigured:', pgConfigured, 'setupCompleted:', setupCompleted, 'willShowSetup:', !setupCompleted && !pgConfigured && hasNoBranches);
+  }
+
+  // Never show setup if setup is completed or PG is configured
+  if (!setupCompleted && !pgConfigured && hasNoBranches && !loading && !isFirstLoad && !showSetupWizard && !forceShowWizard) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
+          <div className="w-24 h-24 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
+            <Building2 className="h-12 w-12 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Get Started with Your PG Management
+          </h2>
+          <p className="text-gray-600 mb-6">
+            It looks like you haven't added any branches yet. Let's set up your first Paying Guest establishment.
+          </p>
+          <button
+            onClick={handleOpenSetupWizard}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Set Up Your First Branch</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show setup wizard ONLY when explicitly triggered by user action
+  // Never show on initial page load
+  if (showSetupWizard === true || forceShowWizard === true) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+        <SetupWizard onComplete={handleSetupComplete} />
+      </div>
+    );
+  }
+      
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Modern Header */}

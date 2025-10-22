@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const { validateBranchCreation } = require('../middleware/validation.middleware');
 const branchController = require('../controllers/branch.controller');
+const Branch = require('../models/branch.model'); // Added missing import
 
 // Create a new branch
 router.post('/',
@@ -13,22 +14,37 @@ router.post('/',
   }
 );
 
-// Get branches for current user's PG (admin only)
+// Modify the GET '/' route
 router.get('/',
   authenticate,
   async (req, res) => {
     try {
-      const pgId = req.user.pgId;
-
-      if (!pgId) {
-        return res.status(400).json({
+      let branches;
+      
+      if (req.user.role === 'maintainer') {
+        // Fetch maintainer's assigned branches
+        const Maintainer = require('../models/maintainer.model');
+        const maintainer = await Maintainer.findById(req.user.maintainerProfile)
+          .populate('branches');
+        
+        branches = maintainer.branches;
+      } else if (req.user.role === 'admin') {
+        // Admin sees all branches for their PG
+        const pgId = req.user.pgId;
+        if (!pgId) {
+          return res.status(400).json({
+            success: false,
+            message: 'No PG associated with this user'
+          });
+        }
+        branches = await Branch.find({ pgId });
+      } else {
+        // Other roles get an empty list or throw an error
+        return res.status(403).json({
           success: false,
-          message: 'No PG associated with this user. Please contact superadmin to assign a PG or complete your PG setup.'
+          message: 'Unauthorized to view branches'
         });
       }
-
-      // Find branches for the current user's PG
-      const branches = await branchController.getBranchesByPG(pgId);
 
       // Add cache control headers
       res.set({
@@ -238,6 +254,22 @@ router.delete('/:branchId',
         error: error.message
       });
     }
+  }
+);
+
+// Assign maintainer to a branch
+router.post('/assign-maintainer', 
+  authenticate, 
+  (req, res) => {
+    branchController.assignMaintainerToBranch(req, res);
+  }
+);
+
+// Get branches with their assigned maintainers
+router.get('/with-maintainers', 
+  authenticate, 
+  (req, res) => {
+    branchController.getBranchesWithMaintainers(req, res);
   }
 );
 

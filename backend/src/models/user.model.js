@@ -93,8 +93,12 @@ const userSchema = new mongoose.Schema({
   // Role and Access Control
   role: {
     type: String,
-    enum: ['superadmin', 'admin', 'user', 'support'],
-    default: 'superadmin'
+    enum: ['superadmin', 'admin', 'user', 'support', 'maintainer'],
+    default: 'user'
+  },
+  maintainerProfile: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Maintainer'
   },
   
   // PG Association (for admin users)
@@ -247,8 +251,23 @@ const userSchema = new mongoose.Schema({
   // Sales-specific fields
   salesRole: {
     type: String,
-    enum: ['sales', 'sub_sales'],
-    default: null
+    enum: {
+      values: ['sales', 'sub_sales'],
+      message: 'salesRole must be either "sales" or "sub_sales"'
+    },
+    required: false,
+    default: undefined,
+    validate: {
+      validator: function(value) {
+        // Allow empty string, null, or undefined for non-sales users
+        if (!value || value === '' || value === null || value === undefined) {
+          return true;
+        }
+        // For actual values, must be 'sales' or 'sub_sales'
+        return ['sales', 'sub_sales'].includes(value);
+      },
+      message: 'salesRole must be either "sales" or "sub_sales"'
+    }
   },
   parentSalesPerson: {
     type: mongoose.Schema.Types.ObjectId,
@@ -284,6 +303,65 @@ const userSchema = new mongoose.Schema({
     default: false
   },
 
+  // Payment History
+  paymentHistory: [{
+    razorpayPaymentId: {
+      type: String,
+      required: true
+    },
+    razorpayOrderId: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true
+    },
+    currency: {
+      type: String,
+      default: 'INR'
+    },
+    status: {
+      type: String,
+      enum: ['paid', 'failed', 'pending', 'cancelled'],
+      default: 'paid'
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['razorpay', 'card', 'netbanking', 'upi', 'wallet'],
+      default: 'razorpay'
+    },
+    billingCycle: {
+      type: String,
+      enum: ['monthly', 'annual'],
+      default: 'monthly'
+    },
+    planDetails: {
+      planId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Subscription'
+      },
+      planName: String,
+      bedCount: {
+        type: Number,
+        default: 1
+      },
+      branchCount: {
+        type: Number,
+        default: 1
+      }
+    },
+    paymentDate: {
+      type: Date,
+      default: Date.now
+    },
+    description: String,
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    }
+  }],
+
   // Default Branch Configuration
   defaultBranch: {
     type: Boolean,
@@ -308,6 +386,9 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 
+// Compound unique index for phone and pgId
+userSchema.index({ phone: 1, pgId: 1 }, { unique: true });
+
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
@@ -324,8 +405,12 @@ userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
-    // Hash password with cost of 12
-    this.password = await bcrypt.hash(this.password, 12);
+    // Ensure password is not already hashed
+    const isAlreadyHashed = /^\$2[aby]\$\d{2}\$/.test(this.password);
+    if (!isAlreadyHashed) {
+      // Hash password with cost of 12
+      this.password = await bcrypt.hash(this.password, 12);
+    }
     this.passwordChangedAt = Date.now() - 1000; // Ensure token is created after password change
     next();
   } catch (error) {
@@ -448,6 +533,22 @@ userSchema.methods.correctPassword = async function(
   userPassword
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+// Static method to cleanup users with invalid salesRole values
+userSchema.statics.cleanupInvalidSalesRoles = async function() {
+  try {
+    const result = await this.updateMany(
+      { salesRole: null },
+      { $unset: { salesRole: 1 } }
+    );
+
+    console.log(`✅ Cleaned up ${result.modifiedCount} users with null salesRole values`);
+    return result;
+  } catch (error) {
+    console.error('Error cleaning up invalid salesRole values:', error);
+    throw error;
+  }
 };
 
 // Ensure virtual fields are serialized

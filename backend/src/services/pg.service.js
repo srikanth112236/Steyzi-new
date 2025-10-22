@@ -270,11 +270,13 @@ class PGService {
 
       // Create admin user for this PG
       const adminEmail = pgData.contact.email;
-      const adminPassword = 'Admin@123';
+      const adminPassword = pgData.adminPassword || pgData.password || 'Admin@123';
+      const adminPhone = pgData.contact.phone || '0000000000'; // Fallback phone number
       
       console.log('Creating admin user for PG:', {
         email: adminEmail,
-        name: pgData.name
+        name: pgData.name,
+        phone: adminPhone
       });
 
       // Check if admin user already exists
@@ -283,19 +285,16 @@ class PGService {
       if (!adminUser) {
         // Create new admin user
         adminUser = new User({
-          firstName: pgData.name.split(' ')[0] || 'Admin',
-          lastName: pgData.name.split(' ').slice(1).join(' ') || 'User',
+          firstName: pgData.name || 'PG Admin',
+          lastName: 'User',
           email: adminEmail,
-          password: adminPassword,
-          phone: pgData.contact.phone,
+          password: adminPassword, // Explicitly set the default password
+          phone: adminPhone, // Add phone number
           role: 'admin',
-          isEmailVerified: true,
-          isActive: true
+          isActive: true,
+          isEmailVerified: true
         });
 
-        // Store plain password temporarily for email
-        adminUser.plainPassword = adminPassword;
-        
         await adminUser.save();
         console.log('Admin user created successfully:', adminUser._id);
       } else {
@@ -305,6 +304,7 @@ class PGService {
           adminUser.role = 'admin';
           adminUser.isActive = true;
           adminUser.isEmailVerified = true;
+          adminUser.phone = adminPhone; // Update phone if not set
           await adminUser.save();
           console.log('Existing user updated to admin role');
         }
@@ -332,7 +332,7 @@ class PGService {
 
       console.log('Formatted PG data:', formattedPGData);
 
-      // Set admin and validate data
+      // Create and save the PG
       const pg = new PG(formattedPGData);
 
       console.log('PG object created, attempting to save...');
@@ -341,38 +341,23 @@ class PGService {
 
       // Associate the PG with the admin user
       adminUser.pgId = savedPG._id;
-      adminUser.pgConfigured = false; // Reset PG configuration status
       await adminUser.save();
-      console.log('Admin user associated with PG:', {
-        userId: adminUser._id,
-        pgId: savedPG._id
-      });
-
-      // Send welcome email to admin
-      try {
-        const emailService = require('./email.service');
-        await emailService.sendPGAdminWelcomeEmail({
-          email: adminUser.email,
-          firstName: adminUser.firstName,
-          lastName: adminUser.lastName,
-          pgName: pgData.name,
-          password: adminPassword,
-          loginUrl: `${process.env.FRONTEND_URL}/admin/login`
-        });
-        console.log('Welcome email sent to admin:', adminUser.email);
-      } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError);
-        // Don't fail the PG creation if email fails
-      }
 
       return {
         success: true,
-        data: savedPG,
-        message: 'PG created successfully and admin credentials sent via email'
+        message: 'PG created successfully',
+        statusCode: 201,
+        data: savedPG
       };
+
     } catch (error) {
-      console.error('PG Service createPG error:', error);
-      throw new Error(`Failed to create PG: ${error.message}`);
+      console.error('PG creation error:', error);
+      return {
+        success: false,
+        message: `Failed to create PG: ${error.message}`,
+        statusCode: 500,
+        error: error.message
+      };
     }
   }
 
@@ -1359,7 +1344,7 @@ class PGService {
               street: 'Auto Street',
               city: 'Auto City',
               state: 'Auto State',
-              pincode: '123456'
+              pincode: '110001' // Default valid pincode
             },
             phone: user.phone || '9876543210',
             email: user.email,

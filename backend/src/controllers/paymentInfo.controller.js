@@ -173,13 +173,37 @@ const getPaymentInfoByQRCode = async (req, res) => {
 };
 
 /**
+ * Get payment info by ID
+ */
+const getPaymentInfoById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return errorResponse(res, 'Payment info ID is required', 400);
+    }
+
+    const paymentInfo = await paymentInfoService.getPaymentInfoById(id);
+    return successResponse(res, 'Payment info retrieved successfully', paymentInfo);
+  } catch (error) {
+    logger.error('Error in getPaymentInfoById controller:', error);
+
+    if (error.message.includes('Payment info not found')) {
+      return errorResponse(res, 'Payment info not found', 404);
+    }
+
+    return errorResponse(res, error.message, 500);
+  }
+};
+
+/**
  * Get all payment info for admin
  */
 const getAllPaymentInfo = async (req, res) => {
   try {
     const { pgId } = req.user;
     const filters = {};
-    
+
     if (req.query.branchId) {
       filters.branchId = req.query.branchId;
     }
@@ -197,5 +221,6 @@ module.exports = {
   createOrUpdatePaymentInfo,
   deletePaymentInfo,
   getPaymentInfoByQRCode,
+  getPaymentInfoById,
   getAllPaymentInfo
 }; 

@@ -951,11 +951,15 @@ const validateBranchCreation = (req, res, next) => {
       landmark: Joi.string().trim().optional(),
       country: Joi.string().trim().default('India')
     }).required(),
+    maintainerId: Joi.string().optional()
+      .messages({
+        'string.empty': 'Maintainer ID cannot be empty'
+      }),
     maintainer: Joi.object({
       name: Joi.string().trim().min(1).max(100).required(),
       mobile: Joi.string().pattern(/^[0-9]{10}$/).required(),
       email: Joi.string().email().lowercase().trim().optional()
-    }).required(),
+    }).optional(),
     contact: Joi.object({
       phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
       email: Joi.string().email().lowercase().trim().optional(),
@@ -980,6 +984,24 @@ const validateBranchCreation = (req, res, next) => {
       success: false,
       error: 'Validation Error',
       message: error.details.map(detail => detail.message).join(', ')
+    });
+  }
+
+  // Custom validation: ensure either maintainerId or maintainer is provided
+  if (!value.maintainerId && !value.maintainer) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      message: 'Either maintainerId or maintainer information is required'
+    });
+  }
+
+  // Custom validation: ensure only one maintainer field is provided
+  if (value.maintainerId && value.maintainer) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      message: 'Cannot provide both maintainerId and maintainer. Please use only one.'
     });
   }
 
