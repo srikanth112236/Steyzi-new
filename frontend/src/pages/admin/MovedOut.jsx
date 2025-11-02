@@ -287,7 +287,7 @@ const MovedOut = () => {
     );
   };
 
-  if (!user || user?.role !== 'admin') {
+  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -311,7 +311,7 @@ const MovedOut = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-full mx-auto py-2 px-4 sm:px-2 lg:px-2">
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">

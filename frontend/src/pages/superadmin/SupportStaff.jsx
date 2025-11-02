@@ -17,6 +17,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import SupportStaffForm from '../../components/superadmin/SupportStaffForm';
+import SupportStaffDetailsModal from '../../components/superadmin/SupportStaffDetailsModal';
 import DeleteConfirmModal from '../../components/superadmin/DeleteConfirmModal';
 import authService from '../../services/auth.service';
 import toast from 'react-hot-toast';
@@ -25,11 +26,14 @@ const SupportStaff = () => {
   const [supportStaff, setSupportStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     loadSupportStaff();
@@ -87,8 +91,8 @@ const SupportStaff = () => {
     try {
       const response = await authService.updateUserStatus(staffId, !currentStatus);
       if (response.success) {
-        setSupportStaff(prev => prev.map(staff => 
-          staff._id === staffId 
+        setSupportStaff(prev => prev.map(staff =>
+          staff._id === staffId
             ? { ...staff, isActive: !currentStatus }
             : staff
         ));
@@ -100,6 +104,30 @@ const SupportStaff = () => {
       console.error('Error updating staff status:', error);
       toast.error('Failed to update status');
     }
+  };
+
+  const handleEditStaff = (staff) => {
+    setEditingStaff(staff);
+    setIsEditing(true);
+    setShowAddForm(true);
+  };
+
+  const handleViewStaff = (staff) => {
+    setSelectedStaff(staff);
+    setShowDetailsModal(true);
+  };
+
+  const handleEditSuccess = () => {
+    loadSupportStaff();
+    setEditingStaff(null);
+    setIsEditing(false);
+    toast.success('Support staff updated successfully!');
+  };
+
+  const handleFormClose = () => {
+    setShowAddForm(false);
+    setEditingStaff(null);
+    setIsEditing(false);
   };
 
   const handleKeyPress = (e, action) => {
@@ -277,25 +305,19 @@ const SupportStaff = () => {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full" role="table" aria-label="Support staff list">
+          <table className="min-w-full divide-y divide-gray-100" role="table" aria-label="Support staff list">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
                   Staff Member
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
-                  Contact
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                  Contact & Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
                   Joined
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
-                  Last Login
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
                   Actions
                 </th>
               </tr>
@@ -311,80 +333,82 @@ const SupportStaff = () => {
                     className="hover:bg-gray-50"
                     role="row"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap" role="cell">
+                    {/* Staff Member */}
+                    <td className="px-3 py-3 whitespace-nowrap" role="cell">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-600" aria-label={`${staff.firstName} ${staff.lastName} initials`}>
-                            {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
-                          </span>
+                        <div className="flex-shrink-0 w-8 h-8">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                            <span className="text-xs font-medium text-white">
+                              {staff.firstName.charAt(0)}{staff.lastName.charAt(0)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="ml-4">
+                        <div className="ml-3">
                           <div className="text-sm font-medium text-gray-900">
                             {staff.firstName} {staff.lastName}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs text-gray-500">
                             ID: {staff._id.slice(-8)}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap" role="cell">
-                      <div className="text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <Mail className="h-4 w-4 mr-2 text-gray-400" aria-hidden="true" />
-                          <a href={`mailto:${staff.email}`} className="hover:text-blue-600">
+
+                    {/* Contact & Status */}
+                    <td className="px-3 py-3" role="cell">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900">
                             {staff.email}
-                          </a>
+                          </span>
+                          <span
+                            className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded border ${getStatusColor(staff.isActive)}`}
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {staff.isActive ? 'Active' : 'Inactive'}
+                          </span>
                         </div>
-                        <div className="flex items-center mt-1">
-                          <Phone className="h-4 w-4 mr-2 text-gray-400" aria-hidden="true" />
-                          <a href={`tel:${staff.phone}`} className="hover:text-blue-600">
-                            {staff.phone}
-                          </a>
+                        <div className="text-xs text-gray-500 flex items-center">
+                          <Phone className="h-3 w-3 mr-1" />
+                          {staff.phone}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap" role="cell">
-                      <span 
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(staff.isActive)}`}
-                        aria-label={`Status: ${staff.isActive ? 'Active' : 'Inactive'}`}
-                      >
-                        <StatusIcon className="h-3 w-3 mr-1" aria-hidden="true" />
-                        {staff.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" role="cell">
+
+                    {/* Joined Date */}
+                    <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900" role="cell">
                       {new Date(staff.createdAt).toLocaleDateString('en-IN', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
                       })}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" role="cell">
-                      {staff.lastLogin 
-                        ? new Date(staff.lastLogin).toLocaleDateString('en-IN', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'Never'
-                      }
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" role="cell">
-                      <div className="flex items-center justify-end space-x-2">
+
+                    {/* Actions */}
+                    <td className="px-3 py-3 whitespace-nowrap" role="cell">
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => handleViewStaff(staff)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleEditStaff(staff)}
+                          className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
+                          title="Edit Staff"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </button>
                         <button
                           onClick={() => handleToggleStatus(staff._id, staff.isActive)}
-                          onKeyPress={(e) => handleKeyPress(e, () => handleToggleStatus(staff._id, staff.isActive))}
-                          className={`px-3 py-1 rounded-md text-xs font-medium focus:ring-2 focus:ring-blue-500 ${
+                          className={`px-2 py-1 rounded text-xs font-medium ${
                             staff.isActive
                               ? 'bg-red-100 text-red-800 hover:bg-red-200'
                               : 'bg-green-100 text-green-800 hover:bg-green-200'
                           }`}
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`${staff.isActive ? 'Deactivate' : 'Activate'} ${staff.firstName} ${staff.lastName}`}
+                          title={staff.isActive ? 'Deactivate' : 'Activate'}
                         >
                           {staff.isActive ? 'Deactivate' : 'Activate'}
                         </button>
@@ -393,16 +417,10 @@ const SupportStaff = () => {
                             setSelectedStaff(staff);
                             setShowDeleteModal(true);
                           }}
-                          onKeyPress={(e) => handleKeyPress(e, () => {
-                            setSelectedStaff(staff);
-                            setShowDeleteModal(true);
-                          })}
-                          className="text-red-600 hover:text-red-900 focus:ring-2 focus:ring-red-500 rounded"
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`Delete ${staff.firstName} ${staff.lastName}`}
+                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                          title="Delete Staff"
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     </td>
@@ -439,11 +457,27 @@ const SupportStaff = () => {
         )}
       </div>
 
-      {/* Add Support Staff Modal */}
+      {/* Add/Edit Support Staff Modal */}
       <SupportStaffForm
         isOpen={showAddForm}
-        onClose={() => setShowAddForm(false)}
-        onSuccess={handleAddSuccess}
+        onClose={handleFormClose}
+        onSuccess={isEditing ? handleEditSuccess : handleAddSuccess}
+        editingStaff={editingStaff}
+        isEditing={isEditing}
+      />
+
+      {/* Support Staff Details Modal */}
+      <SupportStaffDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedStaff(null);
+        }}
+        staff={selectedStaff}
+        onEdit={() => {
+          setShowDetailsModal(false);
+          handleEditStaff(selectedStaff);
+        }}
       />
 
       {/* Delete Confirmation Modal */}

@@ -41,19 +41,23 @@ export const fetchAvailablePlans = createAsyncThunk(
       const cacheAge = state.subscription.plansCacheTime ?
         Date.now() - state.subscription.plansCacheTime : Infinity;
 
-      if (state.subscription.availablePlans.length > 0 && cacheAge < 5 * 60 * 1000) {
-        // Return cached data
-        return state.subscription.availablePlans;
-      }
+      // For now, always fetch fresh data to ensure user-specific plans are loaded
+      // TODO: Implement proper caching with user context validation
+      console.log('📋 Fetching fresh plans data...');
 
       // Use provided user context or fallback to state
       const user = {
         role: userContext.role || state.auth.user?.role || 'admin',
-        pgId: userContext.pgId || state.auth.user?.pgId,
-        email: userContext.email || state.auth.user?.email
+        userPGId: userContext.userPGId || state.auth.user?.pgId,
+        userEmail: userContext.userEmail || state.auth.user?.email
       };
 
+      console.log('🔍 Subscription slice: Using user context:', user);
+
       const response = await subscriptionService.getActivePlans(user);
+
+      // Update cache key in state (we'll handle this in the fulfilled case)
+      // For now, just return the data
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch plans');
@@ -215,8 +219,8 @@ const subscriptionSlice = createSlice({
         state.plansLoading = false;
         state.availablePlans = action.payload;
         state.plansCacheTime = Date.now(); // Cache timestamp
+
         console.log('✅ Plans loaded successfully:', action.payload?.length || 0, 'plans');
-        console.log('📋 Plans data:', action.payload);
       })
       .addCase(fetchAvailablePlans.rejected, (state, action) => {
         state.plansLoading = false;

@@ -22,12 +22,16 @@ class MaintainerController {
         pgId
       } = req.body;
 
+      // Set default password as firstName#2025 if no password provided
+      const defaultPassword = password || `${firstName}#2025`;
+
       console.log('🔍 Maintainer Creation Request:', {
         email,
         phone,
         firstName,
         lastName,
-        pgId: pgId || req.user.pgId
+        pgId: pgId || req.user.pgId,
+        passwordSet: password ? 'provided' : `default: ${defaultPassword}`
       });
 
       // Check if user already exists
@@ -58,7 +62,7 @@ class MaintainerController {
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password || Math.random().toString(36).slice(-8), salt);
+      const hashedPassword = await bcrypt.hash(defaultPassword, salt);
 
       // Create user
       const user = new User({
@@ -89,7 +93,8 @@ class MaintainerController {
 
       res.status(201).json({
         success: true,
-        data: { 
+        message: `Maintainer created successfully. ${!password ? `Default password set: ${defaultPassword}` : 'Password set as provided.'}`,
+        data: {
           user: {
             _id: user._id,
             firstName: user.firstName,
@@ -102,6 +107,11 @@ class MaintainerController {
             _id: maintainer._id,
             specialization: maintainer.specialization,
             status: maintainer.status
+          },
+          loginCredentials: {
+            email: user.email,
+            password: !password ? defaultPassword : 'Password set as provided',
+            passwordType: password ? 'custom' : 'default'
           }
         }
       });

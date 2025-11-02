@@ -1,106 +1,89 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, ChevronDown, Star } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchBranches, selectBranches, selectSelectedBranch, setSelectedBranch } from '../../store/slices/branch.slice';
+import { fetchBranches, selectBranchState, initializeBranches, selectSelectedBranch } from '../../store/slices/branch.slice';
+import { setSelectedBranch } from '../../store/slices/branch.slice';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
-const BranchSelector = ({ selectedBranch, onBranchChange }) => {
-  const { user } = useSelector((state) => state.auth);
-  const branches = useSelector(selectBranches);
-  const globalSelectedBranch = useSelector(selectSelectedBranch);
+const BranchSelector = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const { branches, loading, error } = useSelector(selectBranchState);
+  const selectedBranch = useSelector(selectSelectedBranch);
+  const [availableBranches, setAvailableBranches] = useState([]);
 
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Load branches for admin
   useEffect(() => {
-    if (user?.role === 'admin') {
+    // Initialize branches state and fetch branches for admin and maintainer roles
+    if (user?.role === 'admin' || user?.role === 'maintainer') {
+      dispatch(initializeBranches());
       dispatch(fetchBranches());
     }
   }, [user, dispatch]);
 
-  // Determine the branch shown in the control
-  const effectiveSelectedBranch = selectedBranch || globalSelectedBranch;
+  useEffect(() => {
+    // Safely handle different branch data types
+    const safeBranches = Array.isArray(branches) 
+      ? branches 
+      : branches?.data?.branches || 
+        (branches?.branches ? Object.values(branches.branches) : []);
 
-  const handleBranchSelect = (branch) => {
-    // Update global selection
-    dispatch(setSelectedBranch(branch));
-    // Notify parent if it was using local state
-    if (onBranchChange) onBranchChange(branch);
-    setIsOpen(false);
-  };
+    // Filter branches based on user role
+    if (user?.role === 'maintainer') {
+      // For maintainers, the API already returns only assigned branches
+      // So we can use all branches returned from the API
+      setAvailableBranches(safeBranches);
 
-  // Hide for non-admin
-  if (user?.role !== 'admin') return null;
+      // Automatically select the first branch if only one is available
+      if (safeBranches.length === 1) {
+        dispatch(setSelectedBranch(safeBranches[0]));
+      } else if (safeBranches.length > 1 && !selectedBranch) {
+        // If multiple branches and none selected, select the first one
+        dispatch(setSelectedBranch(safeBranches[0]));
+      }
+    } else if (user?.role === 'admin') {
+      // Admins can see all branches
+      setAvailableBranches(safeBranches);
+    }
+  }, [branches, user, dispatch]);
 
-  if (!branches || branches.length === 0) {
-    return (
-      <div className="relative">
-        <div className="mb-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Select Branch</label>
-        </div>
-        <div className="w-full flex items-center justify-center px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg">
-          <Building2 className="h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-sm text-gray-500">No branches available</span>
-        </div>
-      </div>
-    );
-  }
+
+  // Don't render for roles other than admin and maintainer
+  if (user?.role !== 'admin' && user?.role !== 'maintainer') return null;
 
   return (
-    <div className="relative">
-      <div className="mb-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Select Branch</label>
-      </div>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-      >
-        <div className="flex items-center space-x-3">
-          <Building2 className="h-5 w-5 text-gray-500" />
-          <span className="text-sm font-medium">
-            {effectiveSelectedBranch ? effectiveSelectedBranch.name : 'Choose a branch...'}
-          </span>
-          {effectiveSelectedBranch?.isDefault && (
-            <Star className="h-4 w-4 text-yellow-500 fill-current" />
-          )}
+    <div className="branch-selector p-2">
+      {/* <div className="text-xs font-medium text-gray-500 px-2 py-1 mb-1">
+        Select Branch {user?.role === 'maintainer' ? '(Assigned)' : ''}
+      </div> */}
+      {loading ? (
+        <div>Loading branches...</div>
+      ) : error ? (
+        <div className="text-red-500">Error loading branches: {error}</div>
+      ) : availableBranches.length === 0 ? (
+        <div className="text-yellow-500">
+          {user?.role === 'maintainer' 
+            ? 'No branches assigned to you' 
+            : 'No branches available'}
         </div>
-        <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          <div className="p-2">
-            <div className="text-xs font-medium text-gray-500 px-2 py-1 mb-1">Select Branch</div>
-            {branches.map((branch) => (
-              <button
-                key={branch._id}
-                onClick={() => handleBranchSelect(branch)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-md transition duration-200 ${
-                  effectiveSelectedBranch?._id === branch._id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <Building2 className="h-4 w-4" />
-                  <span className="text-sm font-medium">{branch.name}</span>
-                  {branch.isDefault && <Star className="h-3 w-3 text-yellow-500 fill-current" />}
-                </div>
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    branch.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : branch.status === 'inactive'
-                      ? 'bg-gray-100 text-gray-800'
-                      : branch.status === 'maintenance'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {branch.status}
-                </span>
-              </button>
+      ) : (
+        <Select
+          onValueChange={(value) => {
+            const branch = availableBranches.find(b => b._id === value);
+            console.log('BranchSelector: Selecting branch:', branch);
+            dispatch(setSelectedBranch(branch));
+          }}
+          value={selectedBranch?._id || ''}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a branch" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableBranches.map((branch) => (
+              <SelectItem key={branch._id} value={branch._id}>
+                {branch.name} - {branch.address ? `${branch.address.city}, ${branch.address.state}` : 'Address not available'}
+              </SelectItem>
             ))}
-          </div>
-        </div>
+          </SelectContent>
+        </Select>
       )}
     </div>
   );

@@ -17,6 +17,11 @@ const UserSubscription = require('./userSubscription.model');
 const SubscriptionActivity = require('./subscriptionActivity.model');
 const SalesManager = require('./salesManager.model');
 const SalesHierarchy = require('./salesHierarchy.model');
+const Expense = require('./expense.model');
+const Salary = require('./salary.model');
+const Maintainer = require('./maintainer.model');
+const Floor = require('./floor.model');
+const OnboardingStatus = require('./onboardingStatus.model');
 
 module.exports = {
   User,
@@ -36,5 +41,10 @@ module.exports = {
   UserSubscription,
   SubscriptionActivity,
   SalesManager,
-  SalesHierarchy
+  SalesHierarchy,
+  Expense,
+  Salary,
+  Maintainer,
+  Floor,
+  OnboardingStatus
 };

@@ -145,19 +145,19 @@ class SubscriptionService {
     try {
       // Construct query parameters
       const params = new URLSearchParams();
-      
+
       // Add user context for filtering if provided
       if (userContext.role) params.append('role', userContext.role);
       if (userContext.email) params.append('userEmail', userContext.email);
-      
+
       // Fetch active plans with optional filtering
       const response = await api.get(`/subscriptions/active/plans?${params.toString()}`);
-      
+
       // Ensure response has expected structure
       if (!response.data || !response.data.success) {
         throw new Error(response.data?.message || 'Failed to fetch active plans');
       }
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -165,10 +165,7 @@ class SubscriptionService {
       };
     } catch (error) {
       console.error('Error fetching active plans:', error);
-      return {
-        success: false,
-        message: error.response?.data?.message || 'Failed to fetch active plans'
-      };
+      throw new Error(error.response?.data?.message || error.message || 'Failed to fetch active plans');
     }
   }
 
@@ -277,7 +274,7 @@ class SubscriptionService {
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
 
-      const response = await api.get(`/subscription-management/subscribers?${params.toString()}`);
+      const response = await api.get(`/subscription-management/subscribers`);
       return response.data;
     } catch (error) {
       console.error('Error fetching subscribers:', error);

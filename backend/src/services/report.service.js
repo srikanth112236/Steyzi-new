@@ -10,7 +10,7 @@ class ReportService {
   /**
    * Generate residents report
    */
-  async generateResidentsReport({ startDate, endDate, pgId, status, userId, format = 'json' }) {
+  async generateResidentsReport({ startDate, endDate, pgId, branchId, status, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -20,6 +20,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       // Apply date filters
@@ -103,6 +108,7 @@ class ReportService {
       ]);
 
       return {
+        success: true,
         data: residents,
         statistics: stats,
         monthlyTrend,
@@ -110,7 +116,7 @@ class ReportService {
         statusDistribution,
         genderDistribution,
         roomTypeDistribution,
-        filters: { startDate, endDate, pgId, status },
+        filters: { startDate, endDate, pgId, branchId, status },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -122,7 +128,7 @@ class ReportService {
   /**
    * Generate payments report
    */
-  async generatePaymentsReport({ startDate, endDate, pgId, status, paymentMethod, userId, format = 'json' }) {
+  async generatePaymentsReport({ startDate, endDate, pgId, branchId, status, paymentMethod, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -132,6 +138,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       // Apply date filters
@@ -236,6 +247,7 @@ class ReportService {
       ]);
 
       return {
+        success: true,
         data: payments,
         statistics: stats,
         paymentMethodBreakdown,
@@ -243,7 +255,7 @@ class ReportService {
         monthlyTrend,
         comparisonData,
         statusDistribution,
-        filters: { startDate, endDate, pgId, status, paymentMethod },
+        filters: { startDate, endDate, pgId, branchId, status, paymentMethod },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -257,11 +269,27 @@ class ReportService {
    */
   async generateTicketsReport(filters = {}) {
     try {
-      const { startDate, endDate, pgId, userId } = filters;
+      const { startDate, endDate, pgId, branchId, status, priority, userId } = filters;
       
       // Build query
       const query = {};
       if (pgId) query.pg = pgId; // Use 'pg' field as per Ticket model
+      
+      // Apply branch filter if provided (tickets might have branchId)
+      if (branchId) {
+        query.branchId = branchId;
+      }
+      
+      // Apply status filter
+      if (status && status !== 'all') {
+        query.status = status;
+      }
+      
+      // Apply priority filter
+      if (priority && priority !== 'all') {
+        query.priority = priority;
+      }
+      
       if (startDate && endDate) {
         query.createdAt = {
           $gte: new Date(startDate),
@@ -339,7 +367,7 @@ class ReportService {
   /**
    * Generate onboarding report
    */
-  async generateOnboardingReport({ startDate, endDate, pgId, userId, format = 'json' }) {
+  async generateOnboardingReport({ startDate, endDate, pgId, branchId, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -349,6 +377,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       // Apply date filters
@@ -424,13 +457,14 @@ class ReportService {
       const comparisonData = await this.getComparisonAnalytics('residents', query, startDate, endDate);
 
       return {
+        success: true,
         data: residents,
         statistics: stats,
         monthlyTrend,
         roomTypeBreakdown,
         genderDistribution,
         comparisonData,
-        filters: { startDate, endDate, pgId },
+        filters: { startDate, endDate, pgId, branchId },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -442,7 +476,7 @@ class ReportService {
   /**
    * Generate offboarding report
    */
-  async generateOffboardingReport({ startDate, endDate, pgId, vacationType, userId, format = 'json' }) {
+  async generateOffboardingReport({ startDate, endDate, pgId, branchId, vacationType, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = { status: { $in: ['inactive', 'moved_out', 'notice_period'] } };
@@ -452,6 +486,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       // Apply date filters
@@ -542,6 +581,7 @@ class ReportService {
       const comparisonData = await this.getComparisonAnalytics('residents', query, startDate, endDate);
 
       return {
+        success: true,
         data: residents,
         statistics: stats,
         monthlyTrend,
@@ -549,7 +589,7 @@ class ReportService {
         genderDistribution,
         roomTypeBreakdown,
         comparisonData,
-        filters: { startDate, endDate, pgId, vacationType },
+        filters: { startDate, endDate, pgId, branchId, vacationType },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -561,7 +601,7 @@ class ReportService {
   /**
    * Generate occupancy report
    */
-  async generateOccupancyReport({ startDate, endDate, pgId, userId, format = 'json' }) {
+  async generateOccupancyReport({ startDate, endDate, pgId, branchId, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -573,9 +613,15 @@ class ReportService {
         query.pgId = pgId;
       }
 
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
+      }
+
       // Get rooms and their occupancy
       const rooms = await Room.find(query)
         .populate('pgId', 'name')
+        .populate('branchId', 'name')
         .populate('floorId', 'name');
 
       // Get residents for occupancy calculation
@@ -602,6 +648,7 @@ class ReportService {
       const monthlyTrend = await this.getMonthlyOccupancyTrend(query, startDate, endDate);
 
       return {
+        success: true,
         statistics: {
           totalRooms: rooms.length,
           totalBeds,
@@ -609,9 +656,9 @@ class ReportService {
           availableBeds: totalBeds - occupiedBeds,
           occupancyRate: Math.round(occupancyRate * 100) / 100
         },
-        roomOccupancy,
+        data: roomOccupancy,
         monthlyTrend,
-        filters: { startDate, endDate, pgId },
+        filters: { startDate, endDate, pgId, branchId },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -622,7 +669,7 @@ class ReportService {
   /**
    * Generate financial summary report
    */
-  async generateFinancialSummaryReport({ startDate, endDate, pgId, userId, format = 'json' }) {
+  async generateFinancialSummaryReport({ startDate, endDate, pgId, branchId, userId, format = 'json' }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -632,6 +679,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       // Apply date filters
@@ -706,10 +758,11 @@ class ReportService {
       };
 
       return {
+        success: true,
         statistics: stats,
         monthlyRevenue,
         paymentMethodBreakdown,
-        filters: { startDate, endDate, pgId },
+        filters: { startDate, endDate, pgId, branchId },
         generatedAt: new Date()
       };
     } catch (error) {
@@ -720,7 +773,7 @@ class ReportService {
   /**
    * Get report analytics and charts data
    */
-  async getReportAnalytics({ startDate, endDate, pgId, reportType, userId }) {
+  async getReportAnalytics({ startDate, endDate, pgId, branchId, reportType, userId }) {
     try {
       const user = await User.findById(userId);
       const query = {};
@@ -730,6 +783,11 @@ class ReportService {
         query.pgId = user.pgId;
       } else if (pgId) {
         query.pgId = pgId;
+      }
+
+      // Apply branch filter if provided
+      if (branchId) {
+        query.branchId = branchId;
       }
 
       let analyticsData = {};
@@ -946,21 +1004,27 @@ class ReportService {
   /**
    * Comparison analytics (current period vs previous period)
    */
-  async getComparisonAnalytics(collection, query, startDate, endDate) {
+  async getComparisonAnalytics(collection, baseQuery, startDate, endDate) {
     try {
       let Model;
+      let dateField;
+      
       switch (collection) {
         case 'tickets':
           Model = Ticket;
+          dateField = 'createdAt';
           break;
         case 'payments':
           Model = Payment;
+          dateField = 'paymentDate';
           break;
         case 'residents':
           Model = Resident;
+          dateField = 'createdAt';
           break;
         default:
           Model = Ticket;
+          dateField = 'createdAt';
       }
 
       if (!startDate || !endDate) {
@@ -978,23 +1042,29 @@ class ReportService {
       const previousStart = new Date(currentStart.getTime() - periodDuration);
       const previousEnd = new Date(currentStart.getTime());
 
-      // Current period data
-      const currentQuery = { ...query };
-      if (currentQuery.createdAt) {
-        currentQuery.createdAt = {
-          $gte: currentStart,
-          $lte: currentEnd
-        };
-      }
+      // Current period query - remove existing date filter and apply new one
+      const currentQuery = { ...baseQuery };
+      delete currentQuery.createdAt;
+      delete currentQuery.paymentDate;
+      delete currentQuery.checkInDate;
+      delete currentQuery.checkOutDate;
+      
+      currentQuery[dateField] = {
+        $gte: currentStart,
+        $lte: currentEnd
+      };
 
-      // Previous period data
-      const previousQuery = { ...query };
-      if (previousQuery.createdAt) {
-        previousQuery.createdAt = {
-          $gte: previousStart,
-          $lte: previousEnd
-        };
-      }
+      // Previous period query
+      const previousQuery = { ...baseQuery };
+      delete previousQuery.createdAt;
+      delete previousQuery.paymentDate;
+      delete previousQuery.checkInDate;
+      delete previousQuery.checkOutDate;
+      
+      previousQuery[dateField] = {
+        $gte: previousStart,
+        $lte: previousEnd
+      };
 
       const [currentCount, previousCount] = await Promise.all([
         Model.countDocuments(currentQuery),
@@ -1002,7 +1072,7 @@ class ReportService {
       ]);
 
       const changeCount = currentCount - previousCount;
-      const changePercentage = previousCount > 0 ? ((changeCount / previousCount) * 100) : 0;
+      const changePercentage = previousCount > 0 ? ((changeCount / previousCount) * 100) : (currentCount > 0 ? 100 : 0);
 
       return {
         currentPeriod: { 

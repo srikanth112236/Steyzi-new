@@ -11,7 +11,9 @@ export const fetchBranches = createAsyncThunk(
       if (!data?.success) {
         return rejectWithValue(data?.message || 'Failed to fetch branches');
       }
-      return data.data || [];
+      // Handle different response structures
+      const branches = data.data?.branches || data.data || [];
+      return Array.isArray(branches) ? branches : [];
     } catch (error) {
       return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to fetch branches');
     }
@@ -37,10 +39,17 @@ const branchSlice = createSlice({
       state.selectedBranch = null;
     },
     setBranches: (state, action) => {
-      state.branches = action.payload || [];
+      state.branches = Array.isArray(action.payload) ? action.payload : [];
     },
     clearBranches: (state) => {
       state.branches = [];
+    },
+    initializeBranches: (state) => {
+      // Ensure branches is always an array on initialization
+      if (!Array.isArray(state.branches)) {
+        console.warn('Branch slice: Initializing branches as empty array');
+        state.branches = [];
+      }
     },
   },
   extraReducers: (builder) => {
@@ -51,7 +60,7 @@ const branchSlice = createSlice({
       })
       .addCase(fetchBranches.fulfilled, (state, action) => {
         state.loading = false;
-        state.branches = action.payload || [];
+        state.branches = Array.isArray(action.payload) ? action.payload : [];
         state.lastLoadedAt = Date.now();
         // Auto-select default branch if none selected
         if (!state.selectedBranch && state.branches.length > 0) {
@@ -59,6 +68,7 @@ const branchSlice = createSlice({
           state.selectedBranch = defaultBranch || state.branches[0];
         } else if (
           state.selectedBranch &&
+          Array.isArray(state.branches) &&
           !state.branches.find((b) => b._id === state.selectedBranch._id)
         ) {
           // Previously selected branch no longer available; reset
@@ -78,6 +88,7 @@ export const {
   clearSelectedBranch,
   setBranches,
   clearBranches,
+  initializeBranches,
 } = branchSlice.actions;
 
 export const selectBranchState = (state) => state.branch;

@@ -49,7 +49,7 @@ const SubscriberManagement = () => {
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedSubscriberHistory, setSelectedSubscriberHistory] = useState(null);
-  const [showAllSubscriptions, setShowAllSubscriptions] = useState(false);
+  const [showAllSubscriptions, setShowAllSubscriptions] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -74,6 +74,11 @@ const SubscriberManagement = () => {
 
       if (subsResponse.success) {
         setSubscribers(subsResponse.data);
+        // Update the filter state to match what was actually loaded
+        setFilters(prev => ({
+          ...prev,
+          status: statusFilter
+        }));
       }
 
       if (statsResponse.success) {
@@ -559,7 +564,7 @@ const SubscriberManagement = () => {
         </div>
 
         {/* Mobile Cards View */}
-        <div className="block md:hidden space-y-4 p-4">
+        <div className="block md:hidden space-y-3 p-3">
           {filteredSubscribers.map((subscriber, index) => (
             <motion.div
               key={subscriber._id}
@@ -567,26 +572,26 @@ const SubscriberManagement = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+              className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm"
             >
               {/* Subscriber Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <User className="h-5 w-5 text-white" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">
                       {subscriber.userId?.firstName} {subscriber.userId?.lastName}
                     </h3>
-                    <p className="text-xs text-gray-500">{subscriber.userId?.email}</p>
+                    <p className="text-xs text-gray-500 truncate max-w-48">{subscriber.userId?.email}</p>
                   </div>
                 </div>
                 {getStatusBadge(subscriber.status)}
               </div>
 
               {/* Plan & Billing Info */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Plan</p>
                   <p className="text-sm font-medium text-gray-900">{subscriber.subscriptionPlanId?.planName}</p>
@@ -598,44 +603,38 @@ const SubscriberManagement = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Usage</p>
-                  <p className="text-sm text-gray-900">
+                  <p className="text-xs text-gray-900">
                     {subscriber.currentBedUsage || 0}/{subscriber.totalBeds} beds
                   </p>
                   <p className="text-xs text-gray-600">
-                    {subscriber.currentBranchUsage || 1}/{subscriber.totalBranches} branches
+                    {subscriber.currentBranchUsage || 1}/{subscriber.totalBranches} br
                   </p>
                 </div>
               </div>
 
-              {/* Dates */}
-              <div className="mb-3">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Subscription Period</p>
-                <p className="text-xs text-gray-900">
+              {/* Dates & Actions */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
                   {subscriber.billingCycle === 'trial'
                     ? `${formatDate(subscriber.startDate)} - ${formatDate(subscriber.trialEndDate)}`
                     : `${formatDate(subscriber.startDate)} - ${formatDate(subscriber.endDate)}`}
-                </p>
-                {subscriber.billingCycle === 'trial' && subscriber.daysRemaining > 0 && (
-                  <p className="text-xs text-blue-600">
-                    {subscriber.daysRemaining} trial days remaining
-                  </p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleViewDetails(subscriber)}
-                  className="flex-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleViewHistory(subscriber)}
-                  className="flex-1 px-3 py-2 text-xs bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
-                >
-                  History
-                </button>
+                </div>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={() => handleViewDetails(subscriber)}
+                    className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                    title="View Details"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => handleViewHistory(subscriber)}
+                    className="px-2 py-1 text-xs bg-gray-50 text-gray-700 rounded hover:bg-gray-100 transition-colors"
+                    title="History"
+                  >
+                    <History className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))}
@@ -643,28 +642,22 @@ const SubscriberManagement = () => {
 
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Subscriber
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Plan
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Plan & Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Billing
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Dates
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Usage
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -681,38 +674,38 @@ const SubscriberManagement = () => {
                     className="hover:bg-gray-50"
                   >
                     {/* Subscriber Info */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 w-10 h-10">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-white" />
+                        <div className="flex-shrink-0 w-8 h-8">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <User className="h-4 w-4 text-white" />
                           </div>
                         </div>
-                        <div className="ml-4">
+                        <div className="ml-3">
                           <div className="text-sm font-medium text-gray-900">
                             {subscriber.userId?.firstName} {subscriber.userId?.lastName}
                           </div>
-                          <div className="text-sm text-gray-500 flex items-center space-x-2">
-                            <Mail className="h-3 w-3" />
-                            <span>{subscriber.userId?.email}</span>
-                          </div>
-                          <div className="text-xs text-gray-400 capitalize">
-                            {subscriber.userId?.role}
+                          <div className="text-xs text-gray-500 flex items-center">
+                            <Mail className="h-3 w-3 mr-1" />
+                            <span className="truncate max-w-32">{subscriber.userId?.email}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Plan Info */}
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium text-gray-900">
-                          {subscriber.subscriptionPlanId?.planName}
+                    {/* Plan & Status */}
+                    <td className="px-3 py-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            {subscriber.subscriptionPlanId?.planName}
+                          </span>
+                          {getStatusBadge(subscriber.status)}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-xs text-gray-500">
                           {formatCurrency(subscriber.totalPrice)}/{subscriber.billingCycle}
                         </div>
-                        <div className="flex items-center space-x-3 text-xs text-gray-500">
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
                           <span className="flex items-center space-x-1">
                             <Bed className="h-3 w-3" />
                             <span>{subscriber.totalBeds} beds</span>
@@ -720,98 +713,48 @@ const SubscriberManagement = () => {
                           {subscriber.totalBranches > 1 && (
                             <span className="flex items-center space-x-1">
                               <Building2 className="h-3 w-3" />
-                              <span>{subscriber.totalBranches} branches</span>
+                              <span>{subscriber.totalBranches} br</span>
                             </span>
                           )}
                         </div>
-                        {subscriber.subscriptionPlanId?.features?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {subscriber.subscriptionPlanId.features.slice(0, 2).map((feature, idx) => (
-                              <span key={idx} className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">
-                                {feature.name}
-                              </span>
-                            ))}
-                            {subscriber.subscriptionPlanId.features.length > 2 && (
-                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                                +{subscriber.subscriptionPlanId.features.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
-                        {getStatusBadge(subscriber.status)}
-                        {subscriber.isExpiringSoon && subscriber.daysRemaining > 0 && (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded border bg-yellow-100 text-yellow-800 border-yellow-200">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Expires soon
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Billing Cycle / Trial Info */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {subscriber.billingCycle === 'trial' ? (
-                        <div className="space-y-1">
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded border bg-blue-100 text-blue-800 border-blue-200">
-                            Trial Period
-                          </span>
-                          {subscriber.daysRemaining > 0 && (
-                            <div className="text-xs text-gray-600">
-                              {subscriber.daysRemaining} days left
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        getBillingCycleBadge(subscriber.billingCycle)
-                      )}
                     </td>
 
                     {/* Dates */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div>
-                        <div className="font-medium text-gray-900">Start: {formatDate(subscriber.startDate)}</div>
-                        {subscriber.billingCycle === 'trial' ? (
-                          <div className="text-blue-600">Trial ends: {formatDate(subscriber.trialEndDate)}</div>
-                        ) : (
-                          <div>End: {formatDate(subscriber.endDate)}</div>
-                        )}
-                        {subscriber.billingCycle !== 'trial' && subscriber.trialEndDate && (
-                          <div className="text-xs text-gray-400">Trial ended: {formatDate(subscriber.trialEndDate)}</div>
-                        )}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="text-xs">
+                        <div className="text-gray-900 font-medium">{formatDate(subscriber.startDate)}</div>
+                        <div className="text-gray-500">
+                          {subscriber.billingCycle === 'trial' ? 'to ' + formatDate(subscriber.trialEndDate) : 'to ' + formatDate(subscriber.endDate)}
+                        </div>
                       </div>
                     </td>
 
                     {/* Usage */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-900 space-y-1">
                         <div>Beds: {subscriber.currentBedUsage}/{subscriber.totalBeds}</div>
-                        <div>Branches: {subscriber.currentBranchUsage}/{subscriber.totalBranches}</div>
+                        <div>Br: {subscriber.currentBranchUsage}/{subscriber.totalBranches}</div>
                         {getDaysRemainingBadge(subscriber.daysRemaining, subscriber.isExpiringSoon)}
                       </div>
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="flex items-center space-x-1">
                         <button
                           onClick={() => handleViewDetails(subscriber)}
                           className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
                           title="View Details & History"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => handleViewHistory(subscriber)}
                           className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
                           title="View Subscription History"
                         >
-                          <History className="h-4 w-4" />
+                          <History className="h-3 w-3" />
                         </button>
                       </div>
                     </td>

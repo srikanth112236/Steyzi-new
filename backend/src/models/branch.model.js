@@ -85,6 +85,32 @@ const branchSchema = new mongoose.Schema({
     type: String,
     enum: ['WiFi', 'AC', 'Food', 'Cleaning', 'Security', 'Parking', 'Gym', 'TV', 'Refrigerator', 'Geyser', 'Furnished']
   }],
+  sharingTypes: [{
+    type: {
+      type: String,
+      required: true,
+      enum: ['1-sharing', '2-sharing', '3-sharing', '4-sharing']
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    cost: {
+      type: Number,
+      required: true,
+      min: [0, 'Cost cannot be negative']
+    },
+    isCustom: {
+      type: Boolean,
+      default: false
+    }
+  }],
   status: {
     type: String,
     enum: ['active', 'inactive', 'maintenance', 'full'],

@@ -88,31 +88,49 @@ const SubscriptionSelection = () => {
     // Fetch available plans with current user context
     const fetchPlans = async () => {
       try {
-        console.log('🔄 Starting to fetch subscription plans...');
-
-        // Get current user details
-        const currentUser = await authService.getCurrentUser();
-        console.log('👤 Current user data:', currentUser);
+        // Check authentication first
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          console.log('🚪 No authentication token found');
+          toast.error('Please log in to view subscription plans');
+          return;
+        }
 
         const userContext = {
-          role: currentUser.user?.role || currentUser.role,
-          pgId: currentUser.user?.pgId || currentUser.pgId,
-          email: currentUser.user?.email || currentUser.email
+          role: user?.role || 'admin',
+          userPGId: user?.pgId,
+          userEmail: user?.email
         };
 
-        console.log('📋 User context for plans API:', userContext);
-
-        // Dispatch with user context
+        console.log('📋 Fetching plans with user context:', userContext);
         const result = await dispatch(fetchAvailablePlans(userContext));
-        console.log('📦 Plans fetch result:', result);
+
+        if (result.payload && result.payload.length > 0) {
+          console.log('✅ Plans loaded successfully:', result.payload.length, 'plans');
+        }
       } catch (error) {
         console.error('❌ Error fetching available plans:', error);
+
+        // Check if it's an authentication error
+        if (error.response?.status === 401 || error.response?.data?.message?.includes('Access denied')) {
+          console.log('🚪 Authentication error - redirecting to login');
+          toast.error('Session expired. Please log in again.');
+          // Redirect to admin login
+          window.location.href = '/admin/login';
+          return;
+        }
+
         toast.error('Failed to fetch available plans');
       }
     };
 
-    fetchPlans();
-  }, [dispatch]);
+    // Only fetch if user is authenticated
+    if (user && localStorage.getItem('accessToken')) {
+      fetchPlans();
+    } else {
+      console.log('⚠️ User not authenticated, skipping plans fetch');
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
     if (currentPlan) {

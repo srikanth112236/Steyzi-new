@@ -46,9 +46,15 @@ const PermissionAction = ({
   // Clone children and add disabled state and click handler
   const enhancedChildren = React.Children.map(children, (child) => {
     if (React.isValidElement(child)) {
+      const originalOnClick = child.props.onClick;
       return React.cloneElement(child, {
         disabled: isDisabled,
-        onClick: handleClick,
+        onClick: (e) => {
+          handleClick(e);
+          if (!isDisabled && originalOnClick) {
+            originalOnClick(e);
+          }
+        },
         className: `${child.props.className || ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`.trim(),
         title: isDisabled && showTooltip ? getTooltipMessage() : child.props.title,
         ...props

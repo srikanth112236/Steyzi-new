@@ -13,8 +13,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Globe,
-  Palette,
   Settings as SettingsIcon,
   CheckCircle,
   AlertCircle,
@@ -42,6 +40,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import paymentInfoService from '../../services/paymentInfo.service';
 import BranchManagement from '../../components/admin/BranchManagement';
 import PaymentInfoForm from '../../components/admin/PaymentInfoForm';
 import PaymentSummary from '../../components/admin/PaymentSummary';
@@ -62,9 +61,7 @@ const Settings = () => {
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
-    language: 'en',
-    theme: 'light'
+    phone: ''
   });
   const [pgData, setPgData] = useState({
     name: '',
@@ -146,8 +143,8 @@ const Settings = () => {
       return;
     }
 
-    if (user?.role !== 'admin') {
-      toast.error('Access denied. Admin privileges required.');
+    if (!['admin', 'maintainer'].includes(user?.role)) {
+      toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
     }
@@ -180,9 +177,9 @@ const Settings = () => {
   const loadPaymentData = async () => {
     try {
       if (selectedBranch) {
-        const response = await api.get(`/payment-info/${selectedBranch._id}`);
-        if (response.data.success && response.data.data) {
-          const paymentData = response.data.data;
+        const response = await paymentInfoService.getPaymentInfo(selectedBranch._id);
+        if (response.success && response.data) {
+          const paymentData = response.data;
           // Pre-fill payment form with onboarding data
           setPgData(prev => ({
             ...prev,
@@ -226,13 +223,17 @@ const Settings = () => {
       if (response.data.success) {
         const { user: userData, pgInfo } = response.data.data;
         
+        if (!userData) {
+          console.warn('⚠️ User data not found in response');
+          toast.error('User profile not found. Please log in again.');
+          return;
+        }
+        
         setProfileData({
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
           email: userData.email || '',
-          phone: userData.phone || '',
-          language: userData.language || 'en',
-          theme: userData.theme || 'light'
+          phone: userData.phone || ''
         });
 
        
@@ -247,11 +248,27 @@ const Settings = () => {
           console.log('⚠️ Using default notification preferences:', notifError.message);
           // Keep default notification preferences
         }
+      } else {
+        console.warn('⚠️ Profile response was not successful:', response.data);
+        toast.error(response.data.message || 'Failed to load profile data');
       }
     } catch (error) {
       console.error('❌ Error loading profile data:', error);
       console.error('❌ Error response:', error.response?.data);
-      toast.error('Failed to load profile data');
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        const errorMessage = error.response?.data?.message || 'User not found';
+        console.error('❌ User not found (404):', errorMessage);
+        toast.error(errorMessage);
+      } else if (error.response?.status === 401) {
+        console.error('❌ Unauthorized (401): Token may be invalid');
+        toast.error('Session expired. Please log in again.');
+        // Optionally redirect to login
+        // navigate('/login');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to load profile data');
+      }
     } finally {
       setLoading(false);
     }
@@ -340,8 +357,8 @@ const Settings = () => {
     }));
   };
 
-  // Check if user is admin
-  if (!user || user?.role !== 'admin') {
+  // Check if user is admin or maintainer
+  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
@@ -373,201 +390,98 @@ const Settings = () => {
   }
 
   const renderProfileTab = () => (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Enhanced Header */}
-      {/* <div className="text-center sm:text-left bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 border border-blue-100">
-        <div className="flex items-center justify-center sm:justify-start mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-            <User className="h-6 w-6 text-white" />
+    <div className="max-w-full mx-auto space-y-6">
+      {/* Compact Header */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center mb-4">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+            <User className="h-5 w-5 text-white" />
           </div>
-          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Profile Information</h3>
+            <p className="text-sm text-gray-600">Update your personal details</p>
+          </div>
         </div>
-        <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
-          Profile Settings
-        </h3>
-        <p className="text-gray-600 text-base leading-relaxed max-w-2xl">
-          Manage your personal information and account details to keep your profile up to date.
-        </p>
-      </div> */}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Personal Information - Enhanced */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-              <User className="h-5 w-5 text-white" />
+        
+        {/* Compact Form */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-gray-700">First Name</label>
+              <input
+                type="text"
+                value={profileData.firstName}
+                onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm"
+                placeholder="Enter first name"
+              />
             </div>
-            <div className="w-3 h-3 bg-emerald-500 rounded-full mr-3"></div>
-            <div>
-              <h4 className="text-lg font-bold text-gray-900">Personal Information</h4>
-              <p className="text-sm text-gray-600">Update your personal details</p>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-gray-700">Last Name</label>
+              <input
+                type="text"
+                value={profileData.lastName}
+                onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm"
+                placeholder="Enter last name"
+              />
             </div>
           </div>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-800 mb-2">First Name</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={profileData.firstName}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium"
-                    placeholder="Enter your first name"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-800 mb-2">Last Name</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={profileData.lastName}
-                    onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium"
-                    placeholder="Enter your last name"
-                  />
-                </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-gray-700">Email Address</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail className="h-4 w-4 text-gray-400" />
               </div>
+              <input
+                type="email"
+                value={profileData.email}
+                onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm"
+                placeholder="your.email@example.com"
+              />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium"
-                  placeholder="your.email@example.com"
-                />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-gray-700">Phone Number</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Phone className="h-4 w-4 text-gray-400" />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Phone Number</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="tel"
-                  value={profileData.phone}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium"
-                  placeholder="Enter your phone number"
-                />
-              </div>
+              <input
+                type="tel"
+                value={profileData.phone}
+                onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm"
+                placeholder="Enter phone number"
+              />
             </div>
           </div>
         </div>
 
-        {/* Preferences - Enhanced */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-              <SettingsIcon className="h-5 w-5 text-white" />
-            </div>
-            <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
-            <div>
-              <h4 className="text-lg font-bold text-gray-900">Preferences</h4>
-              <p className="text-sm text-gray-600">Customize your experience</p>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Language</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Globe className="h-4 w-4 text-gray-400" />
-                </div>
-                <select
-                  value={profileData.language}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, language: e.target.value }))}
-                  className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium appearance-none"
-                >
-                  <option value="en">🇺🇸 English</option>
-                  <option value="hi">🇮🇳 Hindi</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">Theme</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Palette className="h-4 w-4 text-gray-400" />
-                </div>
-                <select
-                  value={profileData.theme}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, theme: e.target.value }))}
-                  className="w-full pl-12 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 bg-gray-50 hover:bg-white focus:bg-white text-sm font-medium appearance-none"
-                >
-                  <option value="light">☀️ Light</option>
-                  <option value="dark">🌙 Dark</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Enhanced Quick Settings */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h5 className="text-base font-bold text-gray-900">Quick Settings</h5>
-                  <p className="text-sm text-gray-600">Instant access to common preferences</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 hover:shadow-sm transition-all duration-200 cursor-pointer">
-                  <div className="text-2xl mb-2">🔔</div>
-                  <p className="text-sm font-semibold text-gray-800">Notifications</p>
-                  <p className="text-xs text-gray-600">Manage alerts</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 hover:shadow-sm transition-all duration-200 cursor-pointer">
-                  <div className="text-2xl mb-2">🔒</div>
-                  <p className="text-sm font-semibold text-gray-800">Privacy</p>
-                  <p className="text-xs text-gray-600">Security settings</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Compact Save Button - Aligned at bottom */}
+        <div className="flex justify-end pt-4 mt-6 border-t border-gray-200">
+          <button
+            onClick={handleProfileUpdate}
+            disabled={loading}
+            className="flex items-center px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
         </div>
-      </div>
-
-      {/* Enhanced Save Button */}
-      <div className="flex justify-center pt-6">
-        <button
-          onClick={handleProfileUpdate}
-          disabled={loading}
-          className="group flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white rounded-2xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-1"
-        >
-          <Save className="h-5 w-5 mr-3 group-hover:animate-pulse" />
-          <span>{loading ? 'Saving Changes...' : 'Save Changes'}</span>
-          {loading && (
-            <div className="ml-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
-            </div>
-          )}
-        </button>
       </div>
     </div>
   );
@@ -575,7 +489,7 @@ const Settings = () => {
   const renderSecurityTab = () => (
     <div className="space-y-8">
       
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <div className="flex items-center mb-8">
             <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mr-4">
@@ -671,7 +585,7 @@ const Settings = () => {
         <p className="text-gray-600 text-lg">Configure your email and notification preferences.</p>
       </div>
       
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <div className="flex items-center mb-8">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mr-4">
@@ -918,7 +832,7 @@ const Settings = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-auto">
-          <div className={`p-4 sm:p-6 ${activeTab === 'maintainers' ? 'w-full' : 'max-w-6xl mx-auto'}`}>
+          <div className={`p-4 sm:p-6 ${activeTab === 'maintainers' ? 'w-full' : 'max-w-full mx-auto'}`}>
             {renderTabContent()}
           </div>
         </div>

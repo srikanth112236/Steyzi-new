@@ -291,8 +291,50 @@ class AuthService {
       if (user.role === 'maintainer') {
         // Fetch maintainer profile
         const Maintainer = require('../models/maintainer.model');
+        const User = require('../models/user.model');
+        const UserSubscription = require('../models/userSubscription.model');
+        const PG = require('../models/pg.model');
+
         const maintainer = await Maintainer.findById(user.maintainerProfile)
           .populate('branches');
+
+        // Find the admin who created this maintainer
+        const admin = await User.findOne({ 
+          pgId: user.pgId, 
+          role: 'admin' 
+        });
+
+        if (!admin) {
+          throw new Error('No associated admin found for this maintainer');
+        }
+
+        // Find PG details
+        const pg = await PG.findById(user.pgId);
+        if (!pg) {
+          throw new Error('PG not found for this maintainer');
+        }
+
+        // Check admin's subscription
+        let activeSubscription = await UserSubscription.findOne({
+          userId: admin._id,
+          status: { $in: ['active', 'trial'] },
+          endDate: { $gt: new Date() }
+        }).populate('subscriptionPlanId');
+
+        // If no active subscription found, try to activate a free trial
+        if (!activeSubscription) {
+          const SubscriptionManagementService = require('./subscriptionManagement.service');
+          const trialResult = await SubscriptionManagementService.activateFreeTrial(admin._id, admin._id);
+          
+          if (trialResult.success) {
+            // Refetch the newly created trial subscription
+            activeSubscription = await UserSubscription.findOne({
+              userId: admin._id,
+              status: { $in: ['active', 'trial'] },
+              endDate: { $gt: new Date() }
+            }).populate('subscriptionPlanId');
+          }
+        }
 
         // Add maintainer-specific data to response
         additionalUserInfo = {
@@ -300,7 +342,23 @@ class AuthService {
           role: 'maintainer',
           assignedBranches: maintainer.branches.map(branch => branch._id),
           specialization: maintainer.specialization,
-          maintainerStatus: maintainer.status
+          maintainerStatus: maintainer.status,
+          pgName: pg.name,
+          pgAddress: pg.address,
+          subscription: activeSubscription ? {
+            status: activeSubscription.status,
+            planName: activeSubscription.subscriptionPlanId?.name,
+            endDate: activeSubscription.endDate,
+            billingCycle: activeSubscription.billingCycle,
+            trialEndDate: activeSubscription.trialEndDate,
+            modules: activeSubscription.subscriptionPlanId?.modules,
+            features: activeSubscription.subscriptionPlanId?.features
+          } : {
+            status: 'free',
+            planName: 'Free Basic Plan',
+            modules: [],
+            features: []
+          }
         };
       }
 

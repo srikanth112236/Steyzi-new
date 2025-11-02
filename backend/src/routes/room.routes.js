@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, adminOrSuperadmin } = require('../middleware/auth.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const RoomService = require('../services/room.service');
 const SubscriptionValidationService = require('../services/subscriptionValidation.service');
 const logger = require('../utils/logger');
@@ -10,9 +11,10 @@ const logger = require('../utils/logger');
  * @desc    Create a new room with subscription validation
  * @access  Private (Admin/Superadmin)
  */
-router.post('/', 
-  authenticate, 
+router.post('/',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const roomData = {
@@ -84,9 +86,10 @@ router.post('/',
  * @desc    Bulk upload rooms with subscription validation
  * @access  Private (Admin/Superadmin)
  */
-router.post('/bulk-upload', 
-  authenticate, 
+router.post('/bulk-upload',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { rooms, pgId } = req.body;

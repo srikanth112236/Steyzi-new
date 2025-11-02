@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import authService from '../../services/auth.service';
 
-const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
+const SupportStaffForm = ({ isOpen, onClose, onSuccess, editingStaff = null, isEditing = false }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -38,23 +38,36 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
     feedback: []
   });
 
-  // Reset form when modal opens
+  // Reset form when modal opens or editing staff changes
   useEffect(() => {
     if (isOpen) {
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        password: '',
-        confirmPassword: ''
-      });
+      if (isEditing && editingStaff) {
+        // Populate form with existing staff data
+        setFormData({
+          firstName: editingStaff.firstName || '',
+          lastName: editingStaff.lastName || '',
+          email: editingStaff.email || '',
+          phone: editingStaff.phone || '',
+          password: '',
+          confirmPassword: ''
+        });
+      } else {
+        // Reset form for new staff
+        setFormData({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: ''
+        });
+      }
       setFieldErrors({});
       setError('');
       setSuccess('');
       setPasswordStrength({ score: 0, feedback: [] });
     }
-  }, [isOpen]);
+  }, [isOpen, isEditing, editingStaff]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -141,14 +154,14 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
         return '';
       
       case 'password':
-        if (!value.trim()) return 'Password is required';
-        if (value.length < 8) return 'Password must be at least 8 characters';
-        if (passwordStrength.score < 3) return 'Password is too weak';
+        if (!isEditing && !value.trim()) return 'Password is required';
+        if (value.trim() && value.length < 8) return 'Password must be at least 8 characters';
+        if (value.trim() && passwordStrength.score < 3) return 'Password is too weak';
         return '';
-      
+
       case 'confirmPassword':
-        if (!value.trim()) return 'Please confirm your password';
-        if (value !== formData.password) return 'Passwords do not match';
+        if (!isEditing && !value.trim()) return 'Please confirm your password';
+        if (value.trim() && value !== formData.password) return 'Passwords do not match';
         return '';
       
       default:
@@ -175,7 +188,7 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -183,30 +196,67 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
     setSuccess('');
 
     try {
-      console.log('🔍 SupportStaffForm: Starting support staff registration...');
-      
-      const response = await authService.registerSupportStaff(formData);
-      
-      if (response.success) {
-        console.log('✅ SupportStaffForm: Registration successful');
-        setSuccess('Support staff registered successfully! An email has been sent with login credentials.');
-        
-        // Call success callback
-        if (onSuccess) {
-          onSuccess();
+      if (isEditing && editingStaff) {
+        console.log('🔍 SupportStaffForm: Starting support staff update...');
+
+        // Prepare update data (exclude password if empty)
+        const updateData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone
+        };
+
+        // Only include password if it's provided
+        if (formData.password.trim()) {
+          updateData.password = formData.password;
         }
-        
-        // Close modal after delay
-        setTimeout(() => {
-          onClose();
-        }, 2000);
+
+        const response = await authService.updateUser(editingStaff._id, updateData);
+
+        if (response.success) {
+          console.log('✅ SupportStaffForm: Update successful');
+          setSuccess('Support staff updated successfully!');
+
+          // Call success callback
+          if (onSuccess) {
+            onSuccess();
+          }
+
+          // Close modal after delay
+          setTimeout(() => {
+            onClose();
+          }, 2000);
+        } else {
+          console.log('❌ SupportStaffForm: Update failed:', response.message);
+          setError(response.message || 'Update failed');
+        }
       } else {
-        console.log('❌ SupportStaffForm: Registration failed:', response.message);
-        setError(response.message || 'Registration failed');
+        console.log('🔍 SupportStaffForm: Starting support staff registration...');
+
+        const response = await authService.registerSupportStaff(formData);
+
+        if (response.success) {
+          console.log('✅ SupportStaffForm: Registration successful');
+          setSuccess('Support staff registered successfully! An email has been sent with login credentials.');
+
+          // Call success callback
+          if (onSuccess) {
+            onSuccess();
+          }
+
+          // Close modal after delay
+          setTimeout(() => {
+            onClose();
+          }, 2000);
+        } else {
+          console.log('❌ SupportStaffForm: Registration failed:', response.message);
+          setError(response.message || 'Registration failed');
+        }
       }
     } catch (error) {
-      console.error('❌ SupportStaffForm: Registration error:', error);
-      setError(error.message || 'Registration failed. Please try again.');
+      console.error(`❌ SupportStaffForm: ${isEditing ? 'Update' : 'Registration'} error:`, error);
+      setError(error.message || `${isEditing ? 'Update' : 'Registration'} failed. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -280,10 +330,10 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                     <div>
                       <h3 id="modal-title" className="text-xl font-semibold text-white">
-                        Add Support Staff
+                        {isEditing ? 'Edit Support Staff' : 'Add Support Staff'}
                       </h3>
                       <p className="text-orange-100 text-sm">
-                        Create a new support staff account
+                        {isEditing ? 'Update support staff information' : 'Create a new support staff account'}
                       </p>
                     </div>
                   </div>
@@ -444,7 +494,7 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
-                        Password *
+                        Password {isEditing ? '(Optional)' : '*'}
                       </label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -520,7 +570,7 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
 
                     <div className="space-y-2">
                       <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700">
-                        Confirm Password *
+                        Confirm Password {isEditing ? '(Optional)' : '*'}
                       </label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -609,10 +659,10 @@ const SupportStaffForm = ({ isOpen, onClose, onSuccess }) => {
                       {loading ? (
                         <div className="flex items-center">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Adding...
+                          {isEditing ? 'Updating...' : 'Adding...'}
                         </div>
                       ) : (
-                        'Add Support Staff'
+                        isEditing ? 'Update Support Staff' : 'Add Support Staff'
                       )}
                     </button>
                   </div>

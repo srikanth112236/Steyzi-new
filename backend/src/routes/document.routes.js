@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const { authenticate, adminOrSuperadmin } = require('../middleware/auth.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const { validateDocumentUpload, validateDocumentMetadata } = require('../middleware/validation.middleware');
 const documentService = require('../services/document.service');
 const activityService = require('../services/activity.service');
@@ -40,9 +41,10 @@ const upload = multer({
  * @desc    Upload a document for a resident
  * @access  Private (Admin/Superadmin)
  */
-router.post('/upload/:residentId', 
-  authenticate, 
+router.post('/upload/:residentId',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   upload.single('document'),
   validateDocumentUpload,
   async (req, res) => {
@@ -108,9 +110,10 @@ router.post('/upload/:residentId',
  * @desc    Get all documents for a resident
  * @access  Private (Admin/Superadmin)
  */
-router.get('/resident/:residentId', 
-  authenticate, 
+router.get('/resident/:residentId',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { residentId } = req.params;
@@ -142,9 +145,10 @@ router.get('/resident/:residentId',
  * @desc    Get document statistics for a resident
  * @access  Private (Admin/Superadmin)
  */
-router.get('/resident/:residentId/stats', 
-  authenticate, 
+router.get('/resident/:residentId/stats',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { residentId } = req.params;
@@ -170,9 +174,10 @@ router.get('/resident/:residentId/stats',
  * @desc    Get document types with counts for a resident
  * @access  Private (Admin/Superadmin)
  */
-router.get('/resident/:residentId/types', 
-  authenticate, 
+router.get('/resident/:residentId/types',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { residentId } = req.params;
@@ -198,9 +203,10 @@ router.get('/resident/:residentId/types',
  * @desc    Get document by ID
  * @access  Private (Admin/Superadmin)
  */
-router.get('/:documentId', 
-  authenticate, 
+router.get('/:documentId',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { documentId } = req.params;
@@ -226,9 +232,10 @@ router.get('/:documentId',
  * @desc    Download a document
  * @access  Private (Admin/Superadmin)
  */
-router.get('/:documentId/download', 
-  authenticate, 
+router.get('/:documentId/download',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { documentId } = req.params;
@@ -269,9 +276,10 @@ router.get('/:documentId/download',
  * @desc    Get document preview
  * @access  Private (Admin/Superadmin)
  */
-router.get('/:documentId/preview', 
-  authenticate, 
+router.get('/:documentId/preview',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { documentId } = req.params;
@@ -297,9 +305,10 @@ router.get('/:documentId/preview',
  * @desc    Update document metadata
  * @access  Private (Admin/Superadmin)
  */
-router.put('/:documentId/metadata', 
-  authenticate, 
+router.put('/:documentId/metadata',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   validateDocumentMetadata,
   async (req, res) => {
     try {
@@ -344,9 +353,10 @@ router.put('/:documentId/metadata',
  * @desc    Delete a document
  * @access  Private (Admin/Superadmin)
  */
-router.delete('/:documentId', 
-  authenticate, 
+router.delete('/:documentId',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { documentId } = req.params;
@@ -388,9 +398,10 @@ router.delete('/:documentId',
  * @desc    Verify a document
  * @access  Private (Admin/Superadmin)
  */
-router.post('/:documentId/verify', 
-  authenticate, 
+router.post('/:documentId/verify',
+  authenticate,
   adminOrSuperadmin,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { documentId } = req.params;

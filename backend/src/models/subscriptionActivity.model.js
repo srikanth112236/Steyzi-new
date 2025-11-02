@@ -206,7 +206,7 @@ subscriptionActivitySchema.statics.getUserActivitySummary = async function(userI
   const pipeline = [
     {
       $match: {
-        userId: mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(userId),
         timestamp: { $gte: startTime }
       }
     },
@@ -280,7 +280,7 @@ subscriptionActivitySchema.statics.getFraudIndicators = async function(userId) {
   const indicators = await this.aggregate([
     {
       $match: {
-        userId: mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(userId),
         timestamp: { $gte: sevenDaysAgo }
       }
     },

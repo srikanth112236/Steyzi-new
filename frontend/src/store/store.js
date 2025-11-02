@@ -10,11 +10,21 @@ import branchReducer from './slices/branch.slice';
 import notificationsReducer from './slices/notifications.slice';
 import subscriptionReducer from './slices/subscription.slice';
 
-// Persist configuration
+// Persist configuration with migrations
 const persistConfig = {
   key: 'root',
   storage,
   whitelist: ['auth', 'branch', 'subscription'], // Persist auth, branch, and subscription state
+  migrate: (state) => {
+    // Ensure branch.branches is always an array
+    if (state && state.branch) {
+      if (!Array.isArray(state.branch.branches)) {
+        console.warn('Redux persist: Fixing corrupted branch.branches state');
+        state.branch.branches = [];
+      }
+    }
+    return Promise.resolve(state);
+  },
 };
 
 // Combine reducers

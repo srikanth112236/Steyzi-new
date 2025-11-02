@@ -301,44 +301,6 @@ const BranchManagement = () => {
     }
   };
 
-  const handleSetDefault = async (branchId) => {
-    try {
-      const loadingToast = toast.loading('Setting default branch...');
-      
-      const response = await fetch(`/api/branches/${branchId}/set-default`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache' // Prevent caching
-        }
-      });
-      
-      const data = await response.json();
-      
-      toast.dismiss(loadingToast);
-      
-      if (data.success) {
-        console.log('Default branch set successfully:', data);
-        
-        // Wait a bit for database operations to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Force refresh the branches list with cache busting
-        setLoading(true);
-        await fetchBranchesAndMaintainers(); // Refresh both branches and maintainers
-        
-        toast.success(`Default branch updated to "${data.data?.name || data.name || 'selected branch'}" successfully!`);
-      } else {
-        console.error('Failed to set default branch:', data);
-        
-        toast.error(data.message || 'Failed to set default branch');
-      }
-    } catch (error) {
-      console.error('Error setting default branch:', error);
-      toast.error('Failed to set default branch');
-    }
-  };
 
 
   // Reset form to initial state
@@ -877,15 +839,6 @@ const BranchManagement = () => {
                     
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      {!branch.isDefault && (
-                        <button
-                          onClick={() => handleSetDefault(branch._id)}
-                          className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-md border border-yellow-200 hover:border-yellow-300 transition-colors"
-                          title="Make Default"
-                        >
-                          <Star className="h-4 w-4" />
-                        </button>
-                      )}
                       <button
                         onClick={() => handleEdit(branch)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-md border border-blue-200 hover:border-blue-300 transition-colors"
@@ -1002,15 +955,6 @@ const BranchManagement = () => {
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
-                      {!branch.isDefault && (
-                        <button
-                          onClick={() => handleSetDefault(branch._id)}
-                          className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded border border-yellow-200 transition-colors"
-                        >
-                          <Star className="h-3 w-3" />
-                          <span>Make Default</span>
-                        </button>
-                      )}
                       <button
                         onClick={() => handleEdit(branch)}
                         className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded border border-blue-200 transition-colors"

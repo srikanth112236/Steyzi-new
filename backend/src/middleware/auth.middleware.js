@@ -148,8 +148,10 @@ const authenticate = async (req, res, next) => {
     }
 
     // Attach user and user type to request
+    const userObject = user.toObject ? user.toObject() : user;
     req.user = {
-      ...(user.toObject ? user.toObject() : user),
+      ...userObject,
+      id: userObject._id || userObject.id, // Ensure id is always set
       salesRole: decoded.salesRole || user.salesRole || userType
     };
     req.userType = userType;
@@ -362,10 +364,19 @@ const adminOrSuperadmin = (req, res, next) => {
     });
   }
 
-  if (!['admin', 'superadmin'].includes(req.user.role)) {
+  // Allow maintainers to access admin routes by inheriting admin's permissions
+  if (!['admin', 'superadmin', 'maintainer'].includes(req.user.role)) {
     return res.status(403).json({
       success: false,
       message: 'Access denied. Admin or Superadmin privileges required.'
+    });
+  }
+
+  // If maintainer, ensure they are associated with a PG
+  if (req.user.role === 'maintainer' && !req.user.pgId) {
+    return res.status(403).json({
+      success: false,
+      message: 'Maintainer not associated with a PG.'
     });
   }
 
@@ -386,10 +397,19 @@ const adminOnly = (req, res, next) => {
     });
   }
 
-  if (req.user.role !== 'admin') {
+  // Allow maintainers to access admin routes by inheriting admin's permissions
+  if (req.user.role !== 'admin' && req.user.role !== 'maintainer') {
     return res.status(403).json({
       success: false,
       message: 'Access denied. Admin privileges required.'
+    });
+  }
+
+  // If maintainer, ensure they are associated with a PG
+  if (req.user.role === 'maintainer' && !req.user.pgId) {
+    return res.status(403).json({
+      success: false,
+      message: 'Maintainer not associated with a PG.'
     });
   }
 

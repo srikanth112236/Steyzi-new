@@ -87,7 +87,7 @@ router.get('/pg/:pgId/info', async (req, res) => {
   try {
     const PG = require('../models/pg.model');
     const pg = await PG.findById(req.params.pgId).select('name address contactNumber email');
-    
+
     if (!pg) {
       return res.status(404).json({
         success: false,
@@ -117,5 +117,8 @@ router.get('/pg/:pgId/info', async (req, res) => {
     });
   }
 });
+
+// Razorpay webhook endpoint (Public - for payment processing)
+router.post('/webhook', require('../controllers/subscriptionPayment.controller').handleWebhook);
 
 module.exports = router; 

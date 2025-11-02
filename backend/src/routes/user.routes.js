@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticate, superadminOnly, adminOnly } = require('../middleware/auth.middleware');
 const { checkTrialExpiration } = require('../middleware/subscription.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const AuthService = require('../services/auth.service');
 const UserService = require('../services/user.service');
 const { validateRequest, schemas } = require('../middleware/validation.middleware');
@@ -18,10 +19,33 @@ const pgService = require('../services/pg.service');
  */
 router.get('/profile', authenticate, async (req, res) => {
   try {
-    const result = await UserService.getUserProfile(req.user.id);
+    const userId = req.user._id || req.user.id;
+    console.log('🔍 Profile route - User ID from req.user:', {
+      _id: req.user._id,
+      id: req.user.id,
+      userId,
+      userRole: req.user.role,
+      userEmail: req.user.email
+    });
+    
+    if (!userId) {
+      console.error('❌ Profile route - No user ID found in request');
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request.'
+      });
+    }
+    
+    const result = await UserService.getUserProfile(userId);
+    console.log('✅ Profile route - Result:', {
+      success: result.success,
+      statusCode: result.statusCode,
+      hasUser: !!result.data?.user
+    });
+    
     return res.status(result.statusCode).json(result);
   } catch (error) {
-    console.error('Get profile route error:', error);
+    console.error('❌ Get profile route error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to get profile.',
@@ -37,7 +61,14 @@ router.get('/profile', authenticate, async (req, res) => {
  */
 router.put('/profile', authenticate, validateRequest(schemas.updateProfile), async (req, res) => {
   try {
-    const result = await UserService.updateUserProfile(req.user.id, req.body);
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request.'
+      });
+    }
+    const result = await UserService.updateUserProfile(userId, req.body);
     return res.status(result.statusCode).json(result);
   } catch (error) {
     console.error('Update profile route error:', error);
@@ -84,7 +115,14 @@ router.get('/support-profile', authenticate, async (req, res) => {
  */
 router.put('/change-password', authenticate, validateRequest(schemas.changePassword), async (req, res) => {
   try {
-    const result = await UserService.changePassword(req.user.id, req.body);
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request.'
+      });
+    }
+    const result = await UserService.changePassword(userId, req.body);
     return res.status(result.statusCode).json(result);
   } catch (error) {
     console.error('Change password route error:', error);
@@ -101,7 +139,7 @@ router.put('/change-password', authenticate, validateRequest(schemas.changePassw
  * @desc    Get PG information for admin user
  * @access  Private (Admin)
  */
-router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, async (req, res) => {
+router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, trackAdminActivity(), async (req, res) => {
   try {
     const result = await pgService.getPGInfo(req.user.pgId);
     return res.status(result.statusCode).json(result);
@@ -120,10 +158,11 @@ router.get('/pg-info', authenticate, adminOnly, checkTrialExpiration, async (req
  * @desc    Update PG information (admin only)
  * @access  Private (Admin)
  */
-router.put('/pg-info', authenticate, adminOnly, checkTrialExpiration, validateRequest(schemas.updatePG), async (req, res) => {
+router.put('/pg-info', authenticate, adminOnly, checkTrialExpiration, validateRequest(schemas.updatePG), trackAdminActivity(), async (req, res) => {
   try {
+    const userId = req.user._id || req.user.id;
     console.log('🔍 PG Update Request:', {
-      userId: req.user.id,
+      userId: userId,
       pgId: req.user.pgId,
       body: req.body
     });
@@ -159,7 +198,14 @@ router.put('/pg-info', authenticate, adminOnly, checkTrialExpiration, validateRe
  */
 router.get('/notifications', authenticate, async (req, res) => {
   try {
-    const result = await UserService.getNotificationPreferences(req.user.id);
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request.'
+      });
+    }
+    const result = await UserService.getNotificationPreferences(userId);
     return res.status(result.statusCode).json(result);
   } catch (error) {
     console.error('Get notifications route error:', error);
@@ -178,7 +224,14 @@ router.get('/notifications', authenticate, async (req, res) => {
  */
 router.put('/notifications', authenticate, validateRequest(schemas.notificationPreferences), async (req, res) => {
   try {
-    const result = await UserService.updateNotificationPreferences(req.user.id, req.body);
+    const userId = req.user._id || req.user.id;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found in request.'
+      });
+    }
+    const result = await UserService.updateNotificationPreferences(userId, req.body);
     return res.status(result.statusCode).json(result);
   } catch (error) {
     console.error('Update notifications route error:', error);
@@ -195,7 +248,7 @@ router.put('/notifications', authenticate, validateRequest(schemas.notificationP
  * @desc    Get all users with lock status (superadmin only)
  * @access  Private (Superadmin)
  */
-router.get('/', authenticate, superadminOnly, async (req, res) => {
+router.get('/', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const result = await AuthService.getUsersWithLockStatus();
     return res.status(result.statusCode).json(result);
@@ -214,7 +267,7 @@ router.get('/', authenticate, superadminOnly, async (req, res) => {
  * @desc    Unlock user account (superadmin only)
  * @access  Private (Superadmin)
  */
-router.post('/:userId/unlock', authenticate, superadminOnly, async (req, res) => {
+router.post('/:userId/unlock', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await AuthService.unlockUserAccount(userId);

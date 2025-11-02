@@ -3,6 +3,7 @@ const router = express.Router();
 const subscriptionController = require('../controllers/subscription.controller');
 const { authenticate, authorize, superadminOnly } = require('../middleware/auth.middleware');
 const { validateSubscription, validateCalculation } = require('../middleware/subscriptionValidator.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const {
   enhancedAuthMiddleware,
   atomicUsageMiddleware,
@@ -44,6 +45,7 @@ router.post('/:id/calculate',
 router.get('/pgs-for-custom-plans',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.getPGsForCustomPlans
 );
@@ -59,6 +61,7 @@ router.post('/:id/request-upgrade',
 router.get('/:id/upgrade-requests',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.getUpgradeRequests
 );
@@ -66,6 +69,7 @@ router.get('/:id/upgrade-requests',
 router.post('/:id/upgrade-requests/:requestId/respond',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.respondToUpgradeRequest
 );
@@ -74,6 +78,7 @@ router.post('/:id/upgrade-requests/:requestId/respond',
 router.get('/stats/overview',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.getStatistics
 );
@@ -83,6 +88,7 @@ router.route('/')
   .get(
     authenticate,
     superadminOnly,
+    trackAdminActivity(),
     enhancedAuthMiddleware({ requireMFA: true }),
     secureQueryMiddleware(['status', 'billingCycle', 'isPopular', 'search', 'pgId', 'role', 'userPGId']),
     subscriptionController.getAllSubscriptions
@@ -90,6 +96,7 @@ router.route('/')
   .post(
     authenticate,
     superadminOnly,
+    trackAdminActivity(),
     enhancedAuthMiddleware({ requireMFA: true }),
     fraudDetectionMiddleware,
     validateSubscription,
@@ -100,12 +107,14 @@ router.route('/:id')
   .get(
     authenticate,
     superadminOnly,
+    trackAdminActivity(),
     enhancedAuthMiddleware({ requireMFA: true }),
     subscriptionController.getSubscriptionById
   )
   .put(
     authenticate,
     superadminOnly,
+    trackAdminActivity(),
     enhancedAuthMiddleware({ requireMFA: true }),
     fraudDetectionMiddleware,
     validateSubscription,
@@ -114,6 +123,7 @@ router.route('/:id')
   .delete(
     authenticate,
     superadminOnly,
+    trackAdminActivity(),
     enhancedAuthMiddleware({ requireMFA: true }),
     subscriptionController.deleteSubscription
   );
@@ -122,6 +132,7 @@ router.route('/:id')
 router.post('/:id/duplicate',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.duplicateSubscription
 );
@@ -129,6 +140,7 @@ router.post('/:id/duplicate',
 router.patch('/:id/toggle-popular',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.togglePopular
 );
@@ -136,14 +148,16 @@ router.patch('/:id/toggle-popular',
 router.patch('/:id/toggle-recommended',
   authenticate,
   superadminOnly,
+  trackAdminActivity(),
   enhancedAuthMiddleware({ requireMFA: true }),
   subscriptionController.toggleRecommended
 );
 
 // Add route to fetch custom plans for a specific PG
-router.get('/custom/:pgId', 
-  authenticate, 
-  authorize(['superadmin', 'admin']), 
+router.get('/custom/:pgId',
+  authenticate,
+  authorize(['superadmin', 'admin']),
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { pgId } = req.params;

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const { validateBranchCreation } = require('../middleware/validation.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const branchController = require('../controllers/branch.controller');
 const Branch = require('../models/branch.model'); // Added missing import
 
@@ -9,6 +10,7 @@ const Branch = require('../models/branch.model'); // Added missing import
 router.post('/',
   authenticate,
   validateBranchCreation,
+  trackAdminActivity(),
   (req, res) => {
     branchController.createBranch(req, res);
   }
@@ -17,60 +19,68 @@ router.post('/',
 // Modify the GET '/' route
 router.get('/',
   authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       let branches;
-      
       if (req.user.role === 'maintainer') {
-        // Fetch maintainer's assigned branches
         const Maintainer = require('../models/maintainer.model');
         const maintainer = await Maintainer.findById(req.user.maintainerProfile)
-          .populate('branches');
-        
-        branches = maintainer.branches;
-      } else if (req.user.role === 'admin') {
-        // Admin sees all branches for their PG
-        const pgId = req.user.pgId;
-        if (!pgId) {
-          return res.status(400).json({
-            success: false,
-            message: 'No PG associated with this user'
+          .populate({
+            path: 'branches',
+            match: { status: 'active' },
+            select: 'name address capacity status'
+          });
+
+        if (!maintainer) {
+          return res.status(404).json({ 
+            success: false, 
+            message: 'Maintainer profile not found' 
           });
         }
-        branches = await Branch.find({ pgId });
+
+        branches = maintainer.branches || [];
+      } else if (req.user.role === 'admin') {
+        const pgId = req.user.pgId;
+        if (!pgId) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'No PG associated with this user' 
+          });
+        }
+        branches = await Branch.find({ 
+          pgId, 
+          status: 'active' 
+        });
       } else {
-        // Other roles get an empty list or throw an error
-        return res.status(403).json({
-          success: false,
-          message: 'Unauthorized to view branches'
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Unauthorized to view branches' 
         });
       }
 
-      // Add cache control headers
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
-        data: branches
+        data: {
+          branches,
+          branchCount: branches.length,
+          userRole: req.user.role
+        }
       });
     } catch (error) {
       console.error('Error fetching branches:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: 'Failed to fetch branches',
         error: error.message
       });
     }
-  }
-);
+  });
 
 // Get branches by PG ID
-router.get('/pg/:pgId', 
-  authenticate, 
+router.get('/pg/:pgId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { pgId } = req.params;
@@ -113,54 +123,21 @@ router.get('/pg/:pgId',
   }
 );
 
-// Set a branch as default
+// Set a branch as default - DISABLED: Only the first branch can be default
 router.patch('/:branchId/default', 
   authenticate, 
   async (req, res) => {
-    try {
-      const { branchId } = req.params;
-
-      // Validate branch ID
-      if (!branchId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Branch ID is required'
-        });
-      }
-
-      // Set branch as default
-      const updatedBranch = await branchController.setDefaultBranch(branchId);
-
-      // Return updated branch
-      return res.status(200).json({
-        success: true,
-        branch: updatedBranch
-      });
-    } catch (error) {
-      console.error('Error setting default branch:', error);
-      
-      // Handle different types of errors
-      if (error.name === 'ValidationError') {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Branch ID',
-          error: error.message
-        });
-      }
-
-      // Generic server error
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to set default branch',
-        error: error.message
-      });
-    }
+    return res.status(403).json({
+      success: false,
+      message: 'Setting default branch is not allowed. Only the first branch is automatically set as default and cannot be changed.'
+    });
   }
 );
 
 // Update a branch
-router.put('/:branchId', 
-  authenticate, 
+router.put('/:branchId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { branchId } = req.params;
@@ -212,8 +189,9 @@ router.put('/:branchId',
 );
 
 // Delete a branch
-router.delete('/:branchId', 
-  authenticate, 
+router.delete('/:branchId',
+  authenticate,
+  trackAdminActivity(),
   async (req, res) => {
     try {
       const { branchId } = req.params;
@@ -258,16 +236,18 @@ router.delete('/:branchId',
 );
 
 // Assign maintainer to a branch
-router.post('/assign-maintainer', 
-  authenticate, 
+router.post('/assign-maintainer',
+  authenticate,
+  trackAdminActivity(),
   (req, res) => {
     branchController.assignMaintainerToBranch(req, res);
   }
 );
 
 // Get branches with their assigned maintainers
-router.get('/with-maintainers', 
-  authenticate, 
+router.get('/with-maintainers',
+  authenticate,
+  trackAdminActivity(),
   (req, res) => {
     branchController.getBranchesWithMaintainers(req, res);
   }

@@ -3,6 +3,7 @@ const router = express.Router();
 const residentService = require('../services/resident.service');
 const { authenticate, adminOrSuperadmin } = require('../middleware/auth.middleware');
 const { validateResident } = require('../middleware/validation.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 const {
   atomicUsageMiddleware,
   fraudDetectionMiddleware,
@@ -19,7 +20,7 @@ const activityService = require('../services/activity.service');
 const AdvancedSubscriptionService = require('../services/advancedSubscription.service');
 
 // Get all residents for the user's PG
-router.get('/', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     console.log('🔍 Residents API - User:', { userId: req.user._id, pgId: pgId, branchId: req.query.branchId });
@@ -68,7 +69,7 @@ router.get('/', authenticate, adminOrSuperadmin, async (req, res) => {
 });
 
 // Get resident by ID
-router.get('/:residentId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/:residentId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getResidentById(req.params.residentId);
     return res.status(result.statusCode).json(result);
@@ -83,7 +84,7 @@ router.get('/:residentId', authenticate, adminOrSuperadmin, async (req, res) => 
 });
 
 // Get comprehensive resident details including payments, room history, and allocation
-router.get('/:residentId/details', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/:residentId/details', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getResidentComprehensiveDetails(req.params.residentId);
     return res.status(result.statusCode).json(result);
@@ -196,7 +197,7 @@ router.post('/',
 });
 
 // Update resident
-router.put('/:residentId', authenticate, adminOrSuperadmin, validateResident, async (req, res) => {
+router.put('/:residentId', authenticate, adminOrSuperadmin, validateResident, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.updateResident(req.params.residentId, req.body, req.user._id);
     try {
@@ -228,7 +229,7 @@ router.put('/:residentId', authenticate, adminOrSuperadmin, validateResident, as
 });
 
 // Delete resident
-router.delete('/:residentId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.delete('/:residentId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.deleteResident(req.params.residentId, req.user._id);
     try {
@@ -364,7 +365,7 @@ router.post('/:residentId/assign-room',
 });
 
 // Get residents by room
-router.get('/room/:roomId', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/room/:roomId', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getResidentsByRoom(req.params.roomId);
     return res.status(result.statusCode).json(result);
@@ -379,7 +380,7 @@ router.get('/room/:roomId', authenticate, adminOrSuperadmin, async (req, res) =>
 });
 
 // Get room details with beds
-router.get('/room/:roomId/beds', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/room/:roomId/beds', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getRoomWithBeds(req.params.roomId);
     return res.status(result.statusCode).json(result);
@@ -394,7 +395,7 @@ router.get('/room/:roomId/beds', authenticate, adminOrSuperadmin, async (req, re
 });
 
 // Get resident statistics
-router.get('/stats/overview', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/stats/overview', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -421,7 +422,7 @@ router.get('/stats/overview', authenticate, adminOrSuperadmin, async (req, res) 
 });
 
 // Search residents
-router.get('/search/query', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/search/query', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -458,7 +459,7 @@ router.get('/search/query', authenticate, adminOrSuperadmin, async (req, res) =>
 });
 
 // Export residents data
-router.get('/export/data', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/export/data', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -482,7 +483,7 @@ router.get('/export/data', authenticate, adminOrSuperadmin, async (req, res) => 
 });
 
 // Check room availability
-router.get('/check-availability/:roomId/:bedNumber', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/check-availability/:roomId/:bedNumber', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { roomId, bedNumber } = req.params;
     const { excludeResidentId } = req.query;
@@ -510,7 +511,7 @@ router.get('/check-availability/:roomId/:bedNumber', authenticate, adminOrSupera
 });
 
 // Get residents by status
-router.get('/status/:status', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/status/:status', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -536,7 +537,7 @@ router.get('/status/:status', authenticate, adminOrSuperadmin, async (req, res) 
 });
 
 // Bulk operations
-router.post('/bulk/status-update', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/bulk/status-update', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { residentIds, status } = req.body;
     
@@ -584,7 +585,7 @@ router.post('/bulk/status-update', authenticate, adminOrSuperadmin, async (req, 
 });
 
 // Bulk upload route for residents
-router.post('/bulk-upload', authenticate, adminOrSuperadmin, uploadExcelFile, handleExcelUploadError, async (req, res) => {
+router.post('/bulk-upload', authenticate, adminOrSuperadmin, uploadExcelFile, handleExcelUploadError, trackAdminActivity(), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -721,7 +722,7 @@ router.post('/:id/vacate',
 });
 
 // Onboard resident to room
-router.post('/onboard', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/onboard', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { 
       residentId, 
@@ -806,7 +807,7 @@ router.post('/onboard', authenticate, adminOrSuperadmin, async (req, res) => {
 });
 
 // Store allocation letter
-router.post('/allocation-letter', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/allocation-letter', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { residentId, fileName, allocationData } = req.body;
     
@@ -850,7 +851,7 @@ router.post('/allocation-letter', authenticate, adminOrSuperadmin, async (req, r
 });
 
 // Manual trigger for vacation processor
-router.post('/process-vacations', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/process-vacations', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.processScheduledVacations();
     return res.status(200).json({
@@ -869,7 +870,7 @@ router.post('/process-vacations', authenticate, adminOrSuperadmin, async (req, r
 });
 
 // Get overdue vacations
-router.get('/overdue-vacations', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/overdue-vacations', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getOverdueVacations();
     
@@ -944,7 +945,7 @@ router.get('/allocation-letter/:letterId/download', authenticate, async (req, re
 });
 
 // Update payment status for a specific resident
-router.put('/:residentId/payment-status', authenticate, adminOrSuperadmin, async (req, res) => {
+router.put('/:residentId/payment-status', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.calculateAndUpdatePaymentStatus(req.params.residentId);
     return res.status(result.statusCode).json(result);
@@ -959,7 +960,7 @@ router.put('/:residentId/payment-status', authenticate, adminOrSuperadmin, async
 });
 
 // Update payment status for all residents in PG
-router.put('/payment-status/update-all', authenticate, adminOrSuperadmin, async (req, res) => {
+router.put('/payment-status/update-all', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const pgId = req.user.pgId;
     if (!pgId) {
@@ -982,7 +983,7 @@ router.put('/payment-status/update-all', authenticate, adminOrSuperadmin, async 
 });
 
 // Switch resident room
-router.post('/:residentId/switch-room', authenticate, adminOrSuperadmin, async (req, res) => {
+router.post('/:residentId/switch-room', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { newRoomId, newBedNumber, reason, trackHistory = true } = req.body;
     
@@ -1035,7 +1036,7 @@ router.post('/:residentId/switch-room', authenticate, adminOrSuperadmin, async (
 });
 
 // Get available rooms for switching
-router.get('/switch/available-rooms', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/switch/available-rooms', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const { pgId, currentRoomId, sharingType } = req.query;
     
@@ -1064,7 +1065,7 @@ router.get('/switch/available-rooms', authenticate, adminOrSuperadmin, async (re
 });
 
 // Get resident switch history
-router.get('/:residentId/switch-history', authenticate, adminOrSuperadmin, async (req, res) => {
+router.get('/:residentId/switch-history', authenticate, adminOrSuperadmin, trackAdminActivity(), async (req, res) => {
   try {
     const result = await residentService.getResidentSwitchHistory(req.params.residentId);
     

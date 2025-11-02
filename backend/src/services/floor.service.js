@@ -247,12 +247,17 @@ class FloorService {
       }
 
       // Soft delete the floor
+      const floorName = floor.name;
       floor.isActive = false;
       await floor.save();
 
       return {
         success: true,
         message: 'Floor deleted successfully',
+        data: {
+          _id: floor._id,
+          name: floorName
+        },
         statusCode: 200
       };
     } catch (error) {

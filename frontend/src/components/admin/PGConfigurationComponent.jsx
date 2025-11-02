@@ -16,6 +16,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../store/slices/authSlice';
 import pgService from '../../services/pg.service';
 import branchService from '../../services/branch.service';
+import DefaultBranchModal from './DefaultBranchModal';
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showBranchModal, setShowBranchModal] = useState(false);
 
   // Configuration editing state
   const [editingConfig, setEditingConfig] = useState([]);
@@ -47,6 +49,7 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
     }
   }, [user]);
 
+
   const fetchPGAndBranches = async () => {
     try {
       setLoading(true);
@@ -56,84 +59,82 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
         return;
       }
 
-      // Fetch PG details with branches
-      const pgResponse = await pgService.getPGById(user.pgId);
+      // Fetch branches separately since PG response doesn't include branches
+      const branchesResponse = await branchService.getAllBranches();
 
-      console.log('PG Response:', pgResponse);
-
-      if (pgResponse.success && pgResponse.data) {
-        const pgData = pgResponse.data;
-
-        console.log('PG Response success:', pgResponse.success);
-        console.log('PG Response data keys:', Object.keys(pgData));
-        console.log('PG Data branches:', pgData.branches);
-        console.log('PG Data sharingTypes:', pgData.sharingTypes);
-        console.log('Branches array length:', pgData.branches?.length || 0);
-
-        // Set branches - check if they exist in different possible locations
-        let branchesData = [];
-
-        // Check if branches exist in the main response
-        if (pgData.branches && Array.isArray(pgData.branches)) {
-          branchesData = pgData.branches;
-        }
-        // Check if branches are nested differently (some APIs structure data differently)
-        else if (pgData.data && pgData.data.branches) {
-          branchesData = pgData.data.branches;
-        }
-        // Check if there's a branches field at the root level
-        else if (pgData.branches) {
-          branchesData = pgData.branches;
-        }
-        // Check if branches are in a different location
-        else if (pgData.result && pgData.result.branches) {
-          branchesData = pgData.result.branches;
-        }
-        // Check if branches are in the PG object itself
-        else if (pgData.PG && pgData.PG.branches) {
-          branchesData = pgData.PG.branches;
-        }
-
-        console.log('Branches Data:', branchesData);
-        console.log('Branches Data type:', typeof branchesData);
-        console.log('Branches Data length:', branchesData?.length);
-        console.log('First branch structure:', branchesData?.[0]);
+      if (branchesResponse.success && branchesResponse.data) {
+        const branchesData = Array.isArray(branchesResponse.data)
+          ? branchesResponse.data
+          : branchesResponse.data?.branches || [];
 
         setBranches(branchesData || []);
 
-        // Set sharing types from PG level - these should be available regardless of branches
-        const sharingTypesData = pgData.sharingTypes || [];
-        setSharingTypes(sharingTypesData);
-
         if (branchesData.length === 0) {
-          console.warn('No branches found in PG data');
-          // Don't show error toast here, just set empty branches and continue
-          // The UI will show appropriate messages
           setSelectedBranch(null);
+          setSharingTypes([]);
+        } else {
+          // Auto-select default branch if exists
+          const defaultBranch = branchesData.find(branch => branch.isDefault === true);
+
+          if (defaultBranch) {
+            setSelectedBranch(defaultBranch);
+            // Fetch configurations for the default branch
+            await fetchBranchConfigurations(defaultBranch._id);
+          } else if (branchesData.length > 0) {
+            setSelectedBranch(branchesData[0]);
+            // Fetch configurations for the first branch
+            await fetchBranchConfigurations(branchesData[0]._id);
+          }
         }
-
-        // Auto-select default branch if exists
-        const defaultBranch = branchesData.find(branch => branch.isDefault === true);
-        console.log('Default Branch:', defaultBranch);
-
-        if (defaultBranch) {
-          setSelectedBranch(defaultBranch);
-        } else if (branchesData.length > 0) {
-          setSelectedBranch(branchesData[0]);
-        }
-
-        // Note: Currently, sharing types are stored at PG level and shared across branches
-        // In the future, we could implement branch-specific configurations
       } else {
-        console.error('PG Response failed:', pgResponse);
-        toast.error('Failed to fetch PG data');
+        console.error('Branches fetch failed:', branchesResponse);
+        // Don't show error toast here, just set empty branches
+        setBranches([]);
+        setSelectedBranch(null);
+        setSharingTypes([]);
       }
     } catch (error) {
-      console.error('Error fetching PG and branch data:', error);
-      toast.error('An error occurred while fetching data');
+      console.error('Error fetching branch data:', error);
+      // Don't show error toast here, just set empty state
+      setBranches([]);
+      setSelectedBranch(null);
+      setSharingTypes([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fetch branch-specific configurations
+  const fetchBranchConfigurations = async (branchId) => {
+    try {
+      if (!branchId) {
+        setSharingTypes([]);
+        return;
+      }
+
+      const response = await pgService.getSharingTypesForBranch(branchId);
+
+      if (response.success && response.data) {
+        setSharingTypes(response.data);
+      } else {
+        // If no branch-specific configurations exist, set empty array
+        setSharingTypes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching branch configurations:', error);
+      toast.error('Failed to load branch configurations');
+      setSharingTypes([]);
+    }
+  };
+
+  // Handle branch creation callback
+  const handleBranchCreated = async (branchData) => {
+    setShowBranchModal(false);
+
+    // Refresh branches and configurations
+    await fetchPGAndBranches();
+
+    toast.success('Branch created successfully! You can now configure sharing types for this branch.');
   };
 
   const handleEditConfiguration = () => {
@@ -212,12 +213,16 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
 
   const handleSaveConfiguration = async () => {
     if (!validateSharingTypes()) return;
+    if (!selectedBranch) {
+      toast.error('Please select a branch first');
+      return;
+    }
 
     try {
       setSaving(true);
 
-      const response = await pgService.configureSharingTypes(
-        user.pgId,
+      const response = await pgService.configureSharingTypesForBranch(
+        selectedBranch._id || selectedBranch.id,
         editingConfig
       );
 
@@ -225,7 +230,7 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
         toast.success('Configuration saved successfully');
 
         // Update local state
-        setSharingTypes(editingConfig);
+        setSharingTypes([...editingConfig]);
 
         // Call parent callback
         onConfigurationUpdate && onConfigurationUpdate();
@@ -475,110 +480,142 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
 
   return (
     <div className="space-y-6">
-      {/* Debug Info */}
-      {console.log('Component Render - Branches:', branches, 'Selected:', selectedBranch, 'Sharing Types:', sharingTypes)}
 
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-            <Building2 className="h-6 w-6 text-white" />
+      {/* Main Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <SettingsIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">PG Configuration Management</h2>
+              <p className="text-blue-100">Manage sharing types and pricing for each branch</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">PG Configuration Management</h3>
-            <p className="text-gray-600">Manage sharing types and pricing for each branch</p>
+          <div className="hidden md:flex items-center space-x-2 text-sm text-blue-100">
+            <span>{branches.length} Branch{branches.length !== 1 ? 'es' : ''}</span>
+            {selectedBranch && (
+              <>
+                <span>•</span>
+                <span className="font-medium text-white">{selectedBranch.name}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Branch Selection - Always show if we have PG assigned */}
+      {/* Branch Selection & Configuration */}
       {user?.pgId && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Building2 className="h-6 w-6 text-white" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Branch Selection Header */}
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-sm">
+                  <Building2 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Branch Configuration</h3>
+                  <p className="text-sm text-gray-600">Select a branch to manage its sharing types and pricing</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Branch Configuration</h3>
-                <p className="text-gray-600">Select a branch to manage its sharing types and pricing</p>
-              </div>
+              {editingConfig.length > 0 && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-orange-700 font-medium">Editing Mode</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Branch
-            </label>
-            <Select
-              value={selectedBranch?.id || ''}
-              onValueChange={(value) => {
-                console.log('Branch selection changed to:', value);
-                console.log('Available branches:', branches);
-                const branch = branches.find(b => b.id === value);
-                console.log('Found branch:', branch);
-                if (branch) {
-                  setSelectedBranch(branch);
-                } else {
-                  console.warn('Branch not found for value:', value);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full max-w-md">
-                <SelectValue placeholder="Choose a branch to configure" />
-              </SelectTrigger>
-              <SelectContent>
-                {console.log('Rendering SelectContent with branches:', branches)}
-                {branches.length > 0 ? (
-                  branches.map((branch) => {
-                    console.log('Rendering branch:', branch);
-                    return (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        <div className="flex items-center space-x-2">
-                          <span>{branch.name}</span>
+          {/* Branch Selection Content */}
+          <div className="p-6">
+            <div className="max-w-md">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Select Branch
+                {editingConfig.length > 0 && (
+                  <span className="text-orange-600 text-xs ml-2">(Save or cancel editing to change branch)</span>
+                )}
+              </label>
+              <Select
+                key={selectedBranch?._id || 'no-selection'}
+                disabled={editingConfig.length > 0}
+                value={selectedBranch?._id || selectedBranch?.id || ''}
+                onValueChange={async (value) => {
+                  const branch = branches.find(b => (b._id === value || b.id === value));
+                  if (branch) {
+                    setSelectedBranch(branch);
+                    await fetchBranchConfigurations(branch._id || branch.id);
+                  } else {
+                    setSelectedBranch(null);
+                    setSharingTypes([]);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a branch to configure" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.length > 0 ? (
+                    branches.map((branch) => (
+                      <SelectItem key={branch._id || branch.id} value={branch._id || branch.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-medium">{branch.name}</span>
                           {branch.isDefault && (
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
                               Default
                             </span>
                           )}
                         </div>
                       </SelectItem>
-                    );
-                  })
-                ) : (
-                  <div className="p-2 text-sm text-gray-500">
-                    {loading ? 'Loading branches...' : 'No branches available - Please create branches first'}
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      {loading ? 'Loading branches...' : 'No branches available'}
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+
+              {selectedBranch && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm text-blue-700 font-medium">
+                      {selectedBranch.name} • {sharingTypes.length} sharing type{sharingTypes.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                )}
-              </SelectContent>
-            </Select>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* PG Configuration Section - Always show if we have sharing types */}
-      {sharingTypes.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          {/* PG Configuration Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                <SettingsIcon className="h-6 w-6 text-white" />
-              </div>
-                <div>
-                  <h4 className="text-lg font-bold text-gray-900">PG Configuration</h4>
-                  <p className="text-sm text-gray-600">
-                    Manage sharing types and pricing{selectedBranch ? ` for ${selectedBranch.name}` : branches.length > 0 ? ' (select a branch above)' : ' (shared across all branches)'}
-                  </p>
+      {/* Configuration Section - Show only when branch is selected */}
+      {selectedBranch && (
+        <div key={selectedBranch._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Configuration Header */}
+          <div className="bg-gradient-to-r from-slate-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-sm">
+                  <SettingsIcon className="h-5 w-5 text-white" />
                 </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Configuration for {selectedBranch.name}</h3>
+                  <p className="text-sm text-gray-600">Manage sharing types and pricing</p>
+                </div>
+              </div>
+              <button
+                onClick={handleEditConfiguration}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+              >
+                <Edit className="h-4 w-4" />
+                <span className="font-medium">Edit Configuration</span>
+              </button>
             </div>
-            <button
-              onClick={handleEditConfiguration}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              <Edit className="h-4 w-4" />
-              <span>Edit Configuration</span>
-            </button>
           </div>
 
           {/* Configuration Display/Edit */}
@@ -746,56 +783,26 @@ const PGConfigurationComponent = ({ onConfigurationUpdate }) => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
           <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
           <h4 className="text-lg font-semibold text-gray-900 mb-2">No Branches Found</h4>
-          <p className="text-gray-600">Please create branches first to manage PG configurations.</p>
+          <p className="text-gray-600 mb-6">You need to create at least one branch before you can configure sharing types and pricing.</p>
+          <button
+            onClick={() => setShowBranchModal(true)}
+            className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Create Your First Branch</span>
+          </button>
         </div>
       )}
 
-      {/* Show branches list if available */}
-      {branches.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-3 shadow-sm">
-              <Building2 className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-gray-900">Associated Branches</h4>
-              <p className="text-sm text-gray-600">Branches that use this PG configuration</p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {branches.map((branch) => (
-              <div key={branch.id} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-2">
-                  <h5 className="font-semibold text-gray-900">{branch.name}</h5>
-                  {branch.isDefault && (
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                      Default
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600 mb-2">{branch.address?.city || 'N/A'}, {branch.address?.state || 'N/A'}</p>
-                <p className="text-xs text-gray-500">{branch.address?.street || 'N/A'}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Debug Information */}
-      <div className="bg-gray-50 rounded-lg p-4 text-sm">
-        <h5 className="font-semibold mb-2">Debug Information:</h5>
-        <p>User PG ID: {user?.pgId || 'Not set'}</p>
-        <p>Branches Count: {branches.length}</p>
-        <p>Selected Branch: {selectedBranch?.name || 'None'}</p>
-        <p>Sharing Types Count: {sharingTypes.length}</p>
-        <details>
-          <summary className="cursor-pointer mt-2">View Raw Data</summary>
-          <pre className="mt-2 text-xs bg-white p-2 rounded overflow-auto max-h-40">
-            {JSON.stringify({ branches, selectedBranch, sharingTypes }, null, 2)}
-          </pre>
-        </details>
-      </div>
+      {/* Default Branch Modal */}
+      <DefaultBranchModal
+        isOpen={showBranchModal}
+        onClose={() => setShowBranchModal(false)}
+        onBranchCreated={handleBranchCreated}
+        pgId={user?.pgId}
+      />
     </div>
   );
 };

@@ -33,7 +33,7 @@ import {
   Settings
 } from 'lucide-react';
 
-import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { selectSelectedBranch, selectBranches, initializeBranches, setBranches } from '../../store/slices/branch.slice';
 import { selectPgConfigured, updateAuthState } from '../../store/slices/authSlice';
 import DefaultBranchModal from '../../components/admin/DefaultBranchModal';
 import PGConfigurationModal from '../../components/admin/PGConfigurationModal';
@@ -624,13 +624,13 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const selectedBranch = useSelector(selectSelectedBranch);
+  const reduxBranches = useSelector(selectBranches);
   const pgConfigured = useSelector(selectPgConfigured);
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [forceShowWizard, setForceShowWizard] = useState(false);
-  const [branches, setBranches] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [hasNoBranches, setHasNoBranches] = useState(false);
   const [setupCompleted, setSetupCompleted] = useState(false);
@@ -642,13 +642,14 @@ const Dashboard = () => {
       console.log('Dashboard: User data:', { userId: user?._id, pgId: user?.pgId, role: user?.role });
       const response = await api.get('/branches');
       console.log('Dashboard: Initial branches API response:', response);
-      const fetchedBranches = response.data.branches || [];
+      const fetchedBranches = response.data?.data?.branches || response.data?.branches || [];
       console.log('Dashboard: Initial branches fetched:', fetchedBranches.length, fetchedBranches);
-      setBranches(fetchedBranches);
+      // Update Redux state
+      dispatch(setBranches(fetchedBranches));
       setHasNoBranches(fetchedBranches.length === 0);
 
       // Check PG configuration status if we have branches
-      if (fetchedBranches.length > 0 && user?.pgId) {
+      if (reduxBranches.length > 0 && user?.pgId) {
         try {
           const pgService = (await import('../../services/pg.service')).default;
           const pgResponse = await pgService.getPGDetails(user.pgId);
@@ -665,9 +666,9 @@ const Dashboard = () => {
       }
 
       // TEMP: For testing - always show dashboard if user has pgConfigured OR has branches
-      console.log('Dashboard: Initial check - branches:', fetchedBranches.length, 'pgConfigured:', pgConfigured, 'willLoadDashboard:', pgConfigured || fetchedBranches.length > 0);
+      console.log('Dashboard: Initial check - branches:', reduxBranches.length, 'pgConfigured:', pgConfigured, 'willLoadDashboard:', pgConfigured || reduxBranches.length > 0);
 
-      if (pgConfigured || fetchedBranches.length > 0) {
+      if (pgConfigured || reduxBranches.length > 0) {
         console.log('Loading dashboard because pgConfigured=true OR branches exist');
         loadDashboardData();
       } else {
@@ -748,14 +749,17 @@ const Dashboard = () => {
       return;
     }
 
-    if (user?.role !== 'admin') {
-      toast.error('Access denied. Admin privileges required.');
+    if (!['admin', 'maintainer'].includes(user?.role)) {
+      toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
     }
 
+    // Initialize branch state to ensure it's always an array
+    dispatch(initializeBranches());
+
     checkBranchesAndSetupState();
-  }, [user, navigate]);
+  }, [user, navigate, dispatch]);
 
   // Update setupCompleted when pgConfigured changes
   useEffect(() => {
@@ -831,7 +835,7 @@ const Dashboard = () => {
       setLoading(true);
 
       // If no branches exist but PG is configured, show basic dashboard
-      if (branches.length === 0 && pgConfigured) {
+      if (reduxBranches.length === 0 && pgConfigured) {
         console.log('No branches but PG configured - showing basic dashboard');
         setLoading(false);
         return;
@@ -949,7 +953,7 @@ const Dashboard = () => {
     }
   };
 
-  if (!user || user?.role !== 'admin') {
+  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -959,7 +963,7 @@ const Dashboard = () => {
 
   // Debug: Show current state when not loading
   if (!loading && !isFirstLoad) {
-    console.log('Dashboard state - branches:', branches.length, 'pgConfigured:', pgConfigured, 'setupCompleted:', setupCompleted, 'willShowSetup:', !setupCompleted && !pgConfigured && hasNoBranches);
+    console.log('Dashboard state - branches:', reduxBranches.length, 'pgConfigured:', pgConfigured, 'setupCompleted:', setupCompleted, 'willShowSetup:', !setupCompleted && !pgConfigured && hasNoBranches);
   }
 
   // Never show setup if setup is completed or PG is configured
@@ -1002,7 +1006,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Modern Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-2 lg:px-2">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <div className="flex items-center space-x-3">
@@ -1041,7 +1045,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative max-w-full mx-auto px-4 sm:px-6 lg:px-2 py-8">
         {/* Ambient gradient orbs */}
         <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-gradient-to-br from-emerald-300/20 to-cyan-400/20 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-cyan-200/20 to-blue-300/20 blur-2xl" />

@@ -85,13 +85,16 @@ import ResidentOnboarding from './pages/admin/ResidentOnboarding';
 
 // Import Billing page
 import Billing from './pages/superadmin/Billing';
-import SecurityDashboard from './pages/superadmin/SecurityDashboard';
 
 // Import Advanced Features
 import RevenueDashboard from './pages/superadmin/RevenueDashboard';
 import UsageDashboard from './pages/admin/UsageDashboard';
 import CostCalculator from './pages/admin/CostCalculator';
-import SelfServicePortal from './pages/admin/SelfServicePortal';
+
+// Import Finance Pages
+import Expenses from './pages/admin/Expenses';
+import Salaries from './pages/admin/Salaries';
+import ExpenseManagement from './components/superadmin/ExpenseManagement';
 
 // Import Sales Pages
 import SalesDashboard from './pages/sales/Dashboard';
@@ -108,6 +111,7 @@ import SuperadminPayments from './pages/superadmin/Payments';
 import SuperadminReports from './pages/superadmin/Reports';
 // import SalesAnalytics from './pages/superadmin/SalesAnalytics';
 import SalesAnalytics from './pages/superadmin/SalesAnalytics';
+import CommissionManagement from './pages/superadmin/CommissionManagement';
 
 const App = () => {
   const { user, loading, hasCheckedAuth } = useAuth();
@@ -210,8 +214,9 @@ const App = () => {
         <Route path="billing" element={<Billing />} />
         <Route path="sales-managers" element={<SalesManagerManagement />} />
         <Route path="sales-analytics" element={<SalesAnalytics />} />
-        <Route path="security" element={<SecurityDashboard />} />
+        <Route path="commission-management" element={<CommissionManagement />} />
         <Route path="revenue" element={<RevenueDashboard />} />
+        <Route path="expenses" element={<ExpenseManagement />} />
       </Route>
 
       {/* Sales Manager Auth Routes */}
@@ -329,9 +334,14 @@ const App = () => {
             <CostCalculator />
           </ProtectedRoute>
         } />
-        <Route path="self-service" element={
+        <Route path="finance/expenses" element={
           <ProtectedRoute requireOnboarding={false}>
-            <SelfServicePortal />
+            <Expenses />
+          </ProtectedRoute>
+        } />
+        <Route path="finance/salaries" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <Salaries />
           </ProtectedRoute>
         } />
       </Route>

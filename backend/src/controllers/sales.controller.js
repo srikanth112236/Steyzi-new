@@ -613,6 +613,98 @@ class SalesController {
       });
     }
   }
+
+  /**
+   * Get commission statistics with active subscription breakdown
+   * @route GET /api/sales/commission-stats
+   * @access Sales users
+   */
+  async getCommissionStatistics(req, res) {
+    try {
+      const stats = await SalesService.getCommissionStatistics(req.user);
+      
+      if (!stats.success) {
+        return res.status(400).json(stats);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: stats.data
+      });
+    } catch (error) {
+      console.error('Error getting commission statistics:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get commission statistics',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Recalculate commissions based on active subscriptions
+   * @route POST /api/sales/recalculate-commissions
+   * @access Superadmin only
+   */
+  /**
+   * Get detailed commission management data for superadmin
+   * @route GET /api/sales/commission-management
+   * @access Superadmin only
+   */
+  async getCommissionManagement(req, res) {
+    try {
+      const filters = {
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        salesManagerId: req.query.salesManagerId
+      };
+
+      const result = await SalesService.getCommissionManagementForSuperadmin(filters);
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: result.message || 'Failed to get commission management data',
+          error: result.error
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Commission management data retrieved successfully',
+        data: result
+      });
+    } catch (error) {
+      console.error('Error getting commission management:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get commission management data',
+        error: error.message
+      });
+    }
+  }
+
+  async recalculateCommissions(req, res) {
+    try {
+      const result = await SalesService.recalculateCommissionsBasedOnActiveSubscriptions();
+      
+      return res.status(200).json({
+        success: result.success,
+        message: result.message,
+        data: {
+          processedPGs: result.processedPGs,
+          totalPGsChecked: result.totalPGsChecked
+        }
+      });
+    } catch (error) {
+      console.error('Error recalculating commissions:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to recalculate commissions',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = new SalesController();

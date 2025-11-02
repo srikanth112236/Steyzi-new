@@ -25,6 +25,10 @@ const RoleRedirect = () => {
           console.log('👨‍💼 RoleRedirect: Redirecting admin to dashboard');
           navigate('/admin/dashboard');
           break;
+        case 'maintainer':
+          console.log('🔧 RoleRedirect: Redirecting maintainer to admin dashboard with restricted access');
+          navigate('/admin/dashboard');
+          break;
         case 'superadmin':
           console.log('👑 RoleRedirect: Redirecting superadmin to dashboard');
           navigate('/superadmin/dashboard');

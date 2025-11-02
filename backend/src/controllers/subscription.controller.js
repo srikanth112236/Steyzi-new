@@ -708,26 +708,62 @@ exports.getPaymentStatus = async (req, res) => {
  * @route POST /api/subscriptions/payments/webhook
  * @access Public (webhook endpoint)
  */
+/**
+ * Handle payment webhook
+ * @route POST /api/subscriptions/payments/webhook
+ * @access Public (webhook endpoint)
+ */
 exports.handleWebhook = async (req, res) => {
-    try {
-      const webhookData = req.body;
+  const signature = req.headers['x-razorpay-signature'];
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-      logger.info('Payment webhook received:', { event: webhookData.event });
-
-      const result = await subscriptionService.handlePaymentWebhook(webhookData);
-
-      if (!result.success) {
-        logger.error('Webhook processing failed:', result);
-        return res.status(400).json(result);
-      }
-
-      return res.status(200).json({ success: true, message: 'Webhook processed successfully' });
-    } catch (error) {
-      logger.error('Error in handleWebhook controller:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+  try {
+    // === 1. Verify Signature ===
+    if (!signature) {
+      logger.warn('Webhook received without signature');
+      return res.status(400).json({ success: false, message: 'Missing signature' });
     }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      logger.warn('Invalid webhook signature', {
+        received: signature,
+        expected: expectedSignature
+      });
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+
+    // === 2. Process Webhook ===
+    logger.info('RAZORPAY SERVICE: Processing webhook...', {
+      event: req.body.event,
+      paymentId: req.body?.payload?.payment?.entity?.id,
+      orderId: req.body?.payload?.order?.entity?.id
+    });
+
+    const result = await subscriptionService.handlePaymentWebhook(req.body);
+
+    if (!result.success) {
+      logger.error('Webhook processing failed', result);
+      return res.status(400).json(result);
+    }
+
+    // === 3. Respond ===
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully'
+    });
+  } catch (error) {
+    logger.error('Error in handleWebhook controller:', {
+      error: error.message,
+      stack: error.stack
+    });
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
 };

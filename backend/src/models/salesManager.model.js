@@ -59,6 +59,10 @@ const SalesManagerSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
+    activeSubscriptionPGs: {
+      type: Number,
+      default: 0
+    },
     totalCommissionGenerated: {
       type: Number,
       default: 0

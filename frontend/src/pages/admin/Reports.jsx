@@ -164,8 +164,8 @@ const PgReports = () => {
       return;
     }
 
-    if (user?.role !== 'admin') {
-      toast.error('Access denied. Admin privileges required.');
+    if (!['admin', 'maintainer'].includes(user?.role)) {
+      toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
     }
@@ -208,15 +208,22 @@ const PgReports = () => {
     try {
       setLoading(true);
       const withBranch = { ...filters, branchId: selectedBranch?._id };
+      console.log('🔍 Generating report:', { activeTab, filters: withBranch });
+      
       const response = await reportService.generateReportByType(activeTab, withBranch);
+      console.log('📊 Report response:', response);
       
       if (response.success) {
-        setReportData(response.data);
+        // The response.data contains the actual report data from service
+        // For tickets, it has nested structure, for others it's direct
+        setReportData(response.data || response);
         await loadAnalytics(withBranch);
+      } else {
+        toast.error(response.message || 'Failed to generate report');
       }
     } catch (error) {
-      console.error('Error generating report:', error);
-      toast.error('Failed to generate report');
+      console.error('❌ Error generating report:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to generate report');
     } finally {
       setLoading(false);
     }
@@ -228,10 +235,11 @@ const PgReports = () => {
       const response = await reportService.getReportAnalytics(activeTab, withBranch);
       
       if (response.success) {
-        setAnalyticsData(response.data);
+        setAnalyticsData(response.data || response);
       }
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      console.error('⚠️ Error loading analytics:', error);
+      // Don't show error toast for analytics, it's optional
     }
   };
 
@@ -344,14 +352,25 @@ const PgReports = () => {
   const renderStatistics = () => {
     // Handle different data structures for different report types
     let stats = {};
-    if (activeTab === 'tickets' && reportData?.data?.statistics) {
-      // Tickets report has nested statistics
-      stats = reportData.data.statistics;
-    } else if (reportData?.statistics) {
-      // Direct statistics (residents, payments, etc.)
-      stats = reportData.statistics;
+    
+    // Tickets report has nested structure: { success: true, data: { data: [], statistics: {}, ... } }
+    if (activeTab === 'tickets') {
+      if (reportData?.data?.statistics) {
+        stats = reportData.data.statistics;
+      } else if (reportData?.statistics) {
+        stats = reportData.statistics;
+      } else {
+        return null;
+      }
     } else {
-      return null;
+      // Other reports: { success: true, data: [], statistics: {}, ... }
+      if (reportData?.statistics) {
+        stats = reportData.statistics;
+      } else if (reportData?.data?.statistics) {
+        stats = reportData.data.statistics;
+      } else {
+        return null;
+      }
     }
 
     const currentTab = reportTabs.find(tab => tab.id === activeTab);
@@ -486,14 +505,25 @@ const PgReports = () => {
   const renderChart = () => {
     // Handle different data structures for different report types
     let data = [];
-    if (activeTab === 'tickets' && reportData?.data?.monthlyTrend) {
-      // Tickets report has nested monthly trend
-      data = reportData.data.monthlyTrend;
-    } else if (reportData?.monthlyTrend) {
-      // Direct monthly trend (residents, payments, etc.)
-      data = reportData.monthlyTrend;
+    
+    // Tickets report has nested structure
+    if (activeTab === 'tickets') {
+      if (reportData?.data?.monthlyTrend) {
+        data = reportData.data.monthlyTrend;
+      } else if (reportData?.monthlyTrend) {
+        data = reportData.monthlyTrend;
+      } else {
+        return null;
+      }
     } else {
-      return null;
+      // Other reports
+      if (reportData?.monthlyTrend) {
+        data = reportData.monthlyTrend;
+      } else if (reportData?.data?.monthlyTrend) {
+        data = reportData.data.monthlyTrend;
+      } else {
+        return null;
+      }
     }
 
     if (!data || data.length === 0) {
@@ -555,14 +585,25 @@ const PgReports = () => {
   const renderComparisonAnalytics = () => {
     // Handle different data structures for different report types
     let comparisonData = null;
-    if (activeTab === 'tickets' && reportData?.data?.comparisonData) {
-      // Tickets report has nested comparison data
-      comparisonData = reportData.data.comparisonData;
-    } else if (reportData?.comparisonData) {
-      // Direct comparison data (residents, payments, etc.)
-      comparisonData = reportData.comparisonData;
+    
+    // Tickets report has nested structure
+    if (activeTab === 'tickets') {
+      if (reportData?.data?.comparisonData) {
+        comparisonData = reportData.data.comparisonData;
+      } else if (reportData?.comparisonData) {
+        comparisonData = reportData.comparisonData;
+      } else {
+        return null;
+      }
     } else {
-      return null;
+      // Other reports
+      if (reportData?.comparisonData) {
+        comparisonData = reportData.comparisonData;
+      } else if (reportData?.data?.comparisonData) {
+        comparisonData = reportData.data.comparisonData;
+      } else {
+        return null;
+      }
     }
 
     if (!comparisonData) return null;
@@ -624,12 +665,16 @@ const PgReports = () => {
   const renderResolutionTimeAnalytics = () => {
     // Handle different data structures for different report types
     let resolutionTimeData = null;
-    if (activeTab === 'tickets' && reportData?.data?.resolutionTimeData) {
-      // Tickets report has nested resolution time data
-      resolutionTimeData = reportData.data.resolutionTimeData;
-    } else if (reportData?.resolutionTimeData) {
-      // Direct resolution time data
-      resolutionTimeData = reportData.resolutionTimeData;
+    
+    // Only tickets have resolution time analytics
+    if (activeTab === 'tickets') {
+      if (reportData?.data?.resolutionTimeData) {
+        resolutionTimeData = reportData.data.resolutionTimeData;
+      } else if (reportData?.resolutionTimeData) {
+        resolutionTimeData = reportData.resolutionTimeData;
+      } else {
+        return null;
+      }
     } else {
       return null;
     }
@@ -690,17 +735,25 @@ const PgReports = () => {
 
     // Handle different data structures for different report types
     let data = [];
-    if (activeTab === 'tickets' && reportData.data?.data) {
-      // Tickets report has nested data structure
-      data = reportData.data.data;
-    } else if (reportData.data && Array.isArray(reportData.data)) {
-      // Direct array data (residents, payments, etc.)
-      data = reportData.data;
-    } else if (reportData.data && typeof reportData.data === 'object') {
-      // Object with data property
-      data = reportData.data.data || [];
+    
+    // Tickets report has nested structure: { success: true, data: { data: [], ... } }
+    if (activeTab === 'tickets') {
+      if (reportData?.data?.data && Array.isArray(reportData.data.data)) {
+        data = reportData.data.data;
+      } else if (reportData?.data && Array.isArray(reportData.data)) {
+        data = reportData.data;
+      } else {
+        data = [];
+      }
     } else {
-      data = [];
+      // Other reports: { success: true, data: [], ... }
+      if (reportData?.data && Array.isArray(reportData.data)) {
+        data = reportData.data;
+      } else if (reportData?.data?.data && Array.isArray(reportData.data.data)) {
+        data = reportData.data.data;
+      } else {
+        data = [];
+      }
     }
 
     // Ensure data is an array
@@ -1159,7 +1212,7 @@ const PgReports = () => {
     );
   };
 
-  if (!user || user?.role !== 'admin') {
+  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>

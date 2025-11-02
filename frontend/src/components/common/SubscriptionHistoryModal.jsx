@@ -91,6 +91,8 @@ const SubscriptionHistoryModal = ({ isOpen, onClose, userId, userName }) => {
   };
 
   const getBillingCycleBadge = (cycle) => {
+    if (!cycle) return <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">N/A</span>;
+
     const cycleConfig = {
       monthly: 'bg-blue-100 text-blue-800',
       annual: 'bg-green-100 text-green-800',

@@ -288,6 +288,10 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
+    activeSubscriptionPGs: {
+      type: Number,
+      default: 0
+    },
     totalCommissionEarned: {
       type: Number,
       default: 0

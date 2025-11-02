@@ -47,7 +47,4 @@ router.get('/analytics', subscriptionPaymentController.getPaymentAnalytics);
 // Payment status SSE endpoint
 router.get('/status', paymentStatusController.getPaymentStatusStream);
 
-// Webhook endpoint (public - for Razorpay)
-router.post('/webhook', subscriptionPaymentController.handleWebhook);
-
 module.exports = router;

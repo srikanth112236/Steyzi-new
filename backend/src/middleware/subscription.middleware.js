@@ -15,9 +15,13 @@ const checkModuleAccess = (requiredModules = []) => {
   return async (req, res, next) => {
     try {
       // Completely skip module access checks for these roles
-      const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
-      if (bypassRoles.includes(req.user.role)) {
-        console.log(`🎉 Bypassing ALL module access checks for role: ${req.user.role}`);
+      // Sales managers and sub-sales staff are internal staff managed by superadmin and don't need subscriptions
+      const bypassRoles = ['superadmin', 'support', 'sales_manager', 'sales', 'sub_sales'];
+      const userRole = req.user?.role || req.userType;
+      const userSalesRole = req.user?.salesRole;
+      
+      if (bypassRoles.includes(userRole) || bypassRoles.includes(userSalesRole)) {
+        console.log(`🎉 Bypassing ALL module access checks for role: ${userRole || userSalesRole}`);
         return next();
       }
 
@@ -65,12 +69,16 @@ const checkModuleAccess = (requiredModules = []) => {
  */
 const checkUsageLimits = async (req, res, next) => {
   try {
-    // Completely skip usage limit checks for these roles
-    const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
-    if (bypassRoles.includes(req.user.role)) {
-      console.log(`🎉 Bypassing ALL usage limit checks for role: ${req.user.role}`);
-      return next();
-    }
+      // Completely skip usage limit checks for these roles
+      // Sales managers and sub-sales staff are internal staff managed by superadmin and don't need subscriptions
+      const bypassRoles = ['superadmin', 'support', 'sales_manager', 'sales', 'sub_sales'];
+      const userRole = req.user?.role || req.userType;
+      const userSalesRole = req.user?.salesRole;
+      
+      if (bypassRoles.includes(userRole) || bypassRoles.includes(userSalesRole)) {
+        console.log(`🎉 Bypassing ALL usage limit checks for role: ${userRole || userSalesRole}`);
+        return next();
+      }
 
     // If no subscription exists and user is not in bypass roles, continue to check
     if (!req.subscription) {

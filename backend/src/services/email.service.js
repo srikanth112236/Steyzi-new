@@ -221,7 +221,8 @@ class EmailService {
         to: options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text
+        text: options.text,
+        attachments: options.attachments || []
       };
 
       // Check if this is a mock transporter

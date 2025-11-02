@@ -10,13 +10,14 @@ class ReportController {
    */
   async generateResidentsReport(req, res) {
     try {
-      const { startDate, endDate, pgId, status, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, status, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateResidentsReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         status,
         userId,
         format
@@ -55,13 +56,14 @@ class ReportController {
    */
   async generatePaymentsReport(req, res) {
     try {
-      const { startDate, endDate, pgId, status, paymentMethod, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, status, paymentMethod, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generatePaymentsReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         status,
         paymentMethod,
         userId,
@@ -81,13 +83,14 @@ class ReportController {
    */
   async generateTicketsReport(req, res) {
     try {
-      const { startDate, endDate, pgId, status, priority, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, status, priority, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateTicketsReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         status,
         priority,
         userId,
@@ -107,13 +110,14 @@ class ReportController {
    */
   async generateOnboardingReport(req, res) {
     try {
-      const { startDate, endDate, pgId, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateOnboardingReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         userId,
         format
       });
@@ -131,13 +135,14 @@ class ReportController {
    */
   async generateOffboardingReport(req, res) {
     try {
-      const { startDate, endDate, pgId, vacationType, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, vacationType, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateOffboardingReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         vacationType,
         userId,
         format
@@ -156,13 +161,14 @@ class ReportController {
    */
   async generateOccupancyReport(req, res) {
     try {
-      const { startDate, endDate, pgId, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateOccupancyReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         userId,
         format
       });
@@ -180,13 +186,14 @@ class ReportController {
    */
   async generateFinancialSummaryReport(req, res) {
     try {
-      const { startDate, endDate, pgId, format = 'json' } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, branchId, format = 'json' } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const reportData = await ReportService.generateFinancialSummaryReport({
         startDate,
         endDate,
         pgId,
+        branchId,
         userId,
         format
       });
@@ -204,13 +211,14 @@ class ReportController {
    */
   async getReportAnalytics(req, res) {
     try {
-      const { startDate, endDate, pgId, reportType } = req.query;
-      const userId = req.user._id;
+      const { startDate, endDate, pgId, branchId, reportType } = req.query;
+      const userId = req.user._id || req.user.id;
 
       const analyticsData = await ReportService.getReportAnalytics({
         startDate,
         endDate,
         pgId,
+        branchId,
         reportType,
         userId
       });
@@ -228,7 +236,7 @@ class ReportController {
   async exportReport(req, res) {
     try {
       const { reportType, filters, format } = req.body;
-      const userId = req.user.id;
+      const userId = req.user._id || req.user.id;
 
       console.log('📤 Export request:', { reportType, format, filters });
 

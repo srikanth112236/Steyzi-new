@@ -140,6 +140,16 @@ const SuperadminLayout = () => {
           name: 'Financial Reports',
           href: '/superadmin/reports',
           icon: FileBarChart
+        },
+        {
+          name: 'Commission Management',
+          href: '/superadmin/commission-management',
+          icon: DollarSign
+        },
+        {
+          name: 'Expenses',
+          href: '/superadmin/expenses',
+          icon: DollarSign
         }
       ]
     },

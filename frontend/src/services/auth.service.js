@@ -657,6 +657,21 @@ class AuthService {
   }
 
   /**
+   * Update user information
+   * @param {string} userId - User ID to update
+   * @param {Object} userData - User data to update
+   * @returns {Promise<Object>} - Update result
+   */
+  async updateUser(userId, userData) {
+    try {
+      const response = await api.put(`/users/${userId}`, userData);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Update user status (activate/deactivate)
    * @param {string} userId - User ID to update
    * @param {boolean} isActive - New status

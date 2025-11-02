@@ -145,6 +145,20 @@ const pgSchema = new mongoose.Schema({
   isConfigured: {
     type: Boolean,
     default: false
+  },
+  // Commission tracking
+  commissionAwarded: {
+    type: Boolean,
+    default: false
+  },
+  commissionAwardedDate: {
+    type: Date,
+    default: null
+  },
+  // Subscription start date for phased commission calculation
+  subscriptionStartDate: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true

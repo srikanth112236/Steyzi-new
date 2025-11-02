@@ -15,6 +15,16 @@ class MaintainerService {
       };
 
       const response = await api.post('/maintainers', userData);
+
+      // Show success message with login credentials if default password was used
+      if (response.data.success && response.data.data?.loginCredentials) {
+        const credentials = response.data.data.loginCredentials;
+        if (credentials.passwordType === 'default') {
+          console.log('🔑 Default maintainer password:', credentials.password);
+          // You might want to show this to the admin somehow
+        }
+      }
+
       return response.data;
     } catch (error) {
       this.handleError(error);

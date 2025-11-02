@@ -1124,193 +1124,153 @@ const ResidentOnboarding = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="space-y-4"
+      className="space-y-3"
     >
-      {/* Modern Compact Header */}
-      <div className="text-center">
-        <div className="flex items-center justify-center mb-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center mr-3 shadow-md">
-            <User className="h-5 w-5 text-white" />
+      {/* All-in-One Row Header */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        {/* Title with Icon */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+            <User className="h-4 w-4 text-white" />
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Select Resident</h2>
-            <p className="text-gray-600 text-xs">
-              Choose a resident to onboard into a room
-            </p>
-          </div>
+          <h2 className="text-base font-semibold text-gray-900 whitespace-nowrap">Select Resident</h2>
+        </div>
+
+        {/* Toggle Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAllResidents(false)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
+              !showAllResidents
+                ? 'bg-blue-500 text-white shadow-sm'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5" />
+            Unassigned
+          </button>
+          <button
+            onClick={() => setShowAllResidents(true)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
+              showAllResidents
+                ? 'bg-blue-500 text-white shadow-sm'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            All
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative flex-1 min-w-[250px]">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <input
+            type="text"
+            placeholder="Search by name, phone, or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white text-xs"
+          />
         </div>
       </div>
 
-      {/* Modern Toggle Buttons */}
-      <div className="flex items-center justify-center gap-2">
-        <button
-          onClick={() => setShowAllResidents(false)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
-            !showAllResidents
-              ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-md transform scale-105'
-              : 'bg-white border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
-          }`}
-        >
-          <UserCheck className="h-3 w-3" />
-          Unassigned Only
-        </button>
-        <button
-          onClick={() => setShowAllResidents(true)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
-            showAllResidents
-              ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-md transform scale-105'
-              : 'bg-white border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
-          }`}
-        >
-          <Users className="h-3 w-3" />
-          All Residents
-        </button>
-      </div>
-
-      {/* Modern Search Bar */}
-      <div className="relative max-w-sm mx-auto">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <input
-          type="text"
-          placeholder="Search by name, phone, or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-red-100 focus:border-red-500 transition-all duration-200 bg-gray-50 focus:bg-white text-xs"
-        />
-      </div>
-
-      {/* Ultra-Compact Residents Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-72 overflow-y-auto">
-                  {loading ? (
-            <div className="col-span-full text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-3"></div>
-              <p className="text-gray-600 text-sm">Loading residents...</p>
+      {/* Modern Grid Layout - 4 Cards Per Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
+        {loading ? (
+          <div className="col-span-full text-center py-6">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent mx-auto mb-2"></div>
+            <p className="text-gray-600 text-xs">Loading residents...</p>
+          </div>
+        ) : filteredResidents.length === 0 ? (
+          <div className="col-span-full text-center py-6">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-2 shadow-sm">
+              <Users className="h-6 w-6 text-gray-400" />
             </div>
-          ) : filteredResidents.length === 0 ? (
-            <div className="col-span-full text-center py-8">
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-3 shadow-md">
-                <Users className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">No residents found</h3>
-              <p className="text-gray-600 text-xs">
-                {showAllResidents ? 'No residents available' : 'All residents are already assigned'}
-              </p>
-            </div>
-          ) : (
-            filteredResidents.map((resident) => {
-              const isAssigned = resident.roomId && resident.bedNumber;
-              
-              return (
-                <motion.div
-                  key={resident._id}
-                  whileHover={{ scale: 1.02, y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`group relative p-2 rounded-lg border transition-all duration-300 cursor-pointer ${
-                    isAssigned
-                      ? 'border-gray-200 bg-gray-50 opacity-60'
-                      : 'border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100'
-                  } ${isAssigned ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                  onClick={() => !isAssigned && handleResidentSelect(resident)}
-                >
-                  {/* Background gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
-                  
-                  <div className="relative text-center">
-                    {/* Ultra-Compact Avatar */}
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-1.5 shadow-sm ${
-                      isAssigned 
-                        ? 'bg-gray-200' 
-                        : 'bg-gradient-to-br from-blue-500 to-purple-600'
-                    }`}>
-                      <User className={`h-5 w-5 ${isAssigned ? 'text-gray-400' : 'text-white'}`} />
-                    </div>
-                    
-                    {/* Ultra-Compact Name */}
-                    <h3 className="font-bold text-gray-900 mb-1.5 text-xs">
-                      {resident.firstName} {resident.lastName}
-                    </h3>
-                    
-                    {/* Ultra-Compact Status Badge */}
-                    <div className="mb-1.5">
-                      {isAssigned ? (
-                        <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-                          <CheckCircle className="h-2.5 w-2.5 inline mr-0.5" />
-                          Assigned
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200">
-                          <Sparkles className="h-2.5 w-2.5 inline mr-0.5" />
-                          Available
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Ultra-Compact Contact Info */}
-                    <div className="space-y-0.5 mb-1.5">
-                      {resident.phone && (
-                        <div className="flex items-center justify-center space-x-1 text-xs text-gray-600 bg-white/80 rounded-md p-1">
-                          <Phone className="h-2.5 w-2.5 text-gray-400" />
-                          <span className="truncate font-medium">{resident.phone}</span>
-                        </div>
-                      )}
-                      {resident.email && (
-                        <div className="flex items-center justify-center space-x-1 text-xs text-gray-600 bg-white/80 rounded-md p-1">
-                          <Mail className="h-2.5 w-2.5 text-gray-400" />
-                          <span className="truncate font-medium">{resident.email}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Ultra-Compact Date Information */}
-                    {(resident.checkInDate || resident.contractStartDate) && (
-                      <div className="p-1.5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-md border border-green-200 mb-1.5">
-                        <div className="space-y-0.5">
-                          {resident.checkInDate && (
-                            <div className="flex items-center justify-center space-x-1 text-xs">
-                              <Calendar className="h-2.5 w-2.5 text-green-600" />
-                              <span className="font-semibold text-green-800">
-                                Check-in: {new Date(resident.checkInDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-                          {resident.contractStartDate && (
-                            <div className="flex items-center justify-center space-x-1 text-xs">
-                              <Calendar className="h-2.5 w-2.5 text-green-600" />
-                              <span className="font-semibold text-green-800">
-                                Contract: {new Date(resident.contractStartDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Ultra-Compact Room Assignment Info */}
-                    {resident.roomNumber && (
-                      <div className="p-1.5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-md border border-blue-200 mb-1.5">
-                        <div className="flex items-center justify-center space-x-1">
-                          <Building2 className="h-2.5 w-2.5 text-blue-600" />
-                          <span className="text-xs font-semibold text-blue-800">
-                            Room {resident.roomNumber} • Bed {resident.bedNumber || 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Ultra-Compact Selection Indicator */}
-                    {!isAssigned && (
-                      <div className="mt-1.5 flex items-center justify-center">
-                        <div className="flex items-center gap-1 px-1.5 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md text-xs font-semibold">
-                          <span>Select</span>
-                          <ArrowRight className="h-2.5 w-2.5" />
-                        </div>
-                      </div>
-                    )}
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">No residents found</h3>
+            <p className="text-gray-600 text-xs">
+              {showAllResidents ? 'No residents available' : 'All residents are already assigned'}
+            </p>
+          </div>
+        ) : (
+          filteredResidents.map((resident) => {
+            const isAssigned = resident.roomId && resident.bedNumber;
+            
+            return (
+              <motion.div
+                key={resident._id}
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className={`group relative p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer bg-white ${
+                  isAssigned
+                    ? 'border-gray-200 bg-gray-50 opacity-60'
+                    : 'border-gray-200 hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50 hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-indigo-50/50'
+                } ${isAssigned ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={() => !isAssigned && handleResidentSelect(resident)}
+              >
+                {/* Premium Avatar with Gradient */}
+                <div className="flex items-center justify-center mb-3">
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all relative ${
+                    isAssigned 
+                      ? 'bg-gray-200' 
+                      : 'bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 group-hover:scale-110 group-hover:shadow-xl'
+                  }`}>
+                    <div className={`absolute inset-0 rounded-xl ${
+                      isAssigned ? '' : 'bg-gradient-to-br from-blue-400/30 to-purple-400/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity'
+                    }`}></div>
+                    <User className={`h-7 w-7 relative z-10 ${isAssigned ? 'text-gray-400' : 'text-white'}`} />
                   </div>
-                </motion.div>
-              );
-            })
-          )}
+                </div>
+                
+                {/* Resident Name - Centered */}
+                <div className="text-center mb-3">
+                  <h3 className="font-bold text-base text-gray-900 mb-2 truncate">
+                    {resident.firstName} {resident.lastName}
+                  </h3>
+                  
+                  {/* Status Badge */}
+                  {isAssigned ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200 shadow-sm">
+                      <CheckCircle className="h-3 w-3 inline mr-1.5" />
+                      Assigned
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-100 text-green-700 border border-green-200 shadow-sm">
+                      <Sparkles className="h-3 w-3 inline mr-1.5" />
+                      Available
+                    </span>
+                  )}
+                </div>
+                
+                {/* Contact Details - Card Layout */}
+                <div className="space-y-2 mb-3">
+                  {resident.phone && (
+                    <div className="flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                      <Phone className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate">{resident.phone}</span>
+                    </div>
+                  )}
+                  {resident.email && (
+                    <div className="flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                      <Mail className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 truncate">{resident.email}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Premium Selection Button - Centered */}
+                {!isAssigned && (
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg text-xs font-bold shadow-md group-hover:shadow-lg group-hover:from-blue-600 group-hover:to-indigo-700 transition-all w-full justify-center">
+                      <span>Select</span>
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })
+        )}
       </div>
     </motion.div>
   );
@@ -1322,105 +1282,94 @@ const ResidentOnboarding = () => {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-3"
     >
-      {/* Ultra-Compact Header Section */}
-      <div className="text-center">
-        <div className="flex items-center justify-center mb-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-2 shadow-sm">
+      {/* Compact Header */}
+      <div className="text-center mb-2">
+        <div className="flex items-center justify-center mb-1">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow-sm">
             <Home className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900 mb-0.5">Choose Room Type</h2>
-            <p className="text-gray-600 text-xs">
-              Select the sharing type for {selectedResident?.firstName}
-            </p>
+            <h2 className="text-base font-semibold text-gray-900">Choose Room Type</h2>
           </div>
         </div>
       </div>
 
-      {/* Ultra-Compact Sharing Types Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+      {/* Modern Grid Layout - 4 Cards Per Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {sharingTypes.map((sharingType) => (
-                      <motion.div
-              key={sharingType.id}
-              whileHover={{ scale: 1.02, y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              className={`group relative p-2 rounded-lg border transition-all duration-300 cursor-pointer ${
+          <motion.div
+            key={sharingType.id}
+            whileHover={{ scale: 1.03, y: -4 }}
+            whileTap={{ scale: 0.98 }}
+            className={`group relative p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer bg-white ${
+              selectedSharingType?.id === sharingType.id
+                ? 'border-blue-500 bg-blue-50 shadow-xl'
+                : 'border-gray-200 hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50 hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-indigo-50/50'
+            }`}
+            onClick={() => handleSharingTypeSelect(sharingType)}
+          >
+            {/* Premium Icon - Centered */}
+            <div className="flex items-center justify-center mb-3">
+              <div className={`w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all relative ${
                 selectedSharingType?.id === sharingType.id
-                  ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md shadow-blue-100'
-                  : 'border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50 hover:border-blue-300 hover:shadow-sm'
-              }`}
-              onClick={() => handleSharingTypeSelect(sharingType)}
-            >
-              {/* Background gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
+                  ? 'bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 text-white scale-110 shadow-xl'
+                  : 'bg-blue-100 text-blue-600 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:scale-110 group-hover:shadow-xl'
+              }`}>
+                <div className={`absolute inset-0 rounded-xl ${
+                  selectedSharingType?.id === sharingType.id 
+                    ? 'bg-gradient-to-br from-blue-400/30 to-purple-400/30 blur-md opacity-100'
+                    : 'bg-gradient-to-br from-blue-400/30 to-purple-400/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity'
+                }`}></div>
+                <Users className="h-7 w-7 relative z-10" />
+              </div>
+            </div>
+          
+            {/* Type Info - Centered */}
+            <div className="text-center mb-3">
+              <h3 className="font-bold text-base text-gray-900 mb-2 truncate">
+                {sharingType.name}
+              </h3>
               
-              <div className="relative text-center">
-                {/* Ultra-Compact Icon */}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-1.5 shadow-sm ${
-                  selectedSharingType?.id === sharingType.id
-                    ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
-                    : 'bg-gradient-to-br from-blue-100 to-purple-100 text-blue-600'
-                }`}>
-                  <Users className="h-5 w-5" />
-                </div>
+              {/* Price */}
+              <div className="flex items-center justify-center space-x-1 mb-2">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+                <span className="text-lg font-bold text-blue-600">
+                  ₹{sharingType.cost?.toLocaleString()}
+                </span>
+                <span className="text-xs text-gray-500">/month</span>
+              </div>
               
-                              {/* Ultra-Compact Title */}
-                <h3 className="font-bold text-gray-900 mb-1.5 text-xs">
-                  {sharingType.name}
-                </h3>
-                
-                {/* Ultra-Compact Description */}
-                <p className="text-xs text-gray-600 mb-1.5 px-0.5">
-                  {sharingType.description || `${sharingType.name} accommodation`}
+              {/* Description */}
+              {sharingType.description && (
+                <p className="text-xs text-gray-600 mb-2 truncate">
+                  {sharingType.description}
                 </p>
-                
-                {/* Ultra-Compact Price */}
-                <div className="flex items-center justify-center space-x-1 mb-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="text-base font-bold text-blue-600">
-                    ₹{sharingType.cost?.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-gray-500">/month</span>
-                </div>
+              )}
               
-                              {/* Ultra-Compact Features */}
-                <div className="space-y-0.5 mb-1.5">
-                  <div className="flex items-center justify-center space-x-1 text-xs text-gray-600 bg-white/80 rounded-md p-1">
-                    <Bed className="h-2.5 w-2.5" />
-                    <span className="font-medium">{sharingType.beds || 1} bed{sharingType.beds !== 1 ? 's' : ''} per room</span>
-                  </div>
-                  <div className="flex items-center justify-center space-x-1 text-xs text-gray-600 bg-white/80 rounded-md p-1">
-                    <Star className="h-2.5 w-2.5 text-yellow-500" />
-                    <span className="font-medium">Premium accommodation</span>
-                  </div>
-                </div>
-              
-                              {/* Ultra-Compact Selection Indicator */}
-                {selectedSharingType?.id === sharingType.id && (
-                  <div className="mt-1.5 p-1.5 bg-gradient-to-r from-blue-100 to-purple-100 rounded-md border border-blue-200">
-                    <div className="flex items-center justify-center space-x-1">
-                      <CheckCircle2 className="h-2.5 w-2.5 text-blue-600" />
-                      <span className="text-xs font-semibold text-blue-700">Selected</span>
-                    </div>
-                  </div>
-                )}
+              {/* Selection Indicator */}
+              {selectedSharingType?.id === sharingType.id && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
+                  <CheckCircle2 className="h-3 w-3 inline mr-1.5" />
+                  Selected
+                </span>
+              )}
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Ultra-Compact Action Buttons */}
+      {/* Compact Action Buttons */}
       <div className="flex justify-between items-center pt-2">
         <button
           onClick={goBack}
-          className="flex items-center px-3 py-1.5 text-gray-600 hover:text-gray-800 transition-all duration-200 font-medium text-xs"
+          className="flex items-center px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all"
         >
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back
         </button>
         
-        <div className="text-xs text-gray-500 font-medium">
-          {sharingTypes.length} option{sharingTypes.length !== 1 ? 's' : ''} available
+        <div className="text-[10px] text-gray-500 font-medium">
+          {sharingTypes.length} option{sharingTypes.length !== 1 ? 's' : ''}
         </div>
       </div>
     </motion.div>
@@ -1431,75 +1380,72 @@ const ResidentOnboarding = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="space-y-6"
+      className="space-y-3"
     >
-      {/* Enhanced Header Section */}
-      <div className="text-center">
-        <div className="flex items-center justify-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center mr-4 shadow-lg">
-            <Building2 className="h-7 w-7 text-white" />
+      {/* Compact Header */}
+      <div className="text-center mb-2">
+        <div className="flex items-center justify-center mb-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow-sm">
+            <Building2 className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Room</h2>
-            <p className="text-gray-600 text-sm">
-              Choose a room for {selectedResident?.firstName} ({selectedSharingType?.name})
-            </p>
+            <h2 className="text-base font-semibold text-gray-900">Select Room</h2>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Selected Options Summary */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-200 shadow-lg">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-md">
-              <User className="h-5 w-5 text-blue-600" />
+      {/* Compact Selected Options Summary */}
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shadow-sm">
+              <User className="h-3.5 w-3.5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-600 font-medium">Selected Resident</p>
-              <p className="text-sm font-bold text-gray-900">
+              <p className="text-[10px] text-gray-600 font-medium">Resident</p>
+              <p className="text-xs font-semibold text-gray-900 truncate">
                 {selectedResident?.firstName} {selectedResident?.lastName}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center shadow-md">
-              <Home className="h-5 w-5 text-green-600" />
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center shadow-sm">
+              <Home className="h-3.5 w-3.5 text-green-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-600 font-medium">Room Type</p>
-              <p className="text-sm font-bold text-gray-900">{selectedSharingType?.name}</p>
+              <p className="text-[10px] text-gray-600 font-medium">Room Type</p>
+              <p className="text-xs font-semibold text-gray-900">{selectedSharingType?.name}</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center shadow-md">
-              <Building2 className="h-5 w-5 text-purple-600" />
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shadow-sm">
+              <Building2 className="h-3.5 w-3.5 text-purple-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-600 font-medium">Available Rooms</p>
-              <p className="text-sm font-bold text-gray-900">
-                {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} available
+              <p className="text-[10px] text-gray-600 font-medium">Available</p>
+              <p className="text-xs font-semibold text-gray-900">
+                {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} rooms
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Rooms Grid */}
-      <div className="grid gap-3">
+      {/* Compact Rooms Grid */}
+      <div className="grid gap-2">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-600 font-medium">Loading available rooms...</p>
+          <div className="text-center py-6">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent mx-auto mb-2"></div>
+            <p className="text-gray-600 text-xs font-medium">Loading rooms...</p>
           </div>
         ) : (availableRooms || []).length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Building2 className="h-10 w-10 text-gray-400" />
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-2 shadow-sm">
+              <Building2 className="h-6 w-6 text-gray-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No rooms available</h3>
-            <p className="text-gray-600 text-sm">
-              No rooms are currently available for {selectedSharingType?.name}
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">No rooms available</h3>
+            <p className="text-gray-600 text-xs">
+              No rooms available for {selectedSharingType?.name}
             </p>
           </div>
         ) : (
@@ -1511,102 +1457,77 @@ const ResidentOnboarding = () => {
             return (
               <motion.div
                 key={room._id}
-                whileHover={{ scale: 1.01, y: -2 }}
+                whileHover={{ scale: 1.01, y: -1 }}
                 whileTap={{ scale: 0.99 }}
-                className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer ${
+                className={`group relative p-3 rounded-lg border transition-all duration-300 cursor-pointer ${
                   hasAvailableBeds
-                    ? 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-100'
+                    ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:shadow-sm'
                     : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
                 }`}
                 onClick={() => hasAvailableBeds && handleRoomSelect(room)}
               >
-                {/* Background gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
-                
                 <div className="relative flex items-center justify-between">
-                  {/* Enhanced Room Info */}
-                  <div className="flex items-center space-x-4 flex-1">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
+                  {/* Compact Room Info */}
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm ${
                       hasAvailableBeds
-                        ? 'bg-gradient-to-br from-blue-400 to-indigo-500'
-                        : 'bg-gray-200'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-400'
                     }`}>
-                      <Building2 className={`h-6 w-6 ${hasAvailableBeds ? 'text-white' : 'text-gray-400'}`} />
+                      <Building2 className={`h-5 w-5`} />
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold text-gray-900 text-lg">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <h3 className="font-semibold text-gray-900 text-sm">
                           Room {room.roomNumber}
                         </h3>
                         {hasAvailableBeds ? (
-                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200">
-                            <CheckCircle className="h-3 w-3 inline mr-1.5" />
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-green-100 text-green-700 border border-green-200">
+                            <CheckCircle className="h-2 w-2 inline mr-0.5" />
                             Available
                           </span>
                         ) : (
-                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-                            <Clock className="h-3 w-3 inline mr-1.5" />
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                            <Clock className="h-2 w-2 inline mr-0.5" />
                             Full
                           </span>
                         )}
                       </div>
                       
-                      {/* Enhanced Room Details */}
-                      <div className="grid grid-cols-3 gap-3 text-xs text-gray-600 mb-3">
-                        <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                          <Bed className="h-3 w-3" />
-                          <span className="font-medium">{room.totalBeds || room.numberOfBeds} total beds</span>
+                      {/* Compact Room Details */}
+                      <div className="grid grid-cols-3 gap-1.5 text-[10px] text-gray-600 mb-2">
+                        <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                          <Bed className="h-2.5 w-2.5" />
+                          <span className="font-medium truncate">{room.totalBeds || room.numberOfBeds} beds</span>
                         </div>
-                        <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                          <CheckCircle className="h-3 w-3" />
-                          <span className="font-medium">{room.availableBedsCount} available beds</span>
+                        <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                          <CheckCircle className="h-2.5 w-2.5" />
+                          <span className="font-medium">{room.availableBedsCount} available</span>
                         </div>
-                        <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                          <MapPin className="h-3 w-3" />
-                          <span className="font-medium">Floor {room.floorNumber || 'N/A'}</span>
+                        <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                          <MapPin className="h-2.5 w-2.5" />
+                          <span className="font-medium truncate">Floor {room.floorNumber || 'N/A'}</span>
                         </div>
                       </div>
                       
-                      {/* Enhanced Bed Status */}
-                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-blue-800">Bed Status</span>
-                            <span className="text-xs text-blue-600 font-medium">
-                              {room.availableBedsCount}/{room.totalBeds} available
-                            </span>
-                          </div>
-                          
-                        {/* Available Bed Numbers */}
-                        {room.availableBedNumbers && room.availableBedNumbers.length > 0 && (
-                          <div className="mb-2">
-                            <span className="text-xs text-blue-700 font-medium">Available beds: </span>
-                            <span className="text-xs text-blue-600">
-                              {room.availableBedNumbers.slice(0, 3).join(', ')}
-                              {room.availableBedNumbers.length > 3 && ` +${room.availableBedNumbers.length - 3} more`}
-                                </span>
-                            </div>
-                          )}
-                          
-                        {/* Bed Status Indicators */}
-                        <div className="flex items-center space-x-1">
-                          <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                          <span className="text-xs text-green-700 font-medium">
-                            {room.availableBedsCount} Available
-                                    </span>
-                          <div className="w-3 h-3 rounded-full bg-gray-400 ml-2"></div>
-                          <span className="text-xs text-gray-600 font-medium">
-                            {room.occupiedBeds} Occupied
+                      {/* Compact Bed Status */}
+                      {room.availableBedNumbers && room.availableBedNumbers.length > 0 && (
+                        <div className="flex items-center space-x-1 text-[10px]">
+                          <span className="text-gray-600 font-medium">Available beds: </span>
+                          <span className="text-blue-600 font-semibold">
+                            {room.availableBedNumbers.slice(0, 4).join(', ')}
+                            {room.availableBedNumbers.length > 4 && ` +${room.availableBedNumbers.length - 4}`}
                           </span>
-                              </div>
-                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
-                  {/* Enhanced Action Arrow */}
+                  {/* Compact Action Button */}
                   {hasAvailableBeds && (
-                  <div className="flex items-center ml-3">
-                      <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg text-xs font-semibold">
+                  <div className="flex items-center ml-2">
+                      <div className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded-md text-xs font-semibold">
                         <span>Select</span>
                         <ArrowRight className="h-3 w-3" />
                       </div>
@@ -1617,98 +1538,68 @@ const ResidentOnboarding = () => {
             );
           })}
           
-          {/* Notice Period Rooms Section */}
+          {/* Compact Notice Period Rooms Section */}
           {(availableRooms || []).filter(room => room.hasNoticePeriodBeds && room.availableBedsCount === 0).length > 0 && (
-            <div className="mt-8">
-              <div className="text-center mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Notice Period Rooms</h3>
-                <p className="text-sm text-gray-600">
-                  These rooms will have beds available after notice period expires
+            <div className="mt-4">
+              <div className="text-center mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Notice Period Rooms</h3>
+                <p className="text-xs text-gray-600">
+                  Available after notice period expires
                 </p>
               </div>
               
-              <div className="grid gap-4">
+              <div className="grid gap-2">
                 {(availableRooms || [])
                   .filter(room => room.hasNoticePeriodBeds && room.availableBedsCount === 0)
                   .map((room) => (
                     <motion.div
                       key={room._id}
-                      whileHover={{ scale: 1.01, y: -2 }}
+                      whileHover={{ scale: 1.01, y: -1 }}
                       whileTap={{ scale: 0.99 }}
-                      className="group relative p-4 rounded-2xl border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50 hover:border-yellow-300 hover:shadow-xl hover:shadow-yellow-100 transition-all duration-300"
+                      className="group relative p-3 rounded-lg border border-yellow-200 bg-yellow-50 hover:border-yellow-300 hover:shadow-sm transition-all duration-300"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 flex-1">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
-                            <Clock className="h-6 w-6 text-white" />
+                        <div className="flex items-center space-x-2 flex-1">
+                          <div className="w-9 h-9 rounded-lg bg-yellow-500 flex items-center justify-center shadow-sm">
+                            <Clock className="h-4 w-4 text-white" />
                           </div>
                           
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="font-bold text-gray-900 text-lg">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="font-semibold text-gray-900 text-sm">
                                 Room {room.roomNumber}
                               </h3>
-                              <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 border border-yellow-200">
-                                <Clock className="h-3 w-3 inline mr-1.5" />
+                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-yellow-100 text-yellow-700 border border-yellow-200">
+                                <Clock className="h-2 w-2 inline mr-0.5" />
                                 Notice Period
                               </span>
                             </div>
                             
-                            <div className="grid grid-cols-3 gap-3 text-xs text-gray-600 mb-3">
-                              <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                                <Bed className="h-3 w-3" />
-                                <span className="font-medium">{room.totalBeds || room.numberOfBeds} total beds</span>
+                            <div className="grid grid-cols-3 gap-1.5 text-[10px] text-gray-600">
+                              <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                                <Bed className="h-2.5 w-2.5" />
+                                <span className="font-medium truncate">{room.totalBeds || room.numberOfBeds} beds</span>
                               </div>
-                              <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                                <Clock className="h-3 w-3" />
-                                <span className="font-medium">{room.noticePeriodBedsCount} notice period beds</span>
+                              <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span className="font-medium truncate">{room.noticePeriodBedsCount} notice</span>
                               </div>
-                              <div className="flex items-center space-x-2 bg-white/80 rounded-lg p-2">
-                                <MapPin className="h-3 w-3" />
-                                <span className="font-medium">Floor {room.floorNumber || 'N/A'}</span>
+                              <div className="flex items-center space-x-1 bg-white/80 rounded-md px-1.5 py-1">
+                                <MapPin className="h-2.5 w-2.5" />
+                                <span className="font-medium truncate">Floor {room.floorNumber || 'N/A'}</span>
                               </div>
                             </div>
-                            
-                            {/* Notice Period Details */}
-                            {room.noticePeriodInfo && (
-                              <div className="p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-semibold text-yellow-800">Notice Period Info</span>
-                                  <span className="text-xs text-yellow-600 font-medium">
-                                    {room.noticePeriodInfo.earliestAvailability} - {room.noticePeriodInfo.latestAvailability} days
-                                  </span>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  {room.noticePeriodInfo.beds.map((bed, index) => (
-                                    <div key={index} className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-700">Bed {bed.bedNumber}:</span>
-                                      <div className="text-right">
-                                        <div className="font-medium text-gray-900">{bed.residentName}</div>
-                                        <div className="text-yellow-600">{bed.noticeDays} days notice</div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                <div className="mt-3 p-2 bg-yellow-100 border border-yellow-300 rounded-lg">
-                                  <p className="text-xs text-yellow-800 font-medium text-center">
-                                    ⚠️ This room will have {room.noticePeriodInfo.totalBeds} bed(s) available after notice period expires
-                                  </p>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
                         
-                        {/* Action Button */}
-                        <div className="flex items-center ml-4">
+                        {/* Compact Action Button */}
+                        <div className="flex items-center ml-2">
                           <button
                             onClick={() => handleNoticePeriodRoomSelect(room)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg text-sm font-semibold hover:from-yellow-600 hover:to-orange-700 transition-all duration-200"
+                            className="flex items-center gap-1 px-2 py-1 bg-yellow-500 text-white rounded-md text-xs font-semibold hover:bg-yellow-600 transition-all"
                           >
-                            <Clock className="h-4 w-4" />
-                            <span>Get Notified</span>
+                            <Clock className="h-3 w-3" />
+                            <span>Notify</span>
                           </button>
                         </div>
                       </div>
@@ -1721,18 +1612,18 @@ const ResidentOnboarding = () => {
         )}
       </div>
 
-      {/* Enhanced Action Buttons */}
-      <div className="flex justify-between items-center pt-6">
+      {/* Compact Action Buttons */}
+      <div className="flex justify-between items-center pt-3">
         <button
           onClick={goBack}
-          className="flex items-center px-6 py-3 text-gray-600 hover:text-gray-800 transition-all duration-200 font-medium"
+          className="flex items-center px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back
         </button>
         
-        <div className="text-sm text-gray-500 font-medium">
-          {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} room{(availableRooms || []).filter(room => room.availableBedsCount > 0).length !== 1 ? 's' : ''} available
+        <div className="text-[10px] text-gray-500 font-medium">
+          {(availableRooms || []).filter(room => room.availableBedsCount > 0).length} available
         </div>
       </div>
     </motion.div>
@@ -2841,28 +2732,28 @@ const ResidentOnboarding = () => {
     }
   };
 
-  // Enhanced Step Progress Component
+  // Compact Enhanced Step Progress Component
   const StepProgress = () => (
-    <div className="relative w-full mb-8">
-      {/* Back Button Section - Added to the top */}
-      <div className="flex justify-between items-center mb-4">
+    <div className="relative w-full mb-4">
+      {/* Compact Back Button Section */}
+      <div className="flex justify-between items-center mb-3">
         {currentStep > 1 ? (
           <button
             onClick={goBack}
-            className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+            className="flex items-center text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white px-2 py-1 rounded-md transition-all"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
             Back
           </button>
         ) : (
-          <div></div> // Placeholder to maintain layout
+          <div></div>
         )}
-        <div className="text-sm text-gray-500">
+        <div className="text-xs font-medium text-gray-500">
           {Math.round((currentStep / 7) * 100)}% Complete
         </div>
       </div>
 
-      <div className="flex items-center justify-between space-x-2">
+      <div className="flex items-center justify-between space-x-1">
         {[
           { step: 1, label: 'Resident' },
           { step: 2, label: 'Room Type' },
@@ -2878,28 +2769,28 @@ const ResidentOnboarding = () => {
           >
             <div 
               className={`
-                w-10 h-10 rounded-full flex items-center justify-center 
+                w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold
                 transition-all duration-300 ease-in-out
                 ${
                   item.step < currentStep 
                     ? 'bg-green-500 text-white' 
                     : item.step === currentStep 
-                    ? 'bg-red-500 text-white scale-110' 
+                    ? 'bg-blue-500 text-white scale-110' 
                     : 'bg-gray-200 text-gray-500'
                 }
-                shadow-md
+                shadow-sm
                 relative z-10
               `}
             >
               {item.step < currentStep ? (
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-4 h-4" />
               ) : (
                 item.step
               )}
             </div>
             <span 
               className={`
-                text-xs mt-2 text-center 
+                text-[10px] mt-1 text-center 
                 ${
                   item.step <= currentStep 
                     ? 'text-gray-900 font-semibold' 
@@ -2912,8 +2803,8 @@ const ResidentOnboarding = () => {
             {item.step < 7 && (
               <div 
                 className={`
-                  absolute top-5 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                  h-1 w-full 
+                  absolute top-4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+                  h-0.5 w-full 
                   ${
                     item.step < currentStep 
                       ? 'bg-green-500' 
@@ -2931,27 +2822,27 @@ const ResidentOnboarding = () => {
 
   // Modify the return statement to include the new StepProgress
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        {/* Modern Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center mr-3 shadow-lg">
-              <UserCheck className="h-6 w-6 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-4">
+      <div className="max-w-full mx-auto px-3 sm:px-2">
+        {/* Compact Modern Header */}
+        <div className="text-center mb-4">
+          <div className="flex items-center justify-center mb-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow-md">
+              <UserCheck className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Resident Onboarding</h1>
-              <p className="text-sm text-gray-600">Streamlined process for welcoming new residents</p>
+              <h1 className="text-xl font-bold text-gray-900 mb-0.5">Resident Onboarding</h1>
+              <p className="text-xs text-gray-600">Streamlined onboarding process</p>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Step Progress */}
+        {/* Compact Enhanced Step Progress */}
         <StepProgress />
 
-        {/* Main Content with Enhanced Animations */}
+        {/* Main Content with Compact Design */}
         <motion.div 
-          className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6"
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}

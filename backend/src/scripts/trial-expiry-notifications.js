@@ -139,14 +139,15 @@ function startTrialNotificationCron() {
     await sendTrialExpiredNotifications();
   });
 
-  // Also run immediately for testing
-  if (process.env.NODE_ENV === 'development') {
-    logger.log('info', '🧪 Running trial notifications immediately for testing');
-    setTimeout(() => {
-      sendTrialExpiryNotifications();
-      sendTrialExpiredNotifications();
-    }, 5000); // 5 second delay
-  }
+  // Manual testing can be done by calling runManualCheck() or running the script directly
+  // Uncomment below for testing (be careful with production data):
+  // if (process.env.NODE_ENV === 'development' && process.env.RUN_TRIAL_NOTIFICATIONS_ON_START === 'true') {
+  //   logger.log('info', '🧪 Running trial notifications immediately for testing');
+  //   setTimeout(() => {
+  //     sendTrialExpiryNotifications();
+  //     sendTrialExpiredNotifications();
+  //   }, 5000); // 5 second delay
+  // }
 
   logger.log('info', '✅ Trial notification cron jobs started successfully');
 }

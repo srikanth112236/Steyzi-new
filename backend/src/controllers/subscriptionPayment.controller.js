@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const razorpayService = require('../services/razorpay.service');
 const subscriptionService = require('../services/subscription.service');
 const logger = require('../utils/logger');
@@ -206,84 +207,106 @@ exports.verifyPayment = async (req, res) => {
  * @route POST /api/subscription-payments/webhook
  * @access Public (Razorpay webhook)
  */
+/**
+ * Handle payment webhook
+ * @route POST /api/subscriptions/payments/webhook
+ * @access Public (webhook endpoint)
+ */
 exports.handleWebhook = async (req, res) => {
+  console.log('🎣 WEBHOOK RECEIVED! ===========================================');
+  console.log('⏰ Timestamp:', new Date().toISOString());
+  console.log('📡 Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+
+  const signature = req.headers['x-razorpay-signature'];
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
   try {
-    console.log('\n🎣 WEBHOOK RECEIVED ====================');
-    console.log('📅 Timestamp:', new Date().toISOString());
-    console.log('🔗 Source IP:', req.ip || req.connection.remoteAddress);
+    console.log('🔐 Verifying webhook signature...');
 
-    const webhookSignature = req.headers['x-razorpay-signature'];
-    const payload = req.body;
+    // === 1. Verify Signature ===
+    if (!signature) {
+      console.log('❌ ERROR: Webhook received without signature');
+      logger.warn('Webhook received without signature');
+      return res.status(400).json({ success: false, message: 'Missing signature' });
+    }
 
-    console.log('📨 Webhook Event:', payload.event);
-    console.log('💳 Payment ID:', payload?.payment?.entity?.id);
-    console.log('📋 Order ID:', payload?.order?.entity?.id);
+    console.log('✅ Signature present:', signature.substring(0, 20) + '...');
 
-    // Verify webhook signature for security
-    const crypto = require('crypto');
-    // TEMPORARY: Direct webhook secret (move to .env later)
-    const WEBHOOK_SECRET = 'razorpay_webhook_secret_2025'; // CHANGE THIS TO A STRONG SECRET
-    const expectedSignature = crypto.createHmac('sha256', WEBHOOK_SECRET)
-      .update(JSON.stringify(payload))
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(JSON.stringify(req.body))
       .digest('hex');
 
-    console.log('🔐 Signature Verification:');
-    console.log('   ├─ Received:', webhookSignature);
-    console.log('   └─ Expected:', expectedSignature);
+    console.log('🔍 Expected signature:', expectedSignature.substring(0, 20) + '...');
+    console.log('🔍 Signature match:', signature === expectedSignature ? '✅ YES' : '❌ NO');
 
-    if (webhookSignature !== expectedSignature) {
-      console.log('❌ SIGNATURE VERIFICATION FAILED');
-      logger.warn('Invalid webhook signature received:', {
-        received: webhookSignature,
+    if (signature !== expectedSignature) {
+      console.log('❌ ERROR: Invalid webhook signature!');
+      logger.warn('Invalid webhook signature', {
+        received: signature,
         expected: expectedSignature
       });
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid webhook signature'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
-    console.log('✅ SIGNATURE VERIFICATION PASSED');
+    console.log('✅ Signature verified successfully!');
 
-    console.log('🔄 Processing webhook data...');
+    // === 2. Process Webhook ===
+    const event = req.body.event;
+    const paymentId = req.body?.payload?.payment?.entity?.id;
+    const orderId = req.body?.payload?.order?.entity?.id;
 
-    const webhookResult = await razorpayService.handleWebhook({
-      event: payload.event,
-      payload: payload
+    console.log('🚀 Processing webhook event:', event);
+    console.log('💳 Payment ID:', paymentId || 'N/A');
+    console.log('📋 Order ID:', orderId || 'N/A');
+
+    logger.info('RAZORPAY SERVICE: Processing webhook...', {
+      event: event,
+      paymentId: paymentId,
+      orderId: orderId
     });
 
-    if (!webhookResult.success) {
-      console.log('❌ WEBHOOK PROCESSING FAILED');
-      console.log('   ├─ Error:', webhookResult.error);
-      console.log('   └─ Message:', webhookResult.message);
+    console.log('🔄 Calling subscription service to handle webhook...');
+    const result = await subscriptionService.handlePaymentWebhook(req.body);
 
-      logger.error('Subscription webhook processing failed:', webhookResult.error);
-      return res.status(500).json({
-        success: false,
-        message: 'Webhook processing failed',
-        error: webhookResult.error
-      });
+    console.log('📊 Webhook processing result:', result);
+
+    if (!result.success) {
+      console.log('❌ ERROR: Webhook processing failed!');
+      logger.error('Webhook processing failed', result);
+      return res.status(400).json(result);
     }
 
-    console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY');
-    console.log('   ├─ Event:', payload.event);
-    console.log('   ├─ Payment ID:', payload?.payment?.entity?.id);
-    console.log('   └─ User ID:', payload?.order?.entity?.notes?.userId);
+    console.log('✅ SUCCESS: Webhook processed successfully!');
 
-    return res.status(200).json({
+    // === 3. Respond ===
+    console.log('📤 Sending 200 response to Razorpay...');
+    const response = {
       success: true,
-      message: 'Webhook processed successfully'
-    });
+      message: 'Webhook processed successfully',
+      event: event,
+      paymentId: paymentId
+    };
+    console.log('📤 Response:', JSON.stringify(response, null, 2));
+    console.log('🎉 WEBHOOK PROCESSING COMPLETED! ===========================================\n');
+
+    return res.status(200).json(response);
   } catch (error) {
-    logger.error('Error handling subscription webhook:', error);
+    console.log('💥 ERROR: Exception in webhook handler!');
+    console.log('❌ Error message:', error.message);
+    console.log('❌ Error stack:', error.stack);
+
+    logger.error('Error in handleWebhook controller:', {
+      error: error.message,
+      stack: error.stack
+    });
     return res.status(500).json({
       success: false,
-      message: 'Webhook processing failed',
-      error: error.message
+      message: 'Internal server error'
     });
   }
 };
-
 /**
  * Get user's subscription payment history
  * @route GET /api/subscription-payments/history

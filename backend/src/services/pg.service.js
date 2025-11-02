@@ -156,14 +156,70 @@ class PGService {
 
       console.log('Sales user validated successfully');
 
+      // Create admin user for this PG (similar to regular PG creation)
+      const adminEmail = pgData.contact?.email;
+      const adminPassword = pgData.adminPassword || pgData.password || 'Admin@123';
+      const adminPhone = pgData.contact?.phone || '0000000000'; // Fallback phone number
+      
+      if (!adminEmail) {
+        throw new Error('PG admin email is required');
+      }
+      
+      console.log('Creating admin user for PG:', {
+        email: adminEmail,
+        name: pgData.name,
+        phone: adminPhone
+      });
+
+      // Check if admin user already exists
+      let adminUser = await User.findOne({ email: adminEmail });
+      
+      if (!adminUser) {
+        // Create new admin user
+        adminUser = new User({
+          firstName: pgData.name || 'PG Admin',
+          lastName: 'User',
+          email: adminEmail,
+          password: adminPassword, // Explicitly set the password
+          phone: adminPhone, // Add phone number
+          role: 'admin',
+          isActive: true,
+          isEmailVerified: true
+        });
+
+        await adminUser.save();
+        console.log('Admin user created successfully:', adminUser._id);
+      } else {
+        console.log('Admin user already exists:', adminUser._id);
+        // Update existing user to admin role if needed
+        if (adminUser.role !== 'admin') {
+          adminUser.role = 'admin';
+          adminUser.isActive = true;
+          adminUser.isEmailVerified = true;
+          adminUser.phone = adminPhone; // Update phone if not set
+          await adminUser.save();
+          console.log('Existing user updated to admin role');
+        }
+      }
+
       // Transform the data to match PG model structure (same as regular PG creation)
       const transformedData = {
         name: pgData.name,
         description: pgData.description || '',
-        // Convert address object to string (same format as regular PG creation)
-        address: pgData.address ?
-          `${pgData.address.street}, ${pgData.address.city}, ${pgData.address.state} - ${pgData.address.pincode}${pgData.address.landmark ? ` (${pgData.address.landmark})` : ''}` :
-          '',
+        // Store address as object (same format as regular PG creation)
+        address: pgData.address ? {
+          street: pgData.address.street || '',
+          city: pgData.address.city || '',
+          state: pgData.address.state || '',
+          pincode: pgData.address.pincode || '',
+          landmark: pgData.address.landmark || ''
+        } : {
+          street: '',
+          city: '',
+          state: '',
+          pincode: '',
+          landmark: ''
+        },
         phone: pgData.contact?.phone || '',
         email: pgData.contact?.email || '',
         status: pgData.status || 'active', // Use provided status or default to 'active'
@@ -171,8 +227,8 @@ class PGService {
         salesManager: pgData.salesManager || '',
         salesStaff: pgData.salesStaff || '',
         addedBy: salesUserId,
-        // Create a default admin (sales user themselves for now)
-        admin: salesUserId,
+        // Set admin to the created/updated admin user
+        admin: adminUser._id,
         createdBy: salesUserId,
         isActive: true
       };
@@ -185,48 +241,51 @@ class PGService {
 
       console.log('PG created successfully:', savedPG._id);
 
-      // Update commission calculations for the sales user
+      // Associate the PG with the admin user
+      adminUser.pgId = savedPG._id;
+      await adminUser.save();
+      console.log('PG associated with admin user:', adminUser._id);
+
+      // Track total PGs added (but don't award commission yet - only when subscription is active)
+      // Commission will be awarded when PG admin subscribes to an active plan
       try {
         if (userType === 'sales_manager') {
-          // Update sales manager's commission metrics
+          // Update sales manager's total PGs added count (not commission)
           await SalesManager.findByIdAndUpdate(salesUserId, {
             $inc: {
-              'performanceMetrics.totalPGsAdded': 1,
-              'performanceMetrics.totalCommissionGenerated': salesUser.commissionRate || 10
+              'performanceMetrics.totalPGsAdded': 1
             }
           });
-          console.log(`Updated sales manager commission: +₹${salesUser.commissionRate || 10}`);
+          console.log(`Updated sales manager total PGs: +1`);
         } else if (userType === 'sub_sales') {
-          // For sub-sales staff, update both their own metrics and parent sales manager's commission
-          // Update sub-sales user's own performance metrics
+          // Update sub-sales user's total PGs added count (not commission)
           await User.findByIdAndUpdate(salesUserId, {
             $inc: {
-              'salesPerformanceMetrics.totalPGsAdded': 1,
-              'salesPerformanceMetrics.totalCommissionEarned': salesUser.salesCommissionRate || 10
+              'salesPerformanceMetrics.totalPGsAdded': 1
             },
             $set: {
               'salesPerformanceMetrics.lastPGAddedDate': new Date()
             }
           });
-          console.log(`Updated sub-sales staff performance: +1 PG, +₹${salesUser.salesCommissionRate || 10}`);
+          console.log(`Updated sub-sales staff total PGs: +1`);
 
-          // Update parent sales manager's commission metrics
+          // Update parent sales manager's total PGs count (not commission)
           const parentManager = await SalesManager.findById(salesUser.parentSalesPerson);
           if (parentManager) {
-            const commissionAmount = parentManager.commissionRate || 10;
             await SalesManager.findByIdAndUpdate(parentManager._id, {
               $inc: {
-                'performanceMetrics.totalPGsAdded': 1,
-                'performanceMetrics.totalCommissionGenerated': commissionAmount
+                'performanceMetrics.totalPGsAdded': 1
               }
             });
-            console.log(`Updated parent sales manager commission: +₹${commissionAmount}`);
+            console.log(`Updated parent sales manager total PGs: +1`);
           }
         }
-      } catch (commissionError) {
-        console.warn('Failed to update commission metrics:', commissionError.message);
-        // Don't fail the PG creation if commission update fails
+      } catch (error) {
+        console.warn('Failed to update PG count metrics:', error.message);
+        // Don't fail the PG creation if metric update fails
       }
+
+      console.log('Note: Commission will be awarded when PG admin subscribes to an active plan');
 
       return {
         success: true,
@@ -1436,6 +1495,92 @@ class PGService {
         isCustom: false
       }
     ];
+  }
+
+  // Get sharing types for a specific branch
+  async getSharingTypesForBranch(branchId) {
+    try {
+      const Branch = require('../models/branch.model');
+
+      const branch = await Branch.findById(branchId).select('sharingTypes name');
+
+      if (!branch) {
+        throw new Error('Branch not found');
+      }
+
+      return {
+        success: true,
+        data: branch.sharingTypes || [],
+        message: 'Branch sharing types retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Error getting branch sharing types:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error.message
+      };
+    }
+  }
+
+  // Configure sharing types for a specific branch
+  async configureSharingTypesForBranch(branchId, sharingTypes, user = null) {
+    try {
+      const Branch = require('../models/branch.model');
+
+      // Validate input
+      if (!branchId) {
+        throw new Error('Branch ID is required');
+      }
+
+      // Validate sharing types
+      const validatedSharingTypes = sharingTypes.map(type => {
+        // Validate required fields
+        if (!type.type || !type.name || type.cost === undefined || type.cost <= 0) {
+          throw new Error('Invalid sharing type: Missing or invalid required fields');
+        }
+
+        // Ensure type is one of the predefined or custom
+        const validTypes = ['1-sharing', '2-sharing', '3-sharing', '4-sharing'];
+        if (!validTypes.includes(type.type) && !type.isCustom) {
+          throw new Error(`Invalid sharing type: ${type.type}`);
+        }
+
+        return {
+          type: type.type,
+          name: type.name,
+          description: type.description || '',
+          cost: type.cost,
+          isCustom: type.isCustom || false
+        };
+      });
+
+      // Find and update branch
+      const branch = await Branch.findByIdAndUpdate(
+        branchId,
+        { sharingTypes: validatedSharingTypes },
+        { new: true }
+      );
+
+      if (!branch) {
+        throw new Error('Branch not found');
+      }
+
+      console.log(`Branch ${branch.name} sharing types configured successfully`);
+
+      return {
+        success: true,
+        message: 'Branch sharing types configured successfully',
+        data: branch.sharingTypes
+      };
+    } catch (error) {
+      console.error('Error configuring branch sharing types:', error);
+      return {
+        success: false,
+        message: error.message,
+        error: error.message
+      };
+    }
   }
 }
 

@@ -151,6 +151,11 @@ class BranchService {
         }
       }
 
+      // Prevent changing isDefault - only the first branch can be default
+      if (updateData.hasOwnProperty('isDefault')) {
+        delete updateData.isDefault;
+      }
+
       Object.assign(branch, updateData);
       await branch.save();
 
@@ -198,33 +203,27 @@ class BranchService {
         };
       }
 
-      // If this is the default branch, make another branch default
+      // Prevent deleting the default branch - only the first branch can be default
       if (branch.isDefault) {
-        const otherBranch = await Branch.findOne({ 
-          pgId: branch.pgId, 
-          isActive: true, 
-          _id: { $ne: branchId } 
-        });
-        
-        if (otherBranch) {
-          // Use direct database operation to avoid index conflicts
-          const db = Branch.db;
-          const collection = db.collection('branches');
-          
-          await collection.updateOne(
-            { _id: otherBranch._id },
-            { $set: { isDefault: true } }
-          );
-        }
+        return {
+          success: false,
+          message: 'Cannot delete the default branch. The default branch cannot be deleted.',
+          statusCode: 400
+        };
       }
 
       // Soft delete the branch
+      const branchName = branch.name;
       branch.isActive = false;
       await branch.save();
 
       return {
         success: true,
         message: 'Branch deleted successfully',
+        data: {
+          _id: branch._id,
+          name: branchName
+        },
         statusCode: 200
       };
     } catch (error) {

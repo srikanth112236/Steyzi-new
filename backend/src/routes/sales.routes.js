@@ -292,6 +292,26 @@ router.get('/analytics',
   SalesController.getSalesAnalytics
 );
 
+// Get commission statistics with active subscription breakdown
+router.get('/commission-stats',
+  salesUserAuth,
+  SalesController.getCommissionStatistics
+);
+
+// Get detailed commission management data for superadmin
+router.get('/commission-management',
+  authenticate,
+  authorize('superadmin'),
+  SalesController.getCommissionManagement
+);
+
+// Recalculate commissions based on active subscriptions (superadmin only)
+router.post('/recalculate-commissions',
+  authenticate,
+  authorize('superadmin'),
+  SalesController.recalculateCommissions
+);
+
 // Add error handling middleware
 router.use(salesErrorHandler);
 

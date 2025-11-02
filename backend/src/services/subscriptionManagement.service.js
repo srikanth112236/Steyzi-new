@@ -111,6 +111,35 @@ class SubscriptionManagementService {
       subscriptionPlan.subscribedCount += 1;
       await subscriptionPlan.save();
 
+      // Award commission if this user has a PG added by sales staff
+      // Commission is only awarded for active subscriptions (not trial initially, but can be included)
+      if (paymentStatus === 'completed' || billingCycle === 'trial') {
+        try {
+          const PG = require('../models/pg.model');
+          const salesService = require('./sales.service');
+          
+          // Find PG where this user is the admin
+          const pg = await PG.findOne({ admin: userId });
+          
+          if (pg && pg.addedBy && !pg.commissionAwarded) {
+            // Award commission for this PG subscription with subscription start date for phased rates
+            const commissionResult = await salesService.awardCommissionForActiveSubscription(
+              pg._id.toString(), 
+              user, 
+              startDate // Pass subscription start date for phased commission calculation
+            );
+            if (commissionResult.success) {
+              console.log(`✅ Commission awarded for PG ${pg._id} - User ${userId} subscription activated (Phase: ${commissionResult.commissionPhase})`);
+            } else {
+              console.log(`ℹ️ Commission not awarded: ${commissionResult.message}`);
+            }
+          }
+        } catch (commissionError) {
+          console.warn('Failed to award commission on subscription activation:', commissionError.message);
+          // Don't fail subscription if commission award fails
+        }
+      }
+
       // Log the subscription creation
       console.log(`Subscription created for user ${userId}`, {
         userId,
@@ -699,59 +728,50 @@ class SubscriptionManagementService {
    */
   async getAllSubscribers(filters = {}) {
     try {
-      // Build query for users with subscriptions
-      let userQuery = {};
+      // Build query for UserSubscription collection
+      let subscriptionQuery = {};
 
       // Handle status filter
       if (filters.status === 'all' || !filters.status) {
-        // Show all users with any subscription status except 'free'
-        userQuery = {
-          'subscription.status': { $in: ['active', 'trial', 'expired', 'cancelled'] }
-        };
+        // Show all subscriptions except free ones
+        subscriptionQuery = {};
       } else {
         // Filter by specific status
-        userQuery = {
-          'subscription.status': filters.status
-        };
+        subscriptionQuery.status = filters.status;
       }
 
       if (filters.billingCycle && filters.billingCycle !== 'all') {
-        userQuery['subscription.billingCycle'] = filters.billingCycle;
+        subscriptionQuery.billingCycle = filters.billingCycle;
       }
 
       if (filters.subscriptionPlanId && filters.subscriptionPlanId !== 'all') {
-        userQuery['subscription.planId'] = filters.subscriptionPlanId;
-      }
-
-      if (filters.userRole && filters.userRole !== 'all') {
-        userQuery.role = filters.userRole;
+        subscriptionQuery.subscriptionPlanId = filters.subscriptionPlanId;
       }
 
       // Date range filters
       if (filters.startDate) {
-        userQuery['subscription.startDate'] = { $gte: new Date(filters.startDate) };
+        subscriptionQuery.startDate = { $gte: new Date(filters.startDate) };
       }
       if (filters.endDate) {
-        userQuery['subscription.endDate'] = { $lte: new Date(filters.endDate) };
+        subscriptionQuery.endDate = { $lte: new Date(filters.endDate) };
       }
 
-      // Find users with subscriptions
-      const subscribers = await User.find(userQuery)
-        .populate('subscription.planId', 'planName billingCycle basePrice features')
-        .populate('pgId', 'name email')
-        .sort({ 'subscription.startDate': -1 })
+      // Find subscriptions with user and plan details
+      const subscriptions = await UserSubscription.find(subscriptionQuery)
+        .populate('userId', 'firstName lastName email role pgId')
+        .populate('subscriptionPlanId', 'planName billingCycle basePrice features')
+        .sort({ createdAt: -1 })
         .limit(100); // Limit for performance
 
       // Transform data to match expected format
-      const transformedSubscribers = subscribers.map(user => {
-        const subscription = user.subscription;
+      const transformedSubscribers = subscriptions.map(subscription => {
+        const user = subscription.userId;
+        const plan = subscription.subscriptionPlanId;
 
-        // Skip users without subscription data
-        if (!subscription || !subscription.status) {
+        // Skip subscriptions without user data
+        if (!user) {
           return null;
         }
-
-        const plan = subscription.planId;
 
         // Calculate additional fields
         const now = new Date();
@@ -767,7 +787,7 @@ class SubscriptionManagementService {
         const isTrialActive = subscription.status === 'trial' && trialDaysRemaining > 0;
 
         return {
-          _id: user._id,
+          _id: subscription._id,
           userId: {
             _id: user._id,
             firstName: user.firstName,
@@ -791,16 +811,16 @@ class SubscriptionManagementService {
           totalPrice: subscription.totalPrice || subscription.basePrice || 0,
           totalBeds: subscription.totalBeds,
           totalBranches: subscription.totalBranches,
-          currentBedUsage: subscription.usage?.bedsUsed || 0,
-          currentBranchUsage: subscription.usage?.branchesUsed || 1,
+          currentBedUsage: subscription.currentBedUsage || 0,
+          currentBranchUsage: subscription.currentBranchUsage || 1,
           status: subscription.status,
-          paymentStatus: 'completed', // Assume completed for active subscriptions
-          createdBy: user._id,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
+          paymentStatus: subscription.paymentStatus || 'completed',
+          createdBy: subscription.createdBy,
+          createdAt: subscription.createdAt,
+          updatedAt: subscription.updatedAt,
 
           // Virtual fields
-          durationDays: Math.ceil((endDate - new Date(subscription.startDate)) / (1000 * 60 * 60 * 24)),
+          durationDays: subscription.durationDays || (endDate ? Math.ceil((endDate - new Date(subscription.startDate)) / (1000 * 60 * 60 * 24)) : null),
           daysRemaining: daysRemaining,
           trialDaysRemaining: trialDaysRemaining,
           isExpiringSoon: isExpiringSoon,
@@ -905,44 +925,47 @@ class SubscriptionManagementService {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-      // Get total active subscribers
-      const totalActive = await User.countDocuments({
-        'subscription.status': 'active'
+      // Get total active subscribers from UserSubscription collection
+      const totalActive = await UserSubscription.countDocuments({
+        status: 'active',
+        endDate: { $gt: now }
       });
 
-      // Get total trial users
-      const trialActiveCount = await User.countDocuments({
-        'subscription.status': 'trial',
-        'subscription.trialEndDate': { $gt: now }
+      // Get total trial users (active trials)
+      const trialActiveCount = await UserSubscription.countDocuments({
+        status: 'trial',
+        trialEndDate: { $gt: now }
       });
 
-      // Get revenue calculations
-      const monthlyRevenueResult = await User.aggregate([
+      // Get revenue calculations from UserSubscription collection
+      const monthlyRevenueResult = await UserSubscription.aggregate([
         {
           $match: {
-            'subscription.status': { $in: ['active', 'trial'] },
-            'subscription.billingCycle': 'monthly'
+            status: { $in: ['active', 'trial'] },
+            billingCycle: 'monthly',
+            endDate: { $gt: now }
           }
         },
         {
           $group: {
             _id: null,
-            total: { $sum: '$subscription.totalPrice' }
+            total: { $sum: '$totalPrice' }
           }
         }
       ]);
 
-      const annualRevenueResult = await User.aggregate([
+      const annualRevenueResult = await UserSubscription.aggregate([
         {
           $match: {
-            'subscription.status': { $in: ['active', 'trial'] },
-            'subscription.billingCycle': 'annual'
+            status: { $in: ['active', 'trial'] },
+            billingCycle: 'annual',
+            endDate: { $gt: now }
           }
         },
         {
           $group: {
             _id: null,
-            total: { $sum: '$subscription.totalPrice' }
+            total: { $sum: '$totalPrice' }
           }
         }
       ]);
@@ -951,29 +974,30 @@ class SubscriptionManagementService {
       const annualRevenue = annualRevenueResult[0]?.total || 0;
 
       // Get billing cycle counts
-      const monthlyCount = await User.countDocuments({
-        'subscription.status': { $in: ['active', 'trial'] },
-        'subscription.billingCycle': 'monthly'
+      const monthlyCount = await UserSubscription.countDocuments({
+        status: { $in: ['active', 'trial'] },
+        billingCycle: 'monthly',
+        endDate: { $gt: now }
       });
 
-      const annualCount = await User.countDocuments({
-        'subscription.status': { $in: ['active', 'trial'] },
-        'subscription.billingCycle': 'annual'
+      const annualCount = await UserSubscription.countDocuments({
+        status: { $in: ['active', 'trial'] },
+        billingCycle: 'annual',
+        endDate: { $gt: now }
       });
 
-      // Get expiring soon (30 days)
-      const expiringSoonCount = await User.countDocuments({
-        'subscription.status': { $in: ['active', 'trial'] },
-        'subscription.endDate': {
+      // Get expiring soon (30 days) - subscriptions ending within 30 days but still active
+      const expiringSoonCount = await UserSubscription.countDocuments({
+        status: { $in: ['active', 'trial'] },
+        endDate: {
           $gt: now,
           $lte: thirtyDaysFromNow
         }
       });
 
-      // Get expired count
-      const expiredCount = await User.countDocuments({
-        'subscription.status': 'expired',
-        'subscription.endDate': { $lte: now }
+      // Get expired count - subscriptions that have ended
+      const expiredCount = await UserSubscription.countDocuments({
+        status: { $in: ['expired', 'cancelled'] }
       });
 
       return {
@@ -1508,6 +1532,186 @@ class SubscriptionManagementService {
         totalPrice: subscription.totalPrice
       };
     }
+  }
+
+  /**
+   * Real-time usage validation with security checks
+   * @param {string} userId - User ID to validate
+   * @param {string} resourceType - Type of resource being accessed
+   * @param {number} resourceAmount - Amount of resource requested
+   * @param {Object} securityContext - Additional context for validation
+   * @returns {Object} Validation result
+   */
+  async validateUsageAccess(userId, resourceType, resourceAmount = 1, securityContext = {}) {
+    try {
+      const { requiredPermissions = {}, userRole } = securityContext;
+
+      // 1. Get current subscription with real-time check
+      let subscription = await UserSubscription.findOne({
+        userId,
+        status: { $in: ['active', 'trial'] }
+      }).populate('subscriptionPlanId');
+
+      // If no subscription found, attempt to activate free trial
+      if (!subscription) {
+        const trialResult = await this.activateFreeTrial(userId, userId);
+        
+        if (trialResult.success) {
+          // Refetch the newly created trial subscription
+          subscription = await UserSubscription.findOne({
+            userId,
+            status: { $in: ['active', 'trial'] }
+          }).populate('subscriptionPlanId');
+        }
+      }
+
+      // No subscription available even after trial activation
+      if (!subscription) {
+        await this.logActivity(userId, 'access_denied', {
+          resourceType,
+          reason: 'no_active_subscription',
+          userRole,
+          securityContext
+        });
+
+        return {
+          allowed: false,
+          reason: 'No active subscription found',
+          code: 'NO_SUBSCRIPTION'
+        };
+      }
+
+      // 2. Check trial expiration in real-time
+      const now = new Date();
+      if (subscription.billingCycle === 'trial') {
+        if (subscription.trialEndDate && now > subscription.trialEndDate) {
+          // Auto-expire trial
+          await UserSubscription.findByIdAndUpdate(subscription._id, {
+            status: 'expired',
+            updatedBy: userId
+          });
+
+          await this.logActivity(userId, 'trial_expired', {
+            trialEndDate: subscription.trialEndDate,
+            resourceType,
+            userRole,
+            securityContext
+          });
+
+          return {
+            allowed: false,
+            reason: 'Trial period has expired',
+            code: 'TRIAL_EXPIRED'
+          };
+        }
+      }
+
+      // 3. Check subscription expiration
+      if (subscription.endDate && now > subscription.endDate) {
+        await UserSubscription.findByIdAndUpdate(subscription._id, {
+          status: 'expired',
+          updatedBy: userId
+        });
+
+        return {
+          allowed: false,
+          reason: 'Subscription has expired',
+          code: 'SUBSCRIPTION_EXPIRED'
+        };
+      }
+
+      // 4. Check module and feature access
+      if (resourceType === 'module' && subscription.subscriptionPlanId) {
+        const moduleCheck = this.checkModuleAccess(
+          subscription.subscriptionPlanId.modules, 
+          requiredPermissions,
+          userRole
+        );
+
+        if (!moduleCheck.allowed) {
+          return moduleCheck;
+        }
+      }
+
+      // 5. Check usage limits based on resource type
+      const limitCheck = await this.checkUsageLimit(
+        userId, 
+        resourceType, 
+        resourceAmount, 
+        subscription
+      );
+
+      if (!limitCheck.allowed) {
+        return limitCheck;
+      }
+
+      // All checks passed
+      return {
+        allowed: true,
+        subscriptionDetails: {
+          planName: subscription.subscriptionPlanId?.name,
+          status: subscription.status,
+          billingCycle: subscription.billingCycle,
+          endDate: subscription.endDate,
+          trialEndDate: subscription.trialEndDate
+        }
+      };
+    } catch (error) {
+      console.error('Subscription validation error:', error);
+      return {
+        allowed: false,
+        reason: 'Internal error during subscription validation',
+        code: 'VALIDATION_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Check module and feature access for a given role
+   * @param {Array} modules - Subscription modules
+   * @param {Object} requiredPermissions - Permissions needed
+   * @param {string} userRole - Role of the user
+   * @returns {Object} Module access result
+   */
+  checkModuleAccess(modules, requiredPermissions, userRole) {
+    // For maintainers, use the same access as admin
+    const effectiveRole = userRole === 'maintainer' ? 'admin' : userRole;
+
+    // If no specific permissions required, allow access
+    if (Object.keys(requiredPermissions).length === 0) {
+      return { allowed: true };
+    }
+
+    // Check each required module and its permissions
+    for (const [moduleName, modulePermissions] of Object.entries(requiredPermissions)) {
+      const moduleConfig = modules.find(m => m.moduleName === moduleName);
+
+      // Module not found or disabled
+      if (!moduleConfig || !moduleConfig.enabled) {
+        return {
+          allowed: false,
+          reason: `Module ${moduleName} is not available in your current subscription`,
+          code: 'MODULE_NOT_AVAILABLE'
+        };
+      }
+
+      // Check specific permissions within the module
+      for (const [permissionType, requiredAccess] of Object.entries(modulePermissions)) {
+        const currentPermission = moduleConfig.permissions?.[permissionType];
+
+        // If required access is true but current permission is false
+        if (requiredAccess && !currentPermission?.[effectiveRole]) {
+          return {
+            allowed: false,
+            reason: `Insufficient permissions for ${moduleName}.${permissionType}`,
+            code: 'INSUFFICIENT_PERMISSIONS'
+          };
+        }
+      }
+    }
+
+    // All checks passed
+    return { allowed: true };
   }
 }
 

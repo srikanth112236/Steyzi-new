@@ -99,22 +99,40 @@ const checkSubscriptionPermission = (url, method, data = null) => {
 
   // Check for support users from localStorage as backup
   let storedUserRole = userRole;
+  let storedSalesRole = null;
   try {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       storedUserRole = parsedUser?.role || parsedUser?.salesRole || userRole;
-      console.log(`📦 Stored user role: ${storedUserRole}`);
+      storedSalesRole = parsedUser?.salesRole || null;
+      console.log(`📦 Stored user role: ${storedUserRole}, salesRole: ${storedSalesRole}`);
     }
   } catch (error) {
     console.log('❌ Error reading stored user:', error);
   }
+
+  // Also check current state for salesRole
+  const currentSalesRole = state.auth.user?.salesRole;
 
   // Allow auth and trial activation requests for all subscription statuses
   // This includes /auth/me, /auth/login, /auth/sales-login, etc.
   if (url.includes('/auth/') || url.includes('/activate-trial') || url.includes('/users/support-profile')) {
     console.log('✅ Allowing auth-related request:', url);
     return { allowed: true };
+  }
+
+  // Allow all sales-related endpoints for sales managers and sub-sales staff
+  // These are internal staff managed by superadmin and don't need subscriptions
+  if (url.includes('/sales/') || url.includes('/api/sales/')) {
+    const effectiveRole = storedUserRole || userRole;
+    const effectiveSalesRole = storedSalesRole || currentSalesRole;
+    
+    // Check if user is sales manager or sub-sales staff
+    if (effectiveRole === 'sales_manager' || effectiveSalesRole === 'sub_sales' || effectiveRole === 'sub_sales') {
+      console.log(`✅ Allowing sales endpoint for ${effectiveRole || effectiveSalesRole}:`, url);
+      return { allowed: true };
+    }
   }
 
   // Allow support dashboard analytics for support users
@@ -139,9 +157,13 @@ const checkSubscriptionPermission = (url, method, data = null) => {
   }
 
   // Completely bypass subscription checks for superadmin and other privileged roles
-  const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
-  if (bypassRoles.includes(storedUserRole)) {
-    console.log(`🎉 Bypassing ALL subscription checks for privileged role: ${storedUserRole}`);
+  // Check both role and salesRole for sales staff
+  const effectiveRole = storedUserRole || userRole;
+  const effectiveSalesRole = storedSalesRole || currentSalesRole;
+  const bypassRoles = ['superadmin', 'support', 'sales_manager', 'sales', 'sub_sales'];
+  
+  if (bypassRoles.includes(effectiveRole) || bypassRoles.includes(effectiveSalesRole)) {
+    console.log(`🎉 Bypassing ALL subscription checks for privileged role: ${effectiveRole || effectiveSalesRole}`);
     return { allowed: true };
   }
 

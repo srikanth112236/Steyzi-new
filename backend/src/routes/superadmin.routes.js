@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 
 const { authenticate, superadminOnly } = require('../middleware/auth.middleware');
+const { trackAdminActivity } = require('../middleware/adminActivity.middleware');
 
 // Models
 const User = require('../models/user.model');
@@ -19,7 +20,7 @@ const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
 
 // --- Overview ---
-router.get('/dashboard/overview', authenticate, superadminOnly, async (req, res) => {
+router.get('/dashboard/overview', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const now = new Date();
     const today = startOfDay(now);
@@ -86,7 +87,7 @@ router.get('/dashboard/overview', authenticate, superadminOnly, async (req, res)
 });
 
 // --- Realtime snapshot (poll endpoint used by initial load as well) ---
-router.get('/dashboard/stats', authenticate, superadminOnly, async (req, res) => {
+router.get('/dashboard/stats', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const now = new Date();
     const lastHour = new Date(now.getTime() - 3600000);
@@ -121,7 +122,7 @@ router.get('/dashboard/stats', authenticate, superadminOnly, async (req, res) =>
 });
 
 // --- Activities ---
-router.get('/activities', authenticate, superadminOnly, async (req, res) => {
+router.get('/activities', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
 
@@ -139,7 +140,7 @@ router.get('/activities', authenticate, superadminOnly, async (req, res) => {
 });
 
 // --- Alerts ---
-router.get('/alerts', authenticate, superadminOnly, async (req, res) => {
+router.get('/alerts', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const criticalTickets = await Ticket.find({ priority: 'high', status: { $in: ['open', 'in_progress'] } })
       .sort({ updatedAt: -1 })
@@ -156,7 +157,7 @@ router.get('/alerts', authenticate, superadminOnly, async (req, res) => {
 });
 
 // --- Simple analytics placeholders (compute quickly from models) ---
-router.get('/analytics/revenue', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/revenue', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const period = req.query.period || 'monthly';
     const now = new Date();
@@ -175,7 +176,7 @@ router.get('/analytics/revenue', authenticate, superadminOnly, async (req, res) 
   }
 });
 
-router.get('/analytics/occupancy', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/occupancy', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const totalRooms = await Room.countDocuments({});
     const rooms = await Room.find({}, { numberOfBeds: 1, beds: 1 }).lean();
@@ -193,7 +194,7 @@ router.get('/analytics/occupancy', authenticate, superadminOnly, async (req, res
   }
 });
 
-router.get('/analytics/payments', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/payments', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const period = req.query.period || 'monthly';
     const now = new Date();
@@ -211,7 +212,7 @@ router.get('/analytics/payments', authenticate, superadminOnly, async (req, res)
   }
 });
 
-router.get('/analytics/user-growth', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/user-growth', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const period = req.query.period || 'monthly';
     const now = new Date();
@@ -228,7 +229,7 @@ router.get('/analytics/user-growth', authenticate, superadminOnly, async (req, r
   }
 });
 
-router.get('/analytics/operational', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/operational', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const [activePGs, openTickets, overduePayments] = await Promise.all([
       PG.countDocuments({ isActive: true }),
@@ -242,7 +243,7 @@ router.get('/analytics/operational', authenticate, superadminOnly, async (req, r
   }
 });
 
-router.get('/analytics/satisfaction', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/satisfaction', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     // Placeholder: derive from tickets resolved time as proxy
     const avgResolution = await Ticket.aggregate([
@@ -257,7 +258,7 @@ router.get('/analytics/satisfaction', authenticate, superadminOnly, async (req, 
   }
 });
 
-router.get('/analytics/geographic', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/geographic', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     // Group PGs by city if available
     const groups = await PG.aggregate([
@@ -271,7 +272,7 @@ router.get('/analytics/geographic', authenticate, superadminOnly, async (req, re
   }
 });
 
-router.get('/analytics/top-pgs', authenticate, superadminOnly, async (req, res) => {
+router.get('/analytics/top-pgs', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const metric = req.query.metric || 'revenue';
     if (metric === 'revenue') {
@@ -297,7 +298,7 @@ router.get('/analytics/top-pgs', authenticate, superadminOnly, async (req, res) 
 });
 
 // --- Export dashboard (stubbed CSV) ---
-router.get('/export/dashboard', authenticate, superadminOnly, async (req, res) => {
+router.get('/export/dashboard', authenticate, superadminOnly, trackAdminActivity(), async (req, res) => {
   try {
     const totalPGs = await PG.countDocuments({});
     const totalResidents = await Resident.countDocuments({});

@@ -321,6 +321,30 @@ class SalesService {
   }
 
   /**
+   * Get detailed commission management data for superadmin
+   * @param {Object} filters - Optional filters (startDate, endDate, salesManagerId)
+   * @returns {Promise} Commission management data
+   */
+  async getCommissionManagement(filters = {}) {
+    try {
+      this._logMethodCall('getCommissionManagement', { filters });
+      
+      // Convert filters to query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.startDate) queryParams.append('startDate', filters.startDate);
+      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+      if (filters.salesManagerId) queryParams.append('salesManagerId', filters.salesManagerId);
+
+      const url = `/sales/commission-management${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await api.get(url);
+      console.log('✅ Commission Management Data Retrieved:', response.data);
+      return response.data;
+    } catch (error) {
+      this._handleError(error, 'getCommissionManagement');
+    }
+  }
+
+  /**
    * Update profile for current sales user
    * @param {Object} profileData - Profile data to update
    * @returns {Promise} Updated profile data

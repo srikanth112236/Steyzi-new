@@ -332,6 +332,11 @@ class BranchController {
    */
   async updateBranch(branchId, updateData) {
     try {
+      // Prevent changing isDefault - only the first branch can be default
+      if (updateData.hasOwnProperty('isDefault')) {
+        delete updateData.isDefault;
+      }
+
       // Find and update the branch
       const updatedBranch = await Branch.findByIdAndUpdate(
         branchId, 

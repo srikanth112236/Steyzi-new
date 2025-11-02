@@ -9,8 +9,22 @@ class UserService {
    */
   static async getUserProfile(userId) {
     try {
+      console.log('🔍 UserService.getUserProfile - Searching for user:', {
+        userId,
+        userIdType: typeof userId,
+        isObjectId: userId?.constructor?.name === 'ObjectId'
+      });
+      
       const user = await User.findById(userId).select('-password');
+      
+      console.log('🔍 UserService.getUserProfile - User found:', {
+        found: !!user,
+        userId: user?._id,
+        userEmail: user?.email
+      });
+      
       if (!user) {
+        console.error('❌ UserService.getUserProfile - User not found with ID:', userId);
         return {
           success: false,
           message: 'User not found',

@@ -39,11 +39,13 @@ const subscriptionManagementRoutes = require('./routes/subscriptionManagement.ro
 const subscriptionPaymentRoutes = require('./routes/subscriptionPayment.routes');
 const salesRoutes = require('./routes/sales.routes');
 const salesManagerRoutes = require('./routes/salesManager.routes');
-const securityRoutes = require('./routes/security.routes');
 const advancedFeaturesRoutes = require('./routes/advancedFeatures.routes');
 const onboardingRoutes = require('./routes/onboarding.routes');
 const logsRoutes = require('./routes/logs.routes');
 const maintainerRoutes = require('./routes/maintainer.routes');
+const expenseRoutes = require('./routes/expense.routes');
+const expenseSettingsRoutes = require('./routes/expenseSettings.routes');
+const salaryRoutes = require('./routes/salary.routes');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler.middleware');
 const { apiRateLimit, noRateLimit } = require('./middleware/rateLimit.middleware');
@@ -53,6 +55,7 @@ const { optionalAuthenticate } = require('./middleware/auth.middleware');
 const { setupVacationCron } = require('./scripts/setup-vacation-cron');
 const { setupPaymentStatusCron } = require('./scripts/payment-status-cron');
 const { startTrialNotificationCron } = require('./scripts/trial-expiry-notifications');
+const expenseMonthlyReportJob = require('./jobs/expenseMonthlyReport.job');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,6 +71,9 @@ setupPaymentStatusCron();
 
 // Set up trial notification cron job
 startTrialNotificationCron();
+
+// Set up expense monthly report cron job
+expenseMonthlyReportJob.start();
 
 // Security middleware
 app.use(helmet({
@@ -189,11 +195,13 @@ app.use('/api/subscription-management', subscriptionManagementRoutes);
 app.use('/api/subscription-payments', subscriptionPaymentRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/sales-managers', salesManagerRoutes);
-app.use('/api/security', securityRoutes);
 app.use('/api/advanced', advancedFeaturesRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/maintainers', maintainerRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/expense-settings', expenseSettingsRoutes);
+app.use('/api/salaries', salaryRoutes);
 
 // Add subscription routes
 app.use('/api/subscriptions', subscriptionRoutes);

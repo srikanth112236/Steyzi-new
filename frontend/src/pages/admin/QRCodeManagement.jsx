@@ -34,15 +34,27 @@ const QRCodeManagement = () => {
 
   useEffect(() => {
     console.log('🔍 QRCodeManagement: User data:', user);
-    if (effectivePgId) {
+    console.log('🔍 QRCodeManagement: Selected branch:', selectedBranch);
+
+    // Clear previous data when branch changes
+    setQrCodeData(null);
+    setQrCodeImage(null);
+    setStats(null);
+    setLoading(false);
+    setGenerating(false);
+
+    if (selectedBranch && effectivePgId) {
       console.log('✅ QRCodeManagement: Effective PG ID:', effectivePgId);
       fetchQRCode();
       fetchStats();
+    } else if (!selectedBranch) {
+      console.log('❌ QRCodeManagement: No branch selected');
+      // Don't show error toast here as it's handled by the early return in render
     } else {
       console.log('❌ QRCodeManagement: No PG ID found');
       toast.error('No PG associated with this account. Please contact support.');
     }
-  }, [effectivePgId]);
+  }, [selectedBranch, effectivePgId]);
 
   const fetchQRCode = async () => {
     if (!effectivePgId) {

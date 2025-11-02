@@ -190,9 +190,13 @@ const atomicUsageMiddleware = (resourceType) => {
 const realTimeTrialCheck = async (req, res, next) => {
   try {
     // Completely skip subscription checks for these roles
-    const bypassRoles = ['superadmin', 'support', 'sales', 'sub_sales'];
-    if (bypassRoles.includes(req.user.role)) {
-      console.log(`🎉 Bypassing ALL subscription checks for role: ${req.user.role}`);
+    // Sales managers and sub-sales staff are internal staff managed by superadmin and don't need subscriptions
+    const bypassRoles = ['superadmin', 'support', 'sales_manager', 'sales', 'sub_sales'];
+    const userRole = req.user?.role || req.userType;
+    const userSalesRole = req.user?.salesRole;
+    
+    if (bypassRoles.includes(userRole) || bypassRoles.includes(userSalesRole)) {
+      console.log(`🎉 Bypassing ALL subscription checks for role: ${userRole || userSalesRole}`);
       // Set a dummy subscription context to prevent further checks
       req.subscriptionContext = {
         subscriptionId: null,
@@ -637,5 +641,92 @@ module.exports = {
   secureQueryMiddleware,
   fraudDetectionMiddleware,
   usageLockReleaseMiddleware,
-  subscriptionRateLimit
+  subscriptionRateLimit,
+  /**
+   * Check subscription restrictions and access
+   * @param {Object} options - Configuration for access check
+   * @returns {Function} Middleware function
+   */
+  checkSubscriptionRestrictions(options = {}) {
+    return async (req, res, next) => {
+      try {
+        const { 
+          resourceType = 'module', 
+          requiredPermissions = {},
+          bypassRoles = [] // Roles that bypass subscription checks
+        } = options;
+
+        // Bypass check for specified roles or superadmin
+        if (req.user.role === 'superadmin' || 
+            bypassRoles.includes(req.user.role)) {
+          return next();
+        }
+
+        // For maintainers, use the admin's subscription
+        let userId = req.user.role === 'maintainer' 
+          ? await this.findAdminUserIdForPG(req.user.pgId)
+          : req.user._id;
+
+        if (!userId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Unable to determine subscription context'
+          });
+        }
+
+        const SubscriptionManagementService = require('../services/subscriptionManagement.service');
+        const subscriptionService = new SubscriptionManagementService();
+
+        // Get subscription details
+        const subscriptionCheck = await subscriptionService.validateUsageAccess(
+          userId, 
+          resourceType, 
+          1, 
+          { 
+            requiredPermissions,
+            userRole: req.user.role
+          }
+        );
+
+        // Handle subscription check result
+        if (!subscriptionCheck.allowed) {
+          console.warn(`🚫 Subscription Access Denied: ${subscriptionCheck.reason}`);
+          return res.status(403).json({
+            success: false,
+            message: subscriptionCheck.reason || 'Access denied due to subscription restrictions',
+            code: subscriptionCheck.code || 'SUBSCRIPTION_RESTRICTED'
+          });
+        }
+
+        // Attach subscription details to request for further use
+        req.subscriptionContext = subscriptionCheck;
+        next();
+      } catch (error) {
+        console.error('❌ Subscription Restriction Check Error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Internal server error during subscription check',
+          error: error.message
+        });
+      }
+    };
+  },
+  /**
+   * Find the admin user ID for a given PG
+   * @param {string} pgId - PG identifier
+   * @returns {Promise<string|null>} Admin user ID or null
+   */
+  async findAdminUserIdForPG(pgId) {
+    try {
+      const User = require('../models/user.model');
+      const admin = await User.findOne({ 
+        pgId, 
+        role: 'admin' 
+      });
+      return admin ? admin._id : null;
+    } catch (error) {
+      console.error('Error finding admin for PG:', error);
+      return null;
+    }
+  }
 };

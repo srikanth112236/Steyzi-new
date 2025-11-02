@@ -152,7 +152,11 @@ router.post('/login', authRateLimit, validateLogin, async (req, res) => {
 
     // Return tokens in response body for localStorage storage
     // No need to set cookies since we're using localStorage
-    console.log('✅ Login successful, returning tokens in response body');
+    if (result && result.success) {
+      console.log('✅ Login successful, returning tokens in response body');
+    } else {
+      console.log('❌ Login failed, returning error response');
+    }
 
     return res.status(result.statusCode).json(result);
   } catch (error) {

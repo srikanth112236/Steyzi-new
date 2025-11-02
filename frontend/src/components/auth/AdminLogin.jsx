@@ -30,8 +30,8 @@ const AdminLogin = () => {
     // Clear the navigation state
     window.history.replaceState({}, document.title);
 
-    // Redirect if already logged in as admin
-    if (user && user?.role === 'admin') {
+    // Redirect if already logged in as admin or maintainer
+    if (user && ['admin', 'maintainer'].includes(user?.role)) {
       // Check if user needs trial activation and store flag for AdminLayout
       const needsTrial = user.subscription &&
         (!user.subscription.planId ||
@@ -46,8 +46,8 @@ const AdminLogin = () => {
       }
 
       navigate('/'); // Let RoleRedirect handle the onboarding check
-    } else if (user && user?.role !== 'admin') {
-      toast.error('This login is for PG Admins only');
+    } else if (user && !['admin', 'maintainer'].includes(user?.role)) {
+      toast.error('This login is for PG Admins and Maintainers only');
       navigate('/login');
     }
   }, [user, navigate, location.state]);
@@ -66,13 +66,24 @@ const AdminLogin = () => {
     try {
       const result = await dispatch(login(formData)).unwrap();
 
-      // Check if user is admin
-      if (result.user?.role !== 'admin') {
-        toast.error('Access denied. This login is for PG Admins only.');
+      console.log('🔍 AdminLogin: Login result:', {
+        success: result.success,
+        userRole: result.user?.role,
+        userId: result.user?._id,
+        hasUser: !!result.user,
+        fullResult: result
+      });
+
+      // Check if user is admin or maintainer
+      if (!['admin', 'maintainer'].includes(result.user?.role)) {
+        console.log('❌ AdminLogin: Access denied for role:', result.user?.role);
+        toast.error('Access denied. This login is for PG Admins and Maintainers only.');
         return;
       }
 
-      toast.success('Welcome back, Admin!');
+      console.log('✅ AdminLogin: Access granted for role:', result.user?.role);
+
+      toast.success(`Welcome back, ${result.user?.role === 'admin' ? 'Admin' : 'Maintainer'}!`);
 
       // Check if user needs trial activation and store flag for AdminLayout
       const needsTrial = result.user.subscription &&
@@ -135,7 +146,7 @@ const AdminLogin = () => {
               Admin Portal
             </h1>
             <p className="mt-2 text-sm sm:text-base text-gray-600">
-              Sign in to manage your PG operations securely
+              Sign in to manage your PG operations securely (Admin & Maintainer access)
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-700 ring-1 ring-inset ring-cyan-200">
               <Sparkles className="h-3.5 w-3.5" />
@@ -147,7 +158,7 @@ const AdminLogin = () => {
           <div className="mb-6 rounded-xl bg-gradient-to-br from-cyan-50 to-blue-50 ring-1 ring-cyan-200/50 p-3">
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="h-5 w-5 text-cyan-600" />
-              <span className="font-medium text-cyan-800">PG Administrator Access</span>
+              <span className="font-medium text-cyan-800">PG Admin & Maintainer Access</span>
             </div>
           </div>
 

@@ -782,11 +782,23 @@ const MaintainerManagement = () => {
           }
         }
         
-        toast.success(
-          editingMaintainer 
-            ? 'Maintainer updated successfully!' 
-            : 'Maintainer created successfully!'
-        );
+        // Show success message with login credentials if new maintainer
+        if (!editingMaintainer && response.data?.data?.loginCredentials) {
+          const credentials = response.data.data.loginCredentials;
+          if (credentials.passwordType === 'default') {
+            toast.success(`Maintainer created successfully! Login credentials: Email: ${credentials.email}, Password: ${credentials.password}`, {
+              duration: 10000 // Show longer for credentials
+            });
+          } else {
+            toast.success('Maintainer created successfully!');
+          }
+        } else {
+          toast.success(
+            editingMaintainer
+              ? 'Maintainer updated successfully!'
+              : 'Maintainer created successfully!'
+          );
+        }
         
         setShowForm(false);
         setEditingMaintainer(null);
