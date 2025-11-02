@@ -22,7 +22,7 @@ const HeaderNotifications = () => {
   useEffect(() => {
     // init socket
     try {
-      const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+      const base = (import.meta.env.VITE_API_URL || 'https://api.steyzi.com/api').replace(/\/api$/, '');
       const s = io(base, { withCredentials: true });
       setSocket(s);
 

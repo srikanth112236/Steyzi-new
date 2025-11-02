@@ -4,7 +4,7 @@ async function getToken() {
   try {
     console.log('🔑 Getting JWT token...');
 
-    const response = await axios.post('http://localhost:5000/api/auth/login', {
+    const response = await axios.post('https://api.steyzi.com/api/auth/login', {
       email: 'testpgonee@gmail.com',
       password: 'Admin@123'
     }, {
@@ -32,7 +32,7 @@ async function testPaymentEndpoint(token) {
   try {
     console.log('💳 Testing payment link endpoint with auth...');
 
-    const response = await axios.post('http://localhost:5000/api/subscription-payments/create-payment-link', {
+    const response = await axios.post('https://api.steyzi.com/api/subscription-payments/create-payment-link', {
       subscriptionPlanId: '672f6a9d5c5a9b2d8f8e4a12', // Use a valid plan ID if available
       bedCount: 5,
       branchCount: 1,

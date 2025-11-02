@@ -21,7 +21,7 @@ class PaymentStatusService {
       this.disconnect();
     }
 
-    const eventSourceUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payments/status?userId=${userId}`;
+    const eventSourceUrl = `${process.env.REACT_APP_API_URL || 'https://api.steyzi.com'}/api/payments/status?userId=${userId}`;
 
     console.log('🔗 Connecting to payment status SSE:', eventSourceUrl);
 

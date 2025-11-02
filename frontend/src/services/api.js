@@ -19,7 +19,7 @@ const getApiBaseURL = () => {
   }
   
   // Default to localhost for development
-  return 'http://localhost:5000/api';
+  return 'https://api.steyzi.com/api';
 };
 
 // Create axios instance
@@ -97,7 +97,7 @@ api.interceptors.response.use(
 
         if (refreshToken) {
           const response = await axios.post(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
+            `${import.meta.env.VITE_API_URL || 'https://api.steyzi.com/api'}/auth/refresh`,
             {},
             {
               headers: {

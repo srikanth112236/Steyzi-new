@@ -18,7 +18,7 @@ const getApiBaseURL = () => {
   }
   
   // Default to localhost for development
-  return 'http://localhost:5000/api';
+  return 'https://api.steyzi.com/api';
 };
 
 // Create axios instance

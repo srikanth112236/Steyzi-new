@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.steyzi.com/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -160,7 +160,7 @@ class AuthService {
   async healthCheck() {
     try {
       console.log('🏥 Testing backend health...');
-      const response = await axios.get('http://localhost:5000/health');
+      const response = await axios.get('https://api.steyzi.com/health');
       console.log('✅ Backend health check successful:', response.data);
       return response.data;
     } catch (error) {
