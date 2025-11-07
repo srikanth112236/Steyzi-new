@@ -50,7 +50,9 @@ class Logger {
       // Only log to server in production
       if (!this.isProduction) return;
 
-      await axios.post('/api/logs', {
+      const { getApiBaseUrl } = await import('./apiUrl');
+      const apiBase = getApiBaseUrl();
+      await axios.post(`${apiBase}/logs`, {
         eventType,
         level,
         timestamp: new Date().toISOString(),

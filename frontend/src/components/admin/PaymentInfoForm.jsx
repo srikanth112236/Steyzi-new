@@ -190,7 +190,9 @@ const PaymentInfoForm = () => {
       } else {
         // Try to get onboarding data as fallback
         try {
-          const onboardingResponse = await fetch('/api/onboarding/status', {
+          const { getApiBaseUrl } = await import('../../utils/apiUrl');
+          const apiBase = getApiBaseUrl();
+          const onboardingResponse = await fetch(`${apiBase}/onboarding/status`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
               'Content-Type': 'application/json'

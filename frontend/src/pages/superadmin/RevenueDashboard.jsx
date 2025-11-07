@@ -37,7 +37,9 @@ const revenueService = {
   },
 
   getInsights: async () => {
-    const response = await fetch('/api/advanced/revenue/insights', {
+    const { getApiBaseUrl } = await import('../../utils/apiUrl');
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/advanced/revenue/insights`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
         'Content-Type': 'application/json'

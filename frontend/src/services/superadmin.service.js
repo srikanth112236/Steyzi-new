@@ -9,15 +9,12 @@ const getApiBaseURL = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Get current hostname
-  const hostname = window.location.hostname;
-  
-  // If accessing via IP address, use the same IP for API
-  if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-    return `http://${hostname}:5000/api`;
+  // In development, use direct URL to backend (no proxy)
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5000/api';
   }
   
-  // Default to localhost for development
+  // In production, use production API URL
   return 'https://api.steyzi.com/api';
 };
 

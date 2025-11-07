@@ -1,13 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { logOnboardingEvent } from '../../utils/logging';
+import { getApiBaseUrl } from '../../utils/apiUrl';
+
+const API_BASE = getApiBaseUrl();
 
 // Async thunks for onboarding steps
 export const fetchOnboardingStatus = createAsyncThunk(
   'onboarding/fetchStatus',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/api/onboarding/status');
+      const response = await axios.get(`${API_BASE}/onboarding/status`);
       logOnboardingEvent('fetch_status_success', response.data);
       return response.data.onboardingStatus;
     } catch (error) {
@@ -21,7 +24,7 @@ export const progressPGCreation = createAsyncThunk(
   'onboarding/progressPGCreation',
   async (pgData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/onboarding/pg-creation', pgData);
+      const response = await axios.post(`${API_BASE}/onboarding/pg-creation`, pgData);
       logOnboardingEvent('pg_creation_success', response.data);
       return response.data.onboardingStatus;
     } catch (error) {
@@ -38,7 +41,7 @@ export const progressBranchSetup = createAsyncThunk(
   'onboarding/progressBranchSetup',
   async (branchData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/onboarding/branch-setup', branchData);
+      const response = await axios.post(`${API_BASE}/onboarding/branch-setup`, branchData);
       logOnboardingEvent('branch_setup_success', response.data);
       return response.data.onboardingStatus;
     } catch (error) {
@@ -55,7 +58,7 @@ export const progressPGConfiguration = createAsyncThunk(
   'onboarding/progressPGConfiguration',
   async (configData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/onboarding/pg-configuration', configData);
+      const response = await axios.post(`${API_BASE}/onboarding/pg-configuration`, configData);
       logOnboardingEvent('pg_configuration_success', response.data);
       return response.data.onboardingStatus;
     } catch (error) {

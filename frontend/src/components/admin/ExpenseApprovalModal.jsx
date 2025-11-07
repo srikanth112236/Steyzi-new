@@ -42,14 +42,16 @@ const ExpenseApprovalModal = ({ isOpen, onClose, expense, onConfirmApproval }) =
           <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{expense.expenseName}</h3>
-                <p className="text-sm text-gray-600">{expense.expenseType.replace('_', ' ')}</p>
+                <h3 className="text-lg font-semibold text-gray-900">{expense.description || expense.expenseName || 'N/A'}</h3>
+                <p className="text-sm text-gray-600">
+                  {(expense.type || expense.expenseType || '').replace('_', ' ')}
+                </p>
               </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-green-600">
-                  {expenseService.formatCurrency(expense.amount)}
+                  {expenseService.formatCurrency(expense.amount || 0)}
                 </div>
-                <div className="text-xs text-gray-500">{expense.paidType}</div>
+                <div className="text-xs text-gray-500">{expense.paidType || 'N/A'}</div>
               </div>
             </div>
           </div>
@@ -72,7 +74,9 @@ const ExpenseApprovalModal = ({ isOpen, onClose, expense, onConfirmApproval }) =
                 <span className="text-xs font-medium text-gray-700">Paid By</span>
               </div>
               <div className="text-sm font-medium text-gray-900">
-                {expense.paidBy?.firstName} {expense.paidBy?.lastName}
+                {expense.paidBy?.firstName || expense.createdBy?.firstName 
+                  ? `${expense.paidBy?.firstName || expense.createdBy?.firstName} ${expense.paidBy?.lastName || expense.createdBy?.lastName || ''}`.trim()
+                  : expense.paidBy?.fullName || expense.createdBy?.fullName || 'N/A'}
               </div>
             </div>
           </div>
@@ -84,17 +88,19 @@ const ExpenseApprovalModal = ({ isOpen, onClose, expense, onConfirmApproval }) =
               <span className="text-sm font-medium text-gray-700">Expense Date</span>
             </div>
             <div className="bg-gray-50 rounded p-3">
-              <p className="text-sm text-gray-700">{expenseService.formatDate(expense.expenseDate)}</p>
+              <p className="text-sm text-gray-700">
+                {expenseService.formatDate(expense.date || expense.expenseDate)}
+              </p>
             </div>
 
-            {expense.purpose && (
+            {(expense.description || expense.purpose) && (
               <>
                 <div className="flex items-center space-x-2 mb-2">
                   <MessageSquare className="h-4 w-4 text-gray-400" />
                   <span className="text-sm font-medium text-gray-700">Purpose</span>
                 </div>
                 <div className="bg-gray-50 rounded p-3">
-                  <p className="text-sm text-gray-700">{expense.purpose}</p>
+                  <p className="text-sm text-gray-700">{expense.description || expense.purpose}</p>
                 </div>
               </>
             )}

@@ -16,13 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { getApiBaseUrl } from '../../utils/apiUrl';
 
 // Enhanced Cost Calculator API service
 const costService = {
   // Fetch active subscription plans
   fetchActivePlans: async () => {
     try {
-      const response = await axios.get('/api/subscriptions/active/plans', {
+      const apiBase = getApiBaseUrl();
+      const response = await axios.get(`${apiBase}/subscriptions/active/plans`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
         }
@@ -37,7 +39,8 @@ const costService = {
   // Calculate cost for a specific plan
   calculateCost: async (planId, configuration) => {
     try {
-      const response = await axios.post('/api/advanced/cost/calculate', 
+      const apiBase = getApiBaseUrl();
+      const response = await axios.post(`${apiBase}/advanced/cost/calculate`, 
         { 
           planId, 
           configuration 
@@ -58,7 +61,8 @@ const costService = {
   // Compare multiple plans
   comparePlans: async (planIds, configuration) => {
     try {
-      const response = await axios.post('/api/advanced/cost/compare', 
+      const apiBase = getApiBaseUrl();
+      const response = await axios.post(`${apiBase}/advanced/cost/compare`, 
         { 
           planIds, 
           configuration 

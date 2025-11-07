@@ -15,6 +15,11 @@ export const fetchBranches = createAsyncThunk(
       const branches = data.data?.branches || data.data || [];
       return Array.isArray(branches) ? branches : [];
     } catch (error) {
+      // Check if it's a connection error (backend not running)
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || 
+          error.message?.includes('Failed to fetch') || error.response?.status === 500) {
+        return rejectWithValue('Unable to connect to API server. Please check your connection.');
+      }
       return rejectWithValue(error?.response?.data?.message || error.message || 'Failed to fetch branches');
     }
   }

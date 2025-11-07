@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 // Import common components
 import StatCard from '../../components/common/StatCard';
 import Chart from '../../components/common/charts/Chart';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 
 // Utility function for stable data caching
 const createStableCache = () => {
@@ -88,7 +89,8 @@ const usageService = {
       const cachedData = dashboardCache.get('costBreakdown');
       if (cachedData) return cachedData;
 
-      const response = await axios.get('/api/advanced/usage/cost-breakdown', {
+      const apiBase = getApiBaseUrl();
+      const response = await axios.get(`${apiBase}/advanced/usage/cost-breakdown`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
         }

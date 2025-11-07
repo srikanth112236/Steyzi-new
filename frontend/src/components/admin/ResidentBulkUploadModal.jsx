@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, Loader2, AlertTriangle, XCircle, BarChart3, User, Phone, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 
 const ResidentBulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
   const [file, setFile] = useState(null);
@@ -266,7 +267,8 @@ const ResidentBulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess })
       formData.append('file', new Blob([arrayBuffer], { type: file.type }), file.name);
       formData.append('branchId', selectedBranch._id);
       
-      const response = await fetch('/api/residents/bulk-upload', {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/bulk-upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`

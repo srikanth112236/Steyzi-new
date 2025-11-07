@@ -16,7 +16,7 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
     expenseName: '',
     expenseDate: new Date().toISOString().split('T')[0],
     paidType: 'cash',
-    expenseType: 'other',
+    expenseType: 'miscellaneous', // Default to 'miscellaneous' to match backend enum
     purpose: '',
     amount: '',
     branchId: '',
@@ -66,21 +66,107 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
   // Load expense data for editing
   useEffect(() => {
     if (editingExpense && isOpen) {
-      setFormData({
-        expenseName: editingExpense.expenseName || '',
-        expenseDate: editingExpense.expenseDate ? new Date(editingExpense.expenseDate).toISOString().split('T')[0] : '',
-        paidType: editingExpense.paidType || 'cash',
-        expenseType: editingExpense.expenseType || 'other',
-        purpose: editingExpense.purpose || '',
-        amount: editingExpense.amount || '',
-        branchId: editingExpense.branchId?._id || '',
-        status: editingExpense.status || 'pending',
-        notes: editingExpense.notes || '',
-        tags: editingExpense.tags ? editingExpense.tags.join(', ') : ''
+      // Map backend fields to form fields
+      // Backend returns: description, date, type, amount, category, branchId, notes, tags, receipt
+      // Form expects: expenseName, expenseDate, expenseType, purpose, amount, branchId, notes, tags
+      
+      // Use description for both expenseName and purpose (form has both fields)
+      const description = editingExpense.description || editingExpense.expenseName || editingExpense.purpose || '';
+      
+      // Parse date - backend returns 'date', form expects 'expenseDate'
+      let expenseDate = '';
+      if (editingExpense.date) {
+        const dateObj = new Date(editingExpense.date);
+        if (!isNaN(dateObj.getTime())) {
+          expenseDate = dateObj.toISOString().split('T')[0];
+        }
+      } else if (editingExpense.expenseDate) {
+        const dateObj = new Date(editingExpense.expenseDate);
+        if (!isNaN(dateObj.getTime())) {
+          expenseDate = dateObj.toISOString().split('T')[0];
+        }
+      }
+
+      // Map type - backend returns 'type', form expects 'expenseType'
+      const expenseType = editingExpense.type || editingExpense.expenseType || 'miscellaneous';
+
+      // Map branchId - could be object or string
+      // Ensure we convert to string for the select dropdown
+      let branchId = '';
+      if (editingExpense.branchId) {
+        if (typeof editingExpense.branchId === 'object' && editingExpense.branchId !== null) {
+          // If it's a populated object, get the _id
+          if (editingExpense.branchId._id) {
+            branchId = String(editingExpense.branchId._id);
+          } else if (editingExpense.branchId.id) {
+            branchId = String(editingExpense.branchId.id);
+          } else if (editingExpense.branchId.toString && typeof editingExpense.branchId.toString === 'function') {
+            // If it's a Mongoose ObjectId, convert to string
+            branchId = editingExpense.branchId.toString();
+          } else {
+            // Try to get any string representation
+            branchId = String(editingExpense.branchId);
+          }
+        } else if (typeof editingExpense.branchId === 'string') {
+          branchId = editingExpense.branchId;
+        } else {
+          // If it's an ObjectId or other type, convert to string
+          branchId = String(editingExpense.branchId);
+        }
+      }
+      
+      // Verify branchId exists in branches list (for debugging)
+      if (branchId && branches.length > 0) {
+        const branchExists = branches.some(b => {
+          const bId = String(b._id || b.id || '');
+          return bId === branchId;
+        });
+        if (!branchExists) {
+          console.warn('Branch ID from expense not found in branches list:', branchId);
+        }
+      }
+      
+      // Log for debugging
+      console.log('Editing expense branchId:', {
+        original: editingExpense.branchId,
+        mapped: branchId,
+        type: typeof editingExpense.branchId,
+        branchesLoaded: branches.length,
+        branchExists: branchId && branches.length > 0 ? branches.some(b => String(b._id || b.id || '') === branchId) : 'N/A'
       });
 
-      if (editingExpense.receiptImage) {
-        setReceiptPreview(`/uploads/expenses/${editingExpense.receiptImage.fileName}`);
+      // Map tags - could be array or comma-separated string
+      let tags = '';
+      if (editingExpense.tags) {
+        if (Array.isArray(editingExpense.tags)) {
+          tags = editingExpense.tags.join(', ');
+        } else if (typeof editingExpense.tags === 'string') {
+          tags = editingExpense.tags;
+        }
+      }
+
+      setFormData({
+        expenseName: description, // Use description for expense name
+        expenseDate: expenseDate || new Date().toISOString().split('T')[0],
+        paidType: editingExpense.paidType || 'cash',
+        expenseType: expenseType,
+        purpose: description, // Use description for purpose as well
+        amount: editingExpense.amount ? String(editingExpense.amount) : '',
+        branchId: branchId,
+        status: editingExpense.status || 'pending',
+        notes: editingExpense.notes || '',
+        tags: tags,
+        category: editingExpense.category || ''
+      });
+
+      // Handle receipt image
+      if (editingExpense.receipt) {
+        // If receipt is a URL/path
+        if (typeof editingExpense.receipt === 'string' && editingExpense.receipt.startsWith('http')) {
+          setReceiptPreview(editingExpense.receipt);
+        } else if (editingExpense.receiptImage) {
+          setReceiptPreview(`/uploads/expenses/${editingExpense.receiptImage.fileName}`);
+        }
       }
     } else if (!editingExpense && isOpen) {
       // Reset form for new expense
@@ -88,7 +174,7 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
         expenseName: '',
         expenseDate: new Date().toISOString().split('T')[0],
         paidType: 'cash',
-        expenseType: 'other',
+        expenseType: 'miscellaneous',
         purpose: '',
         amount: '',
         branchId: '',
@@ -99,7 +185,7 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
       setReceiptImage(null);
       setReceiptPreview(null);
     }
-  }, [editingExpense, isOpen]);
+  }, [editingExpense, isOpen, branches]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -161,7 +247,7 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
     e.preventDefault();
 
     // Validation
-    if (!formData.expenseName.trim()) {
+    if (!formData.expenseName || !formData.expenseName.trim()) {
       toast.error('Expense name is required');
       return;
     }
@@ -171,8 +257,15 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
       return;
     }
 
-    if (!formData.purpose.trim()) {
-      toast.error('Purpose is required');
+    // Validate date format
+    const dateObj = new Date(formData.expenseDate);
+    if (isNaN(dateObj.getTime())) {
+      toast.error('Invalid date format');
+      return;
+    }
+
+    if (!formData.purpose || !formData.purpose.trim()) {
+      toast.error('Purpose/Description is required');
       return;
     }
 
@@ -194,19 +287,66 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
     try {
       setLoading(true);
 
-      // Prepare submission data
+      // Prepare submission data - map form fields to backend schema
+      // Combine expenseName and purpose for description (use purpose as primary, expenseName as fallback)
+      const description = (formData.purpose?.trim() || formData.expenseName?.trim() || '').trim();
+      
+      // Validate description is not empty (should not happen due to earlier validation, but double-check)
+      if (!description || description.length === 0) {
+        toast.error('Description is required. Please enter expense name or purpose.');
+        return;
+      }
+      
+      // Parse and validate date
+      const dateObj = new Date(formData.expenseDate);
+      if (isNaN(dateObj.getTime())) {
+        toast.error('Invalid date format');
+        return;
+      }
+
+      // Validate amount
+      const amount = parseFloat(formData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        toast.error('Valid amount is required');
+        return;
+      }
+
+      // Validate type
+      const expenseType = formData.expenseType || formData.type || 'miscellaneous';
+      if (!expenseType || expenseType.trim() === '') {
+        toast.error('Expense type is required');
+        return;
+      }
+
       const submissionData = {
-        ...formData,
-        amount: parseFloat(formData.amount),
-        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : []
+        description: description, // Use purpose as description, or expenseName as fallback
+        date: dateObj.toISOString(), // Convert to ISO format for backend
+        type: expenseType, // Map expenseType to type
+        amount: amount
       };
 
-      // Remove empty fields
-      Object.keys(submissionData).forEach(key => {
-        if (submissionData[key] === '' || submissionData[key] === null || submissionData[key] === undefined) {
-          delete submissionData[key];
+      // Add optional fields only if they have values
+      if (formData.category && formData.category.trim()) {
+        submissionData.category = formData.category.trim();
+      }
+      if (formData.branchId && formData.branchId.trim()) {
+        submissionData.branchId = formData.branchId;
+      }
+      if (formData.status && formData.status.trim()) {
+        submissionData.status = formData.status;
+      }
+      if (formData.paidType && formData.paidType.trim()) {
+        submissionData.paidType = formData.paidType;
+      }
+      if (formData.notes && formData.notes.trim()) {
+        submissionData.notes = formData.notes.trim();
+      }
+      if (formData.tags && formData.tags.trim()) {
+        const tags = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag && tag.length > 0);
+        if (tags.length > 0) {
+          submissionData.tags = tags;
         }
-      });
+      }
 
       await onSubmit(submissionData, receiptImage);
 
@@ -223,7 +363,7 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
       expenseName: '',
       expenseDate: new Date().toISOString().split('T')[0],
       paidType: 'cash',
-      expenseType: 'other',
+      expenseType: 'miscellaneous',
       purpose: '',
       amount: '',
       branchId: '',
@@ -306,18 +446,15 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
                   onChange={(e) => handleInputChange('expenseType', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
+                  <option value="server">Server</option>
                   <option value="maintenance">Maintenance</option>
+                  <option value="office">Office</option>
                   <option value="utilities">Utilities</option>
-                  <option value="housekeeping">Housekeeping</option>
-                  <option value="security">Security</option>
-                  <option value="food">Food</option>
-                  <option value="transportation">Transportation</option>
                   <option value="marketing">Marketing</option>
-                  <option value="office_supplies">Office Supplies</option>
-                  <option value="repairs">Repairs</option>
-                  <option value="insurance">Insurance</option>
-                  <option value="legal">Legal</option>
-                  <option value="other">Other</option>
+                  <option value="software">Software</option>
+                  <option value="hardware">Hardware</option>
+                  <option value="travel">Travel</option>
+                  <option value="miscellaneous">Miscellaneous</option>
                 </select>
               </div>
 
@@ -373,11 +510,15 @@ const ExpenseForm = ({ isOpen, onClose, onSubmit, editingExpense }) => {
                      Array.isArray(branches) && branches.length === 0 ? 'No branches available' :
                      'Select Branch'}
                   </option>
-                  {Array.isArray(branches) && branches.length > 0 && branches.map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.name}
-                    </option>
-                  ))}
+                  {Array.isArray(branches) && branches.length > 0 && branches.map((branch) => {
+                    // Ensure branch._id is converted to string for comparison
+                    const branchIdStr = String(branch._id || branch.id || '');
+                    return (
+                      <option key={branchIdStr} value={branchIdStr}>
+                        {branch.name}
+                      </option>
+                    );
+                  })}
                 </select>
                 {branchError && (
                   <p className="mt-1 text-sm text-red-600">

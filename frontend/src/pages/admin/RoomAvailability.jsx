@@ -680,7 +680,7 @@ const RoomAvailability = () => {
                     <div className="text-gray-500">Occupied</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-gray-700">₹{(room.cost/totalBeds).toFixed(0)}</div>
+                    <div className="font-bold text-gray-700">₹{room.cost.toFixed(0)}</div>
                     <div className="text-gray-500">Per Bed</div>
                   </div>
                 </div>
@@ -1572,7 +1572,7 @@ const RoomAvailability = () => {
                           <DollarSign className="h-3 w-3 text-orange-600" />
                           <span className="text-[10px] font-semibold text-gray-600 uppercase">Per Bed</span>
                         </div>
-                        <div className="text-sm font-bold text-gray-900">₹{Math.round(selectedRoom.cost / selectedRoom.numberOfBeds).toLocaleString()}</div>
+                        <div className="text-sm font-bold text-gray-900">₹{selectedRoom.cost.toLocaleString()}</div>
                       </div>
                     </div>
 

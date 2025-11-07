@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { getAuthToken } from '../utils/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.steyzi.com/api';
+// Use direct URL to backend (no proxy)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+  || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
 
 class PGService {
   constructor() {

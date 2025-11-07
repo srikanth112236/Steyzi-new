@@ -177,7 +177,8 @@ const SupportActivities = () => {
   const onExportCSV = async () => {
     try {
       const params = new URLSearchParams({ ...filters, q: search, type, category, status });
-      const base = import.meta.env.VITE_API_BASE_URL || '/api';
+      const base = import.meta.env.VITE_API_BASE_URL 
+        || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
       const url = `${base.replace(/\/$/, '')}/activities/export/csv?${params.toString()}`;
       window.open(url, '_blank');
     } catch (e) {

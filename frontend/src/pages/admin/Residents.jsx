@@ -48,6 +48,7 @@ import ResidentDetails from '../../components/admin/ResidentDetails';
 import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
 import ResidentBulkUploadModal from '../../components/admin/ResidentBulkUploadModal';
 import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 import PermissionButton from '../../components/common/PermissionButton';
 import PermissionAction from '../../components/common/PermissionAction';
 
@@ -96,7 +97,8 @@ const Residents = () => {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (genderFilter !== 'all') params.append('gender', genderFilter);
 
-      const response = await fetch(`/api/residents?${params}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -139,7 +141,8 @@ const Residents = () => {
         branchId: selectedBranch._id
       });
       
-      const response = await fetch(`/api/residents/stats/overview?${params}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/stats/overview?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -181,7 +184,8 @@ const Residents = () => {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (genderFilter !== 'all') params.append('gender', genderFilter);
 
-      const response = await fetch(`/api/residents/search/query?${params}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/search/query?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -206,9 +210,10 @@ const Residents = () => {
   // Handle resident creation/update
   const handleResidentSubmit = async (residentData) => {
     try {
+      const apiBase = getApiBaseUrl();
       const url = editingResident 
-        ? `/api/residents/${editingResident._id}`
-        : '/api/residents';
+        ? `${apiBase}/residents/${editingResident._id}`
+        : `${apiBase}/residents`;
       
       const method = editingResident ? 'PUT' : 'POST';
       
@@ -244,7 +249,8 @@ const Residents = () => {
     if (!residentToDelete) return;
     
     try {
-      const response = await fetch(`/api/residents/${residentToDelete._id}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/${residentToDelete._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -303,7 +309,8 @@ const Residents = () => {
   // Export residents
   const handleExport = async () => {
     try {
-      const response = await fetch('/api/residents/export/data?format=csv', {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/export/data?format=csv`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'

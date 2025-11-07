@@ -128,12 +128,18 @@ const Expenses = () => {
       const response = await expenseService.getAllExpenses({
         ...filters,
         page,
-        limit: pagination.limit
+        limit: pagination?.limit || 10
       });
 
       if (response.success) {
-        setExpenses(response.data.expenses);
-        setPagination(response.data.pagination);
+        // Backend returns expenses array directly in data, not data.expenses
+        setExpenses(Array.isArray(response.data) ? response.data : response.data?.expenses || []);
+        setPagination(response.data?.pagination || response.pagination || {
+          page: page,
+          limit: pagination?.limit || 10,
+          total: 0,
+          pages: 0
+        });
       }
     } catch (error) {
       console.error('Error loading expenses:', error);
@@ -141,7 +147,7 @@ const Expenses = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.limit]);
+  }, [filters, pagination?.limit]);
 
   // Load statistics
   const loadStats = useCallback(async () => {
@@ -856,11 +862,11 @@ const Expenses = () => {
                       <div className="min-w-0">
                         <div className="flex items-center space-x-2">
                           <div className="text-sm font-medium text-gray-900 truncate">
-                            {expense.expenseName}
+                            {expense.description || expense.expenseName || 'N/A'}
                           </div>
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {expense.purpose}
+                          {expense.type || expense.category || expense.purpose || 'N/A'}
                         </div>
                       </div>
                     </td>
@@ -868,25 +874,33 @@ const Expenses = () => {
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="font-medium text-gray-900">
-                          {expenseService.formatCurrency(expense.amount)}
+                          {expenseService.formatCurrency(expense.amount || 0)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {expense.paidType}
+                          {expense.paidType || 'N/A'}
                         </div>
                       </div>
                     </td>
 
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${expenseService.getStatusColor(expense.status)}`}>
-                        {expense.status}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${expenseService.getStatusColor(expense.status || 'pending')}`}>
+                        {expense.status || 'pending'}
                       </span>
                     </td>
 
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="text-sm">
-                        <div className="text-gray-900">{expenseService.formatDate(expense.expenseDate)}</div>
+                        <div className="text-gray-900">
+                          {expense.date || expense.expenseDate 
+                            ? expenseService.formatDate(expense.date || expense.expenseDate)
+                            : 'N/A'}
+                        </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {expense.paidBy?.firstName} {expense.paidBy?.lastName}
+                          {expense.paidBy?.firstName && expense.paidBy?.lastName
+                            ? `${expense.paidBy.firstName} ${expense.paidBy.lastName}`
+                            : expense.createdBy?.firstName && expense.createdBy?.lastName
+                            ? `${expense.createdBy.firstName} ${expense.createdBy.lastName}`
+                            : 'N/A'}
                         </div>
                       </div>
                     </td>

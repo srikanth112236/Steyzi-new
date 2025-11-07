@@ -10,15 +10,12 @@ const getApiBaseURL = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Get current hostname
-  const hostname = window.location.hostname;
-  
-  // If accessing via IP address, use the same IP for API
-  if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-    return `http://${hostname}:5000/api`;
+  // In development, use direct URL to backend (no proxy)
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5000/api';
   }
   
-  // Default to localhost for development
+  // In production, use production API URL
   return 'https://api.steyzi.com/api';
 };
 
@@ -34,6 +31,8 @@ const api = axios.create({
 
 // Log the API URL for debugging
 console.log('🌐 API Base URL:', api.defaults.baseURL);
+console.log('🌐 Environment:', import.meta.env.DEV ? 'Development' : 'Production');
+console.log('🌐 Direct API calls (no proxy)');
 
 // Apply subscription interceptor
 createSubscriptionInterceptor(api);
@@ -96,8 +95,10 @@ api.interceptors.response.use(
         const refreshToken = localStorage.getItem('refreshToken');
 
         if (refreshToken) {
+          const refreshUrl = import.meta.env.VITE_API_URL 
+            || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
           const response = await axios.post(
-            `${import.meta.env.VITE_API_URL || 'https://api.steyzi.com/api'}/auth/refresh`,
+            `${refreshUrl}/auth/refresh`,
             {},
             {
               headers: {

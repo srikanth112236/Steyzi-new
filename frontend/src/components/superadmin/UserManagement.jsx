@@ -26,7 +26,9 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/users', {
+      const { getApiBaseUrl } = await import('../../utils/apiUrl');
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/users`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json',

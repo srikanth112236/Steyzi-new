@@ -13,19 +13,8 @@ export default defineConfig({
       'a2abd294ffa2.ngrok-free.app',
       '.ngrok-free.app',
       '.ngrok.io'
-    ],
-    proxy: {
-      '/api': {
-        target: 'https://api.steyzi.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/uploads': {
-        target: 'https://api.steyzi.com',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    ]
+    // No proxy - all API calls use direct URLs
   },
   resolve: {
     alias: {

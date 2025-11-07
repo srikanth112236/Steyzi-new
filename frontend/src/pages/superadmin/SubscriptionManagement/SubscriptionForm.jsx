@@ -160,7 +160,9 @@ const SubscriptionForm = ({ isOpen, onClose, subscription, onSuccess }) => {
   const loadPGs = async (search = '') => {
     try {
       setLoadingPGs(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.steyzi.com'}/api/subscriptions/pgs-for-custom-plans?search=${encodeURIComponent(search)}`, {
+      const apiBase = import.meta.env.VITE_API_URL 
+        || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
+      const response = await fetch(`${apiBase}/subscriptions/pgs-for-custom-plans?search=${encodeURIComponent(search)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }

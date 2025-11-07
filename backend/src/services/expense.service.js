@@ -7,8 +7,61 @@ class ExpenseService {
    */
   async createExpense(expenseData, userId) {
     try {
-      // Validate date is not in future
+      // Validate required fields
+      if (!expenseData.description || expenseData.description.trim() === '') {
+        return {
+          success: false,
+          message: 'Expense description is required',
+          statusCode: 400
+        };
+      }
+
+      if (!expenseData.amount || expenseData.amount <= 0) {
+        return {
+          success: false,
+          message: 'Expense amount is required and must be greater than 0',
+          statusCode: 400
+        };
+      }
+
+      if (!expenseData.type || expenseData.type.trim() === '') {
+        return {
+          success: false,
+          message: 'Expense type is required',
+          statusCode: 400
+        };
+      }
+
+      // Validate expense type against enum values
+      const validTypes = ['server', 'maintenance', 'office', 'utilities', 'marketing', 'software', 'hardware', 'travel', 'miscellaneous'];
+      const expenseType = expenseData.type.trim().toLowerCase();
+      if (!validTypes.includes(expenseType)) {
+        return {
+          success: false,
+          message: `Invalid expense type. Valid types are: ${validTypes.join(', ')}`,
+          statusCode: 400
+        };
+      }
+
+      // Validate and parse date
+      if (!expenseData.date) {
+        return {
+          success: false,
+          message: 'Expense date is required',
+          statusCode: 400
+        };
+      }
+
       const expenseDate = new Date(expenseData.date);
+      if (isNaN(expenseDate.getTime())) {
+        return {
+          success: false,
+          message: 'Invalid date format',
+          statusCode: 400
+        };
+      }
+
+      // Validate date is not in future
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today
 
@@ -20,14 +73,43 @@ class ExpenseService {
         };
       }
 
-      const expense = new Expense({
-        ...expenseData,
+      // Get user's pgId for expense association
+      const User = require('../models/user.model');
+      const user = await User.findById(userId).select('pgId');
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+          statusCode: 404
+        };
+      }
+
+      // Prepare expense data with proper field mapping
+      const expenseFields = {
+        description: expenseData.description.trim(),
+        amount: parseFloat(expenseData.amount),
+        type: expenseType, // Use validated type
         date: expenseDate,
-        createdBy: userId
-      });
+        createdBy: userId,
+        pgId: user.pgId || null // Add pgId from user
+      };
+
+      // Add optional fields if provided
+      if (expenseData.category) expenseFields.category = expenseData.category;
+      if (expenseData.branchId && expenseData.branchId.trim() !== '') {
+        expenseFields.branchId = expenseData.branchId;
+      }
+      if (expenseData.receipt) expenseFields.receipt = expenseData.receipt;
+      if (expenseData.notes) expenseFields.notes = expenseData.notes;
+      if (expenseData.tags && Array.isArray(expenseData.tags)) {
+        expenseFields.tags = expenseData.tags;
+      }
+
+      const expense = new Expense(expenseFields);
 
       await expense.save();
       await expense.populate('createdBy', 'firstName lastName email');
+      await expense.populate('branchId', 'name address');
 
       return {
         success: true,
@@ -63,10 +145,20 @@ class ExpenseService {
 
       const skip = (page - 1) * limit;
 
+      // Handle sorting
+      const sortField = filters.sortBy || 'date';
+      const sortOrder = filters.sortOrder === 'asc' ? 1 : -1;
+      const sortOptions = { [sortField]: sortOrder };
+      // Add createdAt as secondary sort for consistent ordering
+      if (sortField !== 'createdAt') {
+        sortOptions.createdAt = -1;
+      }
+
       const [expenses, total] = await Promise.all([
         Expense.find(query)
           .populate('createdBy', 'firstName lastName email')
-          .sort({ date: -1, createdAt: -1 })
+          .populate('branchId', 'name address')
+          .sort(sortOptions)
           .skip(skip)
           .limit(limit),
         Expense.countDocuments(query)
@@ -100,7 +192,8 @@ class ExpenseService {
   async getExpenseById(expenseId) {
     try {
       const expense = await Expense.findById(expenseId)
-        .populate('createdBy', 'firstName lastName email');
+        .populate('createdBy', 'firstName lastName email')
+        .populate('branchId', 'name address');
 
       if (!expense) {
         return {
@@ -160,6 +253,7 @@ class ExpenseService {
       Object.assign(expense, updateData);
       await expense.save();
       await expense.populate('createdBy', 'firstName lastName email');
+      await expense.populate('branchId', 'name address');
 
       return {
         success: true,

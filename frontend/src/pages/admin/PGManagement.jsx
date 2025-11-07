@@ -10,6 +10,7 @@ import { selectSelectedBranch } from '../../store/slices/branch.slice';
 import { useSubscriptionManager } from '../../hooks/useSubscriptionManager';
 import BedLimitExceededModal from '../../components/common/BedLimitExceededModal';
 import FreeTrialModal from '../../components/common/FreeTrialModal';
+import api from '../../services/api';
 
 const PGManagement = () => {
   const [activeTab, setActiveTab] = useState('floors');
@@ -70,19 +71,22 @@ const PGManagement = () => {
 
   const fetchSharingTypes = async () => {
     try {
-      const response = await fetch('/api/pg/sharing-types', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const response = await api.get('/pg/sharing-types');
       
-      if (data.success) {
-        setSharingTypes(data.data);
+      if (response.data?.success) {
+        setSharingTypes(response.data.data);
+      } else {
+        toast.error(response.data?.message || 'Failed to fetch sharing types');
       }
     } catch (error) {
       console.error('Error fetching sharing types:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch sharing types';
+      
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || error.message?.includes('Network Error')) {
+        toast.error('Unable to connect to API server. Please check your connection.');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -90,31 +94,33 @@ const PGManagement = () => {
     if (!selectedBranch) return;
     
     try {
-      const url = `/api/pg/floors?branchId=${selectedBranch._id}`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const response = await api.get(`/pg/floors?branchId=${selectedBranch._id}`);
       
-      if (data.success) {
-        setFloors(data.data);
+      if (response.data?.success) {
+        setFloors(response.data.data);
       } else {
-        if (data.message?.includes('No PG associated with this user')) {
+        const errorMessage = response.data?.message || 'Failed to fetch floors';
+        if (errorMessage.includes('No PG associated with this user')) {
           toast.error('Please complete your PG setup first. Contact superadmin to assign a PG.');
-        } else if (data.message?.includes('No default branch found')) {
+        } else if (errorMessage.includes('No default branch found')) {
           toast.error('Please set up a default branch for your PG first.');
-        } else if (data.message?.includes('Invalid branch ID')) {
+        } else if (errorMessage.includes('Invalid branch ID')) {
           toast.error('Selected branch is invalid. Please select a different branch.');
         } else {
-          toast.error(data.message || 'Failed to fetch floors');
+          toast.error(errorMessage);
         }
       }
     } catch (error) {
       console.error('❌ Error fetching floors:', error);
-      toast.error('Failed to fetch floors');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch floors';
+      
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || error.message?.includes('Network Error')) {
+        toast.error('Unable to connect to API server. Please check your connection.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -124,31 +130,33 @@ const PGManagement = () => {
     if (!selectedBranch) return;
     
     try {
-      const url = `/api/pg/rooms?branchId=${selectedBranch._id}`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
+      const response = await api.get(`/pg/rooms?branchId=${selectedBranch._id}`);
       
-      if (data.success) {
-        setRooms(data.data);
+      if (response.data?.success) {
+        setRooms(response.data.data);
       } else {
-        if (data.message?.includes('No PG associated with this user')) {
+        const errorMessage = response.data?.message || 'Failed to fetch rooms';
+        if (errorMessage.includes('No PG associated with this user')) {
           toast.error('Please complete your PG setup first. Contact superadmin to assign a PG.');
-        } else if (data.message?.includes('No default branch found')) {
+        } else if (errorMessage.includes('No default branch found')) {
           toast.error('Please set up a default branch for your PG first.');
-        } else if (data.message?.includes('Invalid branch ID')) {
+        } else if (errorMessage.includes('Invalid branch ID')) {
           toast.error('Selected branch is invalid. Please select a different branch.');
         } else {
-          toast.error(data.message || 'Failed to fetch rooms');
+          toast.error(errorMessage);
         }
       }
     } catch (error) {
       console.error('❌ Error fetching rooms:', error);
-      toast.error('Failed to fetch rooms');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch rooms';
+      
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || error.message?.includes('Network Error')) {
+        toast.error('Unable to connect to API server. Please check your connection.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -156,38 +164,28 @@ const PGManagement = () => {
     e.preventDefault();
     
     try {
-      const url = editingFloor 
-        ? `/api/pg/floors/${editingFloor._id}`
-        : '/api/pg/floors';
+      const floorData = {
+        ...floorFormData,
+        branchId: selectedBranch._id
+      };
       
-      const method = editingFloor ? 'PUT' : 'POST';
+      const response = editingFloor
+        ? await api.put(`/pg/floors/${editingFloor._id}`, floorData)
+        : await api.post('/pg/floors', floorData);
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...floorFormData,
-          branchId: selectedBranch._id
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data?.success) {
         toast.success(editingFloor ? 'Floor updated successfully' : 'Floor created successfully');
         setShowFloorModal(false);
         setEditingFloor(null);
         setFloorFormData({ name: '', totalRooms: 1 });
         fetchFloors();
       } else {
-        toast.error(data.message || 'Failed to save floor');
+        toast.error(response.data?.message || 'Failed to save floor');
       }
     } catch (error) {
       console.error('Error saving floor:', error);
-      toast.error('Failed to save floor');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save floor';
+      toast.error(errorMessage);
     }
   };
 
@@ -219,12 +217,6 @@ const PGManagement = () => {
     }
 
     try {
-      const url = editingRoom 
-        ? `/api/pg/rooms/${editingRoom._id}`
-        : '/api/pg/rooms';
-      
-      const method = editingRoom ? 'PUT' : 'POST';
-      
       // Prepare room data with bed numbers
       const roomData = {
         ...roomFormData,
@@ -232,18 +224,11 @@ const PGManagement = () => {
         bedNumbers: roomFormData.bedNumbers.filter(bed => bed.trim() !== '') // Only send non-empty bed numbers
       };
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(roomData)
-      });
+      const response = editingRoom
+        ? await api.put(`/pg/rooms/${editingRoom._id}`, roomData)
+        : await api.post('/pg/rooms', roomData);
       
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data?.success) {
         toast.success(editingRoom ? 'Room updated successfully' : 'Room created successfully');
         setShowRoomModal(false);
         setEditingRoom(null);
@@ -257,6 +242,7 @@ const PGManagement = () => {
         });
         fetchRooms();
       } else {
+        const data = response.data;
         // Handle subscription errors
         if (data.subscriptionError) {
           setRequestedBeds(roomFormData.numberOfBeds);
@@ -276,7 +262,25 @@ const PGManagement = () => {
       }
     } catch (error) {
       console.error('Error saving room:', error);
-      toast.error('Failed to save room');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save room';
+      
+      // Handle subscription errors from API
+      if (error.response?.data?.subscriptionError) {
+        const data = error.response.data;
+        setRequestedBeds(roomFormData.numberOfBeds);
+        
+        if (data.upgradeRequired) {
+          if (subscriptionSummary?.billingCycle === 'trial') {
+            setShowFreeTrialModal(true);
+          } else {
+            setShowBedLimitModal(true);
+          }
+        } else {
+          toast.error(data.message || errorMessage);
+        }
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -351,25 +355,18 @@ const PGManagement = () => {
   const handleFloorDelete = async (floorId) => {
     setConfirmAction(() => async () => {
       try {
-        const response = await fetch(`/api/pg/floors/${floorId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await api.delete(`/pg/floors/${floorId}`);
         
-        const data = await response.json();
-        
-        if (data.success) {
+        if (response.data?.success) {
           toast.success('Floor deleted successfully');
           fetchFloors();
         } else {
-          toast.error(data.message || 'Failed to delete floor');
+          toast.error(response.data?.message || 'Failed to delete floor');
         }
       } catch (error) {
         console.error('Error deleting floor:', error);
-        toast.error('Failed to delete floor');
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to delete floor';
+        toast.error(errorMessage);
       }
     });
     setShowConfirmDialog(true);
@@ -378,25 +375,18 @@ const PGManagement = () => {
   const handleRoomDelete = async (roomId) => {
     setConfirmAction(() => async () => {
       try {
-        const response = await fetch(`/api/pg/rooms/${roomId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await api.delete(`/pg/rooms/${roomId}`);
         
-        const data = await response.json();
-        
-        if (data.success) {
+        if (response.data?.success) {
           toast.success('Room deleted successfully');
           fetchRooms();
         } else {
-          toast.error(data.message || 'Failed to delete room');
+          toast.error(response.data?.message || 'Failed to delete room');
         }
       } catch (error) {
         console.error('Error deleting room:', error);
-        toast.error('Failed to delete room');
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to delete room';
+        toast.error(errorMessage);
       }
     });
     setShowConfirmDialog(true);

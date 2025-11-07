@@ -36,11 +36,47 @@ const expenseSchema = new mongoose.Schema({
     trim: true
   },
   
+  // Branch association
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    required: false
+  },
+  
+  // PG association
+  pgId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PG',
+    required: false
+  },
+  
   // Metadata
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  
+  // Additional information
+  notes: {
+    type: String,
+    required: false,
+    trim: true,
+    maxlength: [1000, 'Notes cannot exceed 1000 characters']
+  },
+  tags: [{
+    type: String,
+    trim: true
+  }],
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'paid'],
+    default: 'pending'
+  },
+  paidType: {
+    type: String,
+    enum: ['cash', 'online_transfer', 'upi', 'card', 'cheque', 'other'],
+    required: false
   },
   
   // Receipt or document (optional)
