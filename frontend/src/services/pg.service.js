@@ -3,7 +3,7 @@ import { getAuthToken } from '../utils/auth';
 
 // Use direct URL to backend (no proxy)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
-  || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
+  || (import.meta.env.DEV ? 'https://api.steyzi.com/api' : 'https://api.steyzi.com/api');
 
 class PGService {
   constructor() {

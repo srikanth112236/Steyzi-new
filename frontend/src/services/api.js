@@ -12,7 +12,7 @@ const getApiBaseURL = () => {
   
   // In development, use direct URL to backend (no proxy)
   if (import.meta.env.DEV) {
-    return 'http://localhost:5000/api';
+    return 'https://api.steyzi.com/api';
   }
   
   // In production, use production API URL
@@ -96,7 +96,7 @@ api.interceptors.response.use(
 
         if (refreshToken) {
           const refreshUrl = import.meta.env.VITE_API_URL 
-            || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
+            || (import.meta.env.DEV ? 'https://api.steyzi.com/api' : 'https://api.steyzi.com/api');
           const response = await axios.post(
             `${refreshUrl}/auth/refresh`,
             {},

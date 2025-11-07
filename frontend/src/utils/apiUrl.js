@@ -10,7 +10,7 @@ export const getApiBaseUrl = () => {
   
   // In development, use direct URL to backend (no proxy)
   if (import.meta.env.DEV) {
-    return 'http://localhost:5000/api';
+    return 'https://api.steyzi.com/api';
   }
   
   // In production, use production API URL

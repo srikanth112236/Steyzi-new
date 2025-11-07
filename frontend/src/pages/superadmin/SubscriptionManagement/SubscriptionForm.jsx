@@ -161,7 +161,7 @@ const SubscriptionForm = ({ isOpen, onClose, subscription, onSuccess }) => {
     try {
       setLoadingPGs(true);
       const apiBase = import.meta.env.VITE_API_URL 
-        || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
+        || (import.meta.env.DEV ? 'https://api.steyzi.com/api' : 'https://api.steyzi.com/api');
       const response = await fetch(`${apiBase}/subscriptions/pgs-for-custom-plans?search=${encodeURIComponent(search)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`

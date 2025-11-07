@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use direct URL to backend (no proxy)
 const API_BASE_URL = import.meta.env.VITE_API_URL 
-  || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
+  || (import.meta.env.DEV ? 'https://api.steyzi.com/api' : 'https://api.steyzi.com/api');
 
 // Create axios instance with default config
 const api = axios.create({
