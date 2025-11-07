@@ -8,6 +8,7 @@ import {
   ArrowUpDown, Filter, Star, Wifi, Car, Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../../services/api';
 import ResidentDetails from '../../components/admin/ResidentDetails';
 import {
   Select,
@@ -95,6 +96,8 @@ const customScrollbarStyles = `
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   }
 `;
+
+// Note: Using api service from services/api.js which handles JSON parsing automatically
 
 const RoomAvailability = () => {
   const selectedBranch = useSelector(selectSelectedBranch);
@@ -307,40 +310,35 @@ const RoomAvailability = () => {
     const fetchData = async () => {
       try {
         // Fetch floors with branch filtering
-        const floorResponse = await fetch(`/api/pg/floors?branchId=${selectedBranch._id}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const floorData = await floorResponse.json();
-        if (floorData.success) {
-          setFloors(floorData.data);
+        const floorResponse = await api.get(`/pg/floors?branchId=${selectedBranch._id}`);
+        
+        if (floorResponse.data.success) {
+          setFloors(floorResponse.data.data);
+        } else {
+          toast.error(floorResponse.data.message || 'Failed to fetch floors');
         }
 
-        // Fetch rooms with branch filtering
-        const roomResponse = await fetch(`/api/pg/rooms?branchId=${selectedBranch._id}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const roomData = await roomResponse.json();
-        if (roomData.success) {
+        // Fetch rooms with branch filtering using the actual API endpoint
+        const roomResponse = await api.get(`/pg/rooms?branchId=${selectedBranch._id}`);
+        
+        if (roomResponse.data.success) {
           // Server now returns enhanced room data with proper bed status
           // No need to filter by branchId as server handles it
-          setRooms(roomData.data);
+          setRooms(roomResponse.data.data);
           setLastFetchTime(Date.now());
           
           // Log enhanced data for debugging
           if (process.env.NODE_ENV === 'development') {
-            console.log('Enhanced room data received:', roomData);
-            console.log('Metadata:', roomData.metadata);
+            console.log('Enhanced room data received:', roomResponse.data);
+            console.log('Metadata:', roomResponse.data.metadata);
           }
+        } else {
+          toast.error(roomResponse.data.message || 'Failed to fetch rooms');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast.error('Failed to fetch data');
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch data. Please check your connection and try again.';
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -423,30 +421,26 @@ const RoomAvailability = () => {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/pg/rooms?branchId=${selectedBranch._id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
+      // Use the actual API endpoint to get room availability data
+      const response = await api.get(`/pg/rooms?branchId=${selectedBranch._id}`);
       
-      if (data.success) {
+      if (response.data.success) {
         // Server now returns enhanced room data with proper bed status
-        setRooms(data.data);
+        setRooms(response.data.data);
         setLastFetchTime(Date.now());
         toast.success('Rooms refreshed successfully');
         
         // Log enhanced data for debugging
         if (process.env.NODE_ENV === 'development') {
-          console.log('Refreshed room data:', data);
+          console.log('Refreshed room data:', response.data);
         }
       } else {
-        toast.error(data.message || 'Failed to fetch rooms');
+        toast.error(response.data.message || 'Failed to fetch rooms');
       }
     } catch (error) {
       console.error('Error refreshing rooms:', error);
-      toast.error('Failed to refresh rooms');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to refresh rooms. Please check your connection and try again.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
