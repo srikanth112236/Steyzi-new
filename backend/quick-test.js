@@ -3,7 +3,7 @@ const axios = require('axios');
 async function test() {
   try {
     console.log('🧪 Testing payment link endpoint...');
-    const response = await axios.post('https://api.steyzi.com/api/subscription-payments/create-payment-link', {
+    const response = await axios.post('http://localhost:5000/api/subscription-payments/create-payment-link', {
       subscriptionPlanId: 'test_plan',
       bedCount: 5,
       branchCount: 1,

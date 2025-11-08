@@ -22,7 +22,7 @@ class PaymentStatusService {
     }
 
     const apiBase = import.meta.env.VITE_API_URL 
-      || (import.meta.env.DEV ? 'https://api.steyzi.com/api' : 'https://api.steyzi.com/api');
+      || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://api.steyzi.com/api');
     const eventSourceUrl = `${apiBase}/payments/status?userId=${userId}`;
 
     console.log('🔗 Connecting to payment status SSE:', eventSourceUrl);

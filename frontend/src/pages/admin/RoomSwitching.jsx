@@ -32,6 +32,7 @@ import {
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 import { 
   Select, 
   SelectContent, 
@@ -68,12 +69,25 @@ const RoomSwitching = () => {
   const fetchResidents = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/residents?branchId=${selectedBranch._id}&status=active`, {
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/residents?branchId=${selectedBranch._id}&status=active`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Expected JSON but received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check API endpoint.');
+      }
       
       const data = await response.json();
       
@@ -95,12 +109,25 @@ const RoomSwitching = () => {
 
   const fetchAvailableRooms = async () => {
     try {
-      const response = await fetch(`/api/residents/switch/available-rooms?pgId=${selectedBranch.pgId}`, {
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/residents/switch/available-rooms?pgId=${selectedBranch.pgId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Expected JSON but received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check API endpoint.');
+      }
       
       const data = await response.json();
       
@@ -149,19 +176,32 @@ const RoomSwitching = () => {
 
     try {
       setLoading(true);
+      const apiBaseUrl = getApiBaseUrl();
       
-      const response = await fetch(`/api/residents/${selectedResident._id}/switch-room`, {
+      const response = await fetch(`${apiBaseUrl}/residents/${selectedResident._id}/switch-room`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           newRoomId: selectedRoom._id,
           newBedNumber: selectedBed,
           reason: switchReason || 'Room switch request'
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Expected JSON but received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check API endpoint.');
+      }
       
       const data = await response.json();
       
@@ -184,12 +224,25 @@ const RoomSwitching = () => {
 
   const handleViewHistory = async (residentId) => {
     try {
-      const response = await fetch(`/api/residents/${residentId}/switch-history`, {
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/residents/${residentId}/switch-history`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Expected JSON but received:', text.substring(0, 200));
+        throw new Error('Server returned non-JSON response. Check API endpoint.');
+      }
       
       const data = await response.json();
       
