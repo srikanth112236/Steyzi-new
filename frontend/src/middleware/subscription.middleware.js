@@ -115,10 +115,23 @@ const checkSubscriptionPermission = (url, method, data = null) => {
   // Also check current state for salesRole
   const currentSalesRole = state.auth.user?.salesRole;
 
-  // Allow auth and trial activation requests for all subscription statuses
+  // Allow auth, trial activation, and subscription payment requests for all subscription statuses
   // This includes /auth/me, /auth/login, /auth/sales-login, etc.
-  if (url.includes('/auth/') || url.includes('/activate-trial') || url.includes('/users/support-profile')) {
-    console.log('✅ Allowing auth-related request:', url);
+  // IMPORTANT: Allow subscription payment endpoints so users can purchase/renew subscriptions
+  const alwaysAllowedEndpoints = [
+    '/auth/',
+    '/activate-trial',
+    '/users/support-profile',
+    '/subscription-payments/',
+    '/subscriptions/active/plans',
+    '/subscriptions/popular/plans',
+    '/subscriptions/',
+    '/users/my-subscription',
+    '/users/subscription-history'
+  ];
+
+  if (alwaysAllowedEndpoints.some(endpoint => url.includes(endpoint))) {
+    console.log('✅ Allowing always-allowed request:', url);
     return { allowed: true };
   }
 
@@ -189,7 +202,7 @@ const checkSubscriptionPermission = (url, method, data = null) => {
 
   console.log('🔍 Checking subscription status:', subscription.status, 'for URL:', url);
   // Check subscription status for non-auth/trial requests
-  if (!['active', 'trial'].includes(subscription.status)) {
+  if (!['active', 'trial', 'free'].includes(subscription.status)) {
     console.log('❌ Blocking request - subscription status:', subscription.status);
     return {
       allowed: false,
@@ -198,10 +211,13 @@ const checkSubscriptionPermission = (url, method, data = null) => {
   }
   console.log('✅ Allowing request - valid subscription status');
 
-  // Check trial expiration
-  if (subscription.isTrialActive && subscription.trialEndDate) {
+  // Check trial expiration - ONLY check trialEndDate for trial subscriptions
+  if (subscription.billingCycle === 'trial' && subscription.trialEndDate) {
     const trialEnd = new Date(subscription.trialEndDate);
-    if (trialEnd <= new Date()) {
+    const now = new Date();
+    console.log('🔍 Trial check - End:', trialEnd, 'Now:', now, 'Expired:', trialEnd <= now);
+    if (trialEnd <= now) {
+      console.log('❌ Trial has expired');
       return {
         allowed: false,
         reason: 'Trial period has expired'
@@ -209,10 +225,13 @@ const checkSubscriptionPermission = (url, method, data = null) => {
     }
   }
 
-  // Check subscription expiration
-  if (subscription.endDate) {
+  // Check subscription expiration - ONLY for active subscriptions, NOT for trial
+  if (subscription.status === 'active' && subscription.billingCycle !== 'trial' && subscription.endDate) {
     const endDate = new Date(subscription.endDate);
-    if (endDate <= new Date()) {
+    const now = new Date();
+    console.log('🔍 Subscription check - End:', endDate, 'Now:', now, 'Expired:', endDate <= now);
+    if (endDate <= now) {
+      console.log('❌ Subscription has expired');
       return {
         allowed: false,
         reason: 'Subscription has expired'

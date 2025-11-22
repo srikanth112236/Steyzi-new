@@ -44,7 +44,7 @@ import { useTokenExpiry } from '../hooks/useTokenExpiry';
 import BranchSelector from '../components/common/BranchSelector';
 import { selectSelectedBranch } from '../store/slices/branch.slice';
 import HeaderNotifications from '../components/common/HeaderNotifications';
-// import SubscriptionStatusBanner from '../components/common/SubscriptionStatusBanner';
+import SubscriptionStatusIndicator from '../components/common/SubscriptionStatusIndicator';
 import { useSubscription } from '../utils/subscriptionUtils';
 import { selectUser, selectSubscription, updateAuthState, selectPgConfigured, selectDefaultBranch, selectPgId } from '../store/slices/authSlice';
 import FreeTrialModal from '../components/common/FreeTrialModal';
@@ -394,7 +394,11 @@ const AdminLayout = () => {
       href: '/admin/cost-calculator',
       icon: Calculator
     },
-   
+    {
+      name: 'Subscription',
+      href: '/admin/subscription-history',
+      icon: Package
+    },
     {
       name: 'Settings',
       href: '/admin/settings',
@@ -486,6 +490,11 @@ const AdminLayout = () => {
 
         // All Activities - always show
         if (item.name === 'All Activities') {
+          return true;
+        }
+
+        // Subscription - always show for all users
+        if (item.name === 'Subscription') {
           return true;
         }
 
@@ -694,15 +703,22 @@ const AdminLayout = () => {
   // Separate navigation items for Apps section
   const getMainNavItems = () => {
     const filtered = getFilteredNavigationItems();
-    return filtered.filter(item => 
-      !['Settings', 'QR Codes', 'Room Availability', 'Cost Calculator'].includes(item.name)
+    return filtered.filter(item =>
+      !['Settings', 'Subscription', 'QR Codes', 'Room Availability', 'Cost Calculator'].includes(item.name)
     );
   };
 
   const getAppItems = () => {
     const filtered = getFilteredNavigationItems();
-    return filtered.filter(item => 
+    return filtered.filter(item =>
       ['QR Codes', 'Room Availability', 'Cost Calculator'].includes(item.name)
+    );
+  };
+
+  const getBottomNavItems = () => {
+    const filtered = getFilteredNavigationItems();
+    return filtered.filter(item =>
+      ['Subscription'].includes(item.name)
     );
   };
 
@@ -1028,9 +1044,73 @@ const AdminLayout = () => {
           </div>
         </nav>
 
-       
-        {/* Bottom Section - Settings, Info, Collapse */}
+
+        {/* Bottom Section - Subscription, Settings, Collapse */}
         <div className="border-t border-gray-200 px-3 py-3 space-y-1 bg-gradient-to-t from-gray-50 to-white">
+          {/* Subscription */}
+          {getBottomNavItems().map((item) => {
+            const isActive = isActiveRoute(item.href);
+            return (
+              <div
+                key={item.name}
+                className="relative group"
+                onMouseEnter={(e) => sidebarCollapsed && handleMouseEnter(item.name, e, false, null)}
+                onMouseLeave={handleMouseLeave}
+              >
+                {sidebarCollapsed ? (
+                  <>
+                    <Link
+                      ref={(el) => (buttonRefs.current[item.name] = el)}
+                      to={item.href}
+                      className={`flex items-center justify-center px-3 py-3 rounded-lg transition-all duration-200 relative z-10 group-hover:bg-gray-50 shadow-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-md'
+                          : 'text-gray-700 hover:bg-gray-50 hover:shadow-sm'
+                      }`}
+                    >
+                      <item.icon className={`h-5 w-5 transition-colors ${
+                        isActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-gray-700'
+                      }`} />
+                    </Link>
+
+                    <AnimatePresence>
+                      {hoveredItem === item.name && (
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="fixed bg-gradient-to-r from-cyan-400 to-cyan-500 text-white rounded-lg px-3 py-2 text-sm font-medium z-[9999] pointer-events-none whitespace-nowrap shadow-lg"
+                          style={{
+                            top: `${tooltipPosition.top}px`,
+                            left: `${tooltipPosition.left}px`
+                          }}
+                        >
+                          {item.name}
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gradient-to-r from-cyan-400 to-cyan-500 rotate-45"></div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <Link
+                    to={item.href}
+                    className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <item.icon className={`h-5 w-5 mr-3 flex-shrink-0 ${
+                      isActive ? 'text-blue-600' : 'text-gray-500'
+                    }`} />
+                    <div>{item.name}</div>
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+
           {/* Settings */}
           <div 
             className="relative group"
@@ -1298,8 +1378,8 @@ const AdminLayout = () => {
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="py-6">
             <div className="max-w-full mx-auto px-6">
-              {/* Subscription Status Banner */}
-              {/* <SubscriptionStatusBanner /> */}
+              {/* Subscription Status Indicator */}
+              <SubscriptionStatusIndicator />
               <Outlet />
             </div>
           </div>

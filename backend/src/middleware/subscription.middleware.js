@@ -1,12 +1,97 @@
 const SubscriptionManagementService = require('../services/subscriptionManagement.service');
 const AdvancedSubscriptionService = require('../services/advancedSubscription.service');
 const { realTimeTrialCheck } = require('./advancedSecurity.middleware');
+const User = require('../models/user.model');
 
 /**
  * Enhanced trial expiration check with real-time validation
  * Fixes: Trial Bypass Vulnerabilities
  */
 const checkTrialExpiration = realTimeTrialCheck;
+
+/**
+ * Comprehensive subscription validation middleware
+ * Checks for active subscription, expiry, and redirects to subscription page if needed
+ */
+const checkSubscriptionStatus = async (req, res, next) => {
+  try {
+    // Bypass roles - these users don't need subscriptions
+    const bypassRoles = ['superadmin', 'support', 'sales_manager', 'sales', 'sub_sales'];
+    const userRole = req.user?.role;
+    const userSalesRole = req.user?.salesRole;
+
+    if (bypassRoles.includes(userRole) || bypassRoles.includes(userSalesRole)) {
+      return next();
+    }
+
+    // Get fresh user data with subscription
+    const user = await User.findById(req.user._id).populate('subscription.planId');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        requiresSubscription: true
+      });
+    }
+
+    // Check if user has any subscription
+    if (!user.subscription || !user.subscription.planId) {
+      return res.status(403).json({
+        success: false,
+        message: 'No active subscription. Please select a subscription plan.',
+        requiresSubscription: true,
+        redirectTo: '/admin/subscription-selection'
+      });
+    }
+
+    // Check if subscription is expired
+    const now = new Date();
+    let isExpired = false;
+    let endDate = null;
+
+    // Check trial expiration
+    if (user.subscription.billingCycle === 'trial' && user.subscription.trialEndDate) {
+      endDate = new Date(user.subscription.trialEndDate);
+      isExpired = endDate < now;
+    }
+    // Check regular subscription expiration
+    else if (user.subscription.endDate) {
+      endDate = new Date(user.subscription.endDate);
+      isExpired = endDate < now;
+    }
+
+    if (isExpired) {
+      // Update subscription status to expired
+      user.subscription.status = 'expired';
+      user.markModified('subscription');
+      await user.save();
+
+      return res.status(403).json({
+        success: false,
+        message: 'Your subscription has expired. Please renew to continue.',
+        subscriptionExpired: true,
+        redirectTo: '/admin/subscription-selection'
+      });
+    }
+
+    // Check if subscription is active
+    if (user.subscription.status !== 'active' && user.subscription.billingCycle !== 'trial') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your subscription is not active. Please contact support or renew your subscription.',
+        requiresSubscription: true,
+        redirectTo: '/admin/subscription-selection'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Subscription status check error:', error);
+    // Don't block request on middleware error, but log it
+    next();
+  }
+};
 
 /**
  * Check if user has access to specific modules/features
@@ -127,6 +212,7 @@ const checkUsageLimits = async (req, res, next) => {
 
 module.exports = {
   checkTrialExpiration,
+  checkSubscriptionStatus,
   checkModuleAccess,
   checkUsageLimits
 };

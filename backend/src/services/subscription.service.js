@@ -1137,168 +1137,134 @@ exports.handlePaymentWebhook = async (payload) => {
         logger.info('Payment captured', { paymentId, orderId, amount, userId });
         console.log('🚀 STARTING PAYMENT PROCESSING LOGIC...');
 
-        // Find or create payment record
-        let payment = await Payment.findOne({ razorpayOrderId: orderId });
+        // Get the subscription plan details
+        const planDetails = await Subscription.findById(subscriptionPlanId);
+        if (!planDetails) {
+          logger.error('Subscription plan not found', { subscriptionPlanId });
+          return { success: false, message: 'Subscription plan not found' };
+        }
 
-        if (!payment) {
-          console.log('📝 Payment record not found, creating new one...');
+        // Calculate subscription dates
+        const startDate = new Date();
+        const billingCycleDays = billingCycle === 'annual' ? 365 : 30;
+        const endDate = new Date(startDate.getTime() + billingCycleDays * 24 * 60 * 60 * 1000);
 
-          // Create subscription for the user if needed
-          let subscription = await Subscription.findOne({
+        // Find or create UserSubscription record
+        const UserSubscription = require('../models/userSubscription.model');
+        let userSubscription = await UserSubscription.findOne({
+          userId: userId,
+          subscriptionPlanId: subscriptionPlanId,
+          status: { $in: ['active', 'trial'] }
+        });
+
+        if (!userSubscription) {
+          console.log('📝 UserSubscription not found, creating new one...');
+
+          // Create new UserSubscription
+          userSubscription = await UserSubscription.create({
             userId: userId,
-            planId: subscriptionPlanId
+            subscriptionPlanId: subscriptionPlanId,
+            billingCycle: billingCycle,
+            startDate: startDate,
+            endDate: endDate,
+            basePrice: planDetails.basePrice,
+            totalBeds: bedCount,
+            totalBranches: branchCount,
+            totalPrice: amount / 100, // Convert from paise to rupees
+            status: 'active',
+            paymentStatus: 'completed',
+            paymentId: paymentId,
+            createdBy: userId,
+            notes: 'Created via webhook payment'
           });
+          console.log('✅ UserSubscription created:', userSubscription._id);
+        } else {
+          console.log('📝 Updating existing UserSubscription...');
+          // Update existing subscription
+          userSubscription.status = 'active';
+          userSubscription.paymentStatus = 'completed';
+          userSubscription.paymentId = paymentId;
+          userSubscription.totalBeds = bedCount;
+          userSubscription.totalBranches = branchCount;
+          userSubscription.totalPrice = amount / 100;
+          userSubscription.startDate = startDate;
+          userSubscription.endDate = endDate;
+          await userSubscription.save();
+          console.log('✅ UserSubscription updated');
+        }
 
-          if (!subscription) {
-            console.log('📝 Subscription not found, creating new one...');
-            const planDetails = await Subscription.findById(subscriptionPlanId);
+        // Update User model's embedded subscription field
+        const user = await User.findById(userId);
+        if (user) {
+          user.subscription = {
+            planId: subscriptionPlanId,
+            status: 'active',
+            startDate: startDate,
+            endDate: endDate,
+            trialEndDate: null,
+            autoRenew: true,
+            totalBeds: bedCount,
+            totalBranches: branchCount,
+            usage: {
+              bedsUsed: 0,
+              branchesUsed: 0
+            },
+            customPricing: {
+              maxBedsAllowed: bedCount,
+              topUpBeds: bedCount - planDetails.baseBedCount,
+              basePrice: planDetails.basePrice,
+              topUpCost: (bedCount - planDetails.baseBedCount) * planDetails.topUpPricePerBed,
+              totalMonthlyPrice: amount / 100,
+              totalAnnualPrice: billingCycle === 'annual' ? amount / 100 : (amount / 100) * 12,
+              updatedAt: new Date()
+            }
+          };
+          user.markModified('subscription');
 
-            subscription = await Subscription.create({
-              userId: userId,
-              planId: subscriptionPlanId,
-              name: planDetails?.name || 'Basic Plan',
-              status: 'pending',
-              billingCycle: billingCycle,
-              billingCycleDays: billingCycle === 'annual' ? 365 : 30,
-              totalBeds: bedCount,
-              totalBranches: branchCount,
-              usage: {
-                bedsUsed: 0,
-                branchesUsed: 0
-              },
-              customPricing: {
-                basePrice: amount / 100,
-                topUpBeds: 0,
-                topUpCost: 0,
-                totalAnnualPrice: billingCycle === 'annual' ? amount / 100 : (amount / 100) * 12,
-                totalMonthlyPrice: billingCycle === 'monthly' ? amount / 100 : (amount / 100) / 12
-              }
-            });
-            console.log('✅ Subscription created:', subscription._id);
-          }
-
-          // Create payment record
-          payment = await Payment.create({
-            userId: userId,
-            subscriptionId: subscription._id,
-            razorpayOrderId: orderId,
+          // Add payment to user's payment history
+          const paymentHistoryEntry = {
             razorpayPaymentId: paymentId,
+            razorpayOrderId: orderId,
             amount: amount / 100, // Convert from paise to rupees
             currency: currency,
             status: 'paid',
-            bedCount: bedCount,
-            branchCount: branchCount,
-            paymentDate: new Date()
-          });
-          console.log('✅ Payment record created:', payment._id);
-
-        } else {
-          console.log('📝 Updating existing payment record...');
-          // Update existing payment record
-          payment.razorpayPaymentId = paymentId;
-          payment.status = 'paid';
-          payment.amount = amount / 100;
-          payment.currency = currency;
-          payment.paymentDate = new Date();
-
-          // Update user info if missing
-          if (!payment.userId && userId) {
-            payment.userId = userId;
-          }
-          if (!payment.subscriptionId && subscriptionPlanId) {
-            // Find or create subscription
-            let subscription = await Subscription.findOne({
-              userId: userId,
-              planId: subscriptionPlanId
-            });
-
-            if (!subscription) {
-              const planDetails = await Subscription.findById(subscriptionPlanId);
-              subscription = await Subscription.create({
-                userId: userId,
-                planId: subscriptionPlanId,
-                name: planDetails?.name || 'Basic Plan',
-                status: 'pending',
-                billingCycle: billingCycle,
-                billingCycleDays: billingCycle === 'annual' ? 365 : 30,
-                totalBeds: bedCount,
-                totalBranches: branchCount
-              });
+            paymentMethod: paymentEntity?.method || 'razorpay',
+            billingCycle: billingCycle,
+            planDetails: {
+              planId: subscriptionPlanId,
+              planName: planDetails?.planName,
+              bedCount: bedCount,
+              branchCount: branchCount
+            },
+            paymentDate: new Date(),
+            description: `Payment for ${planDetails?.planName} subscription`,
+            metadata: {
+              subscriptionId: userSubscription._id,
+              orderId: orderId,
+              capturedAt: new Date()
             }
-            payment.subscriptionId = subscription._id;
-          }
-          if (!payment.bedCount) payment.bedCount = bedCount;
-          if (!payment.branchCount) payment.branchCount = branchCount;
+          };
 
-          await payment.save();
-          console.log('✅ Payment record updated');
-        }
-
-        // Activate subscription
-        const subscription = await Subscription.findById(payment.subscriptionId);
-        if (subscription) {
-          subscription.status = 'active';
-          subscription.currentPeriodStart = new Date();
-          subscription.currentPeriodEnd = new Date(
-            Date.now() + subscription.billingCycleDays * 24 * 60 * 60 * 1000
-          );
-          await subscription.save();
-
-          // Update user beds/branches
-          const user = await User.findById(payment.userId);
-          if (user) {
-            user.totalBeds = (user.totalBeds || 0) + payment.bedCount;
-            user.totalBranches = (user.totalBranches || 0) + payment.branchCount;
-
-            // Add payment to user's payment history
-            const paymentHistoryEntry = {
-              razorpayPaymentId: paymentId,
-              razorpayOrderId: orderId,
-              amount: amount / 100, // Convert from paise to rupees
-              currency: currency,
-              status: 'paid',
-              paymentMethod: paymentEntity?.method || 'razorpay',
-              billingCycle: subscription?.billingCycle || 'monthly',
-              planDetails: {
-                planId: subscription?._id,
-                planName: subscription?.name,
-                bedCount: payment.bedCount,
-                branchCount: payment.branchCount
-              },
-              paymentDate: new Date(),
-              description: `Payment for ${subscription?.name} subscription`,
-              metadata: {
-                subscriptionId: subscription?._id,
-                orderId: orderId,
-                capturedAt: new Date()
-              }
-            };
-
-            // Initialize paymentHistory array if it doesn't exist
-            if (!user.paymentHistory) {
-              user.paymentHistory = [];
-            }
-
-            user.paymentHistory.push(paymentHistoryEntry);
-
-            await user.save();
-
-            console.log('✅ PAYMENT ADDED TO USER HISTORY!');
-            console.log('👤 User ID:', payment.userId);
-            console.log('💳 Payment ID:', paymentId);
-            console.log('💰 Amount:', amount / 100, 'INR');
-            console.log('📊 Payment History Length:', user.paymentHistory.length);
-
-            logger.info('Payment added to user history', {
-              userId: payment.userId,
-              paymentId: paymentId,
-              amount: amount / 100
-            });
+          // Initialize paymentHistory array if it doesn't exist
+          if (!user.paymentHistory) {
+            user.paymentHistory = [];
           }
 
-          logger.info('Subscription activated', {
-            subscriptionId: subscription._id,
-            userId: payment.userId
+          user.paymentHistory.push(paymentHistoryEntry);
+
+          await user.save();
+
+          console.log('✅ SUBSCRIPTION ACTIVATED AND PAYMENT ADDED TO USER HISTORY!');
+          console.log('👤 User ID:', userId);
+          console.log('💳 Payment ID:', paymentId);
+          console.log('💰 Amount:', amount / 100, 'INR');
+          console.log('📊 Payment History Length:', user.paymentHistory.length);
+
+          logger.info('Subscription activated and payment added to user history', {
+            userId: userId,
+            paymentId: paymentId,
+            amount: amount / 100,
+            subscriptionId: userSubscription._id
           });
 
           // Optional: Send confirmation email
@@ -1307,11 +1273,17 @@ exports.handlePaymentWebhook = async (payload) => {
               to: user.email,
               subject: 'Subscription Activated!',
               template: 'subscription-activated',
-              data: { subscription, user }
+              data: {
+                subscription: userSubscription,
+                plan: planDetails,
+                user: user
+              }
             });
           } catch (emailErr) {
             logger.error('Failed to send activation email', emailErr);
           }
+        } else {
+          logger.error('User not found', { userId });
         }
 
         return { success: true };
@@ -1321,54 +1293,64 @@ exports.handlePaymentWebhook = async (payload) => {
       // ——————————————————————
       case 'payment.failed':
         console.log('❌ PAYMENT.FAILED EVENT - Processing failed payment...');
-        if (!paymentId) break;
+        if (!paymentId || !userId) {
+          logger.warn('payment.failed missing IDs', { paymentId, userId });
+          return { success: true }; // Still acknowledge
+        }
 
-        const failedPayment = await Payment.findOneAndUpdate(
-          { razorpayPaymentId: paymentId },
-          { status: 'failed', failedAt: new Date() },
-          { new: true }
-        );
+        // Update UserSubscription if it exists
+        const UserSubscriptionModel = require('../models/userSubscription.model');
+        const failedUserSubscription = await UserSubscriptionModel.findOne({
+          userId: userId,
+          paymentId: paymentId
+        });
+
+        if (failedUserSubscription) {
+          failedUserSubscription.paymentStatus = 'failed';
+          failedUserSubscription.status = 'cancelled';
+          failedUserSubscription.cancelledAt = new Date();
+          failedUserSubscription.cancellationReason = paymentEntity?.error_description || 'Payment failed';
+          await failedUserSubscription.save();
+        }
 
         // Add failed payment to user's payment history
-        if (failedPayment) {
-          const user = await User.findById(failedPayment.userId);
-          if (user) {
-            const failedPaymentEntry = {
-              razorpayPaymentId: paymentId,
-              razorpayOrderId: failedPayment.razorpayOrderId,
-              amount: failedPayment.amount,
-              currency: failedPayment.currency || 'INR',
-              status: 'failed',
-              paymentMethod: paymentEntity?.method || 'razorpay',
-              billingCycle: 'monthly', // Default
-              paymentDate: new Date(),
-              description: `Failed payment - ${paymentEntity?.error_description || 'Payment failed'}`,
-              metadata: {
-                subscriptionId: failedPayment.subscriptionId,
-                orderId: failedPayment.razorpayOrderId,
-                failedAt: new Date(),
-                failureReason: paymentEntity?.error_description
-              }
-            };
-
-            // Initialize paymentHistory array if it doesn't exist
-            if (!user.paymentHistory) {
-              user.paymentHistory = [];
+        const failedPaymentUser = await User.findById(userId);
+        if (failedPaymentUser) {
+          const failedPaymentEntry = {
+            razorpayPaymentId: paymentId,
+            razorpayOrderId: orderId,
+            amount: amount ? amount / 100 : 0,
+            currency: currency || 'INR',
+            status: 'failed',
+            paymentMethod: paymentEntity?.method || 'razorpay',
+            billingCycle: billingCycle || 'monthly',
+            paymentDate: new Date(),
+            description: `Failed payment - ${paymentEntity?.error_description || 'Payment failed'}`,
+            metadata: {
+              subscriptionPlanId: subscriptionPlanId,
+              orderId: orderId,
+              failedAt: new Date(),
+              failureReason: paymentEntity?.error_description
             }
+          };
 
-            user.paymentHistory.push(failedPaymentEntry);
-            await user.save();
-
-            console.log('❌ FAILED PAYMENT ADDED TO USER HISTORY!');
-            console.log('👤 User ID:', failedPayment.userId);
-            console.log('💳 Payment ID:', paymentId);
-            console.log('📊 Payment History Length:', user.paymentHistory.length);
-
-            logger.info('Failed payment added to user history', {
-              userId: failedPayment.userId,
-              paymentId: paymentId
-            });
+          // Initialize paymentHistory array if it doesn't exist
+          if (!failedPaymentUser.paymentHistory) {
+            failedPaymentUser.paymentHistory = [];
           }
+
+          failedPaymentUser.paymentHistory.push(failedPaymentEntry);
+          await failedPaymentUser.save();
+
+          console.log('❌ FAILED PAYMENT ADDED TO USER HISTORY!');
+          console.log('👤 User ID:', userId);
+          console.log('💳 Payment ID:', paymentId);
+          console.log('📊 Payment History Length:', failedPaymentUser.paymentHistory.length);
+
+          logger.info('Failed payment added to user history', {
+            userId: userId,
+            paymentId: paymentId
+          });
         }
 
         logger.warn('Payment failed', { paymentId, reason: paymentEntity?.error_description });

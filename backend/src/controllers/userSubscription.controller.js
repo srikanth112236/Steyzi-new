@@ -613,3 +613,32 @@ exports.addBranchesToSubscription = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get user's subscription history
+ * @route GET /api/users/subscription-history
+ * @access Private (Admin only)
+ */
+exports.getSubscriptionHistory = async (req, res) => {
+  try {
+    const UserSubscription = require('../models/userSubscription.model');
+
+    // Get all subscriptions for the user
+    const subscriptions = await UserSubscription.find({ userId: req.user._id })
+      .populate('subscriptionPlanId', 'planName baseBedCount basePrice billingCycle')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: subscriptions,
+      count: subscriptions.length
+    });
+  } catch (error) {
+    logger.error('Error fetching subscription history:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch subscription history',
+      error: error.message
+    });
+  }
+};

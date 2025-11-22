@@ -308,6 +308,13 @@ router.post('/select-subscription', authenticate, userSubscriptionController.sel
 router.put('/subscription-usage', authenticate, userSubscriptionController.updateSubscriptionUsage);
 
 /**
+ * @route   GET /api/users/subscription-history
+ * @desc    Get user's subscription history
+ * @access  Private
+ */
+router.get('/subscription-history', authenticate, userSubscriptionController.getSubscriptionHistory);
+
+/**
  * @route   GET /api/users/check-restrictions
  * @desc    Check subscription restrictions
  * @access  Private
@@ -327,6 +334,13 @@ router.post('/subscription/add-beds', authenticate, userSubscriptionController.a
  * @access  Private
  */
 router.post('/subscription/add-branches', authenticate, userSubscriptionController.addBranchesToSubscription);
+
+/**
+ * @route   GET /api/users/subscription-history
+ * @desc    Get user's subscription history
+ * @access  Private
+ */
+router.get('/subscription-history', authenticate, userSubscriptionController.getSubscriptionHistory);
 
 /**
  * @route   GET /api/users/:id

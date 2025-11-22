@@ -77,6 +77,8 @@ import TokenExpiryTest from './components/debug/TokenExpiryTest';
 import SubscriptionTest from './components/debug/SubscriptionTest';
 import SubscriptionDebug from './components/debug/SubscriptionDebug';
 import SubscriptionTestPage from './pages/admin/SubscriptionTestPage';
+import SubscriptionSelection from './components/admin/SubscriptionSelection';
+import SubscriptionHistory from './pages/admin/SubscriptionHistory';
 import UserManagement from './components/superadmin/UserManagement';
 import NotificationsPage from './pages/admin/Notifications';
 import PgReports from './pages/admin/Reports';
@@ -95,6 +97,9 @@ import CostCalculator from './pages/admin/CostCalculator';
 import Expenses from './pages/admin/Expenses';
 import Salaries from './pages/admin/Salaries';
 import ExpenseManagement from './components/superadmin/ExpenseManagement';
+
+// Import Subscription Pages
+import SubscriptionHistory from './pages/admin/SubscriptionHistory';
 
 // Import Sales Pages
 import SalesDashboard from './pages/sales/Dashboard';
@@ -243,6 +248,11 @@ const App = () => {
             <Settings />
           </ProtectedRoute>
         } />
+        <Route path="subscription-history" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <SubscriptionHistory />
+          </ProtectedRoute>
+        } />
         <Route path="residents" element={
           <ProtectedRoute requireOnboarding={false}>
             <Residents />
@@ -342,6 +352,16 @@ const App = () => {
         <Route path="finance/salaries" element={
           <ProtectedRoute requireOnboarding={false}>
             <Salaries />
+          </ProtectedRoute>
+        } />
+        <Route path="subscription-selection" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <SubscriptionSelection />
+          </ProtectedRoute>
+        } />
+        <Route path="subscription-history" element={
+          <ProtectedRoute requireOnboarding={false}>
+            <SubscriptionHistory />
           </ProtectedRoute>
         } />
       </Route>
