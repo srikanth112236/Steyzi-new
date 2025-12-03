@@ -1,24 +1,22 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  Clock, 
-  User, 
-  Building2, 
-  Phone, 
-  MapPin, 
-  MessageSquare, 
-  Star, 
-  CheckCircle, 
-  AlertCircle, 
-  XCircle, 
-  Play, 
+import {
+  X,
+  Clock,
+  User,
+  Building2,
+  MapPin,
+  MessageSquare,
+  Star,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Play,
   Users,
   Calendar,
   FileText,
   Tag,
   MessageCircle,
-  TrendingUp,
   Award,
   Shield,
   Activity
@@ -93,201 +91,191 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
           onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden"
+            initial={{ y: 24, opacity: 0.5 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0.5 }}
+            className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-100 bg-white/95 shadow-2xl shadow-black/20 backdrop-blur"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                    <MessageSquare className="h-8 w-8 text-white" />
-                  </div>
+            <div className="relative flex flex-col gap-6 p-6">
+              <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 p-6 text-white">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-bold">Ticket #{ticket._id.slice(-8)}</h2>
-                    <p className="text-blue-100">Complete ticket overview and timeline</p>
+                    <p className="text-[11px] uppercase tracking-[0.4em] text-white/60">Ticket overview</p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                      Ticket #{ticket._id.slice(-8)}
+                    </h2>
+                    <p className="mt-1 text-sm text-white/70">Complete context, history, and actions in one compact sheet.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusColor(ticket.status)}`}>
+                      {getStatusIcon(ticket.status)}
+                      {ticket.status.replace('_', ' ')}
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getPriorityColor(ticket.priority)}`}>
+                      <span className="h-2 w-2 rounded-full bg-current" />
+                      {ticket.priority}
+                    </span>
+                    <button
+                      onClick={onClose}
+                      className="rounded-full border border-white/20 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                <div className="flex flex-wrap gap-3 text-xs text-white/70">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(ticket.createdAt)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Age {ticket.age || 0} days
+                  </span>
+                  {ticket.user?.firstName && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
+                      <User className="h-3.5 w-3.5" />
+                      {ticket.user?.firstName} {ticket.user?.lastName}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Tab Navigation */}
-            <div className="border-b border-gray-200 bg-gray-50">
-              <div className="flex space-x-1 p-4">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                      activeTab === tab.id
-                        ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                    }`}
-                  >
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
+              <div className="border-b border-slate-200">
+                <nav className="flex gap-4 text-sm font-semibold">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 transition ${
+                        activeTab === tab.id
+                          ? 'bg-slate-900 text-white shadow'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
               </div>
-            </div>
 
-            {/* Content */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <AnimatePresence mode="wait">
+              <div className="max-h-[55vh] overflow-y-auto pr-2">
+                <AnimatePresence mode="wait">
                 {activeTab === 'overview' && (
                   <motion.div
                     key="overview"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="space-y-6"
+                    className="space-y-5"
                   >
-                    {/* Ticket Header */}
-                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">{ticket.title}</h3>
-                          <p className="text-gray-600 leading-relaxed">{ticket.description}</p>
-                        </div>
-                        <div className="flex flex-col items-end space-y-2 ml-4">
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border ${getStatusColor(ticket.status)}`}>
-                            {getStatusIcon(ticket.status)}
-                            <span className="ml-1.5 capitalize">{ticket.status.replace('_', ' ')}</span>
-                          </span>
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border ${getPriorityColor(ticket.priority)}`}>
-                            <span className="w-2 h-2 rounded-full bg-current mr-2" />
-                            {ticket.priority}
-                          </span>
-                        </div>
-                      </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                      <h3 className="text-lg font-semibold text-slate-900">{ticket.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600 leading-relaxed">{ticket.description}</p>
                     </div>
 
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl text-white">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-blue-100 text-sm font-medium">Created</p>
-                            <p className="text-xl font-bold">{formatDate(ticket.createdAt)}</p>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {[
+                        { label: 'Created', value: formatDate(ticket.createdAt), icon: Calendar, tone: 'from-blue-500/15 to-blue-600/15 text-blue-900' },
+                        { label: 'Category', value: ticket.category, icon: Tag, tone: 'from-emerald-500/15 to-emerald-600/15 text-emerald-900' },
+                        { label: 'Age', value: `${ticket.age || 0} days`, icon: Clock, tone: 'from-purple-500/15 to-purple-600/15 text-purple-900' }
+                      ].map((card) => (
+                        <div key={card.label} className={`rounded-2xl border border-slate-100 bg-gradient-to-br ${card.tone} p-4`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs uppercase tracking-widest text-slate-500">{card.label}</p>
+                              <p className="mt-2 text-lg font-semibold capitalize">{card.value}</p>
+                            </div>
+                            <card.icon className="h-5 w-5 opacity-70" />
                           </div>
-                          <Calendar className="h-8 w-8 text-blue-200" />
                         </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-green-100 text-sm font-medium">Category</p>
-                            <p className="text-xl font-bold capitalize">{ticket.category}</p>
-                          </div>
-                          <Tag className="h-8 w-8 text-green-200" />
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-xl text-white">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-purple-100 text-sm font-medium">Age</p>
-                            <p className="text-xl font-bold">{ticket.age || 0} days</p>
-                          </div>
-                          <Clock className="h-8 w-8 text-purple-200" />
-                        </div>
-                      </div>
+                      ))}
                     </div>
 
-                    {/* Key Information Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Ticket Information */}
-                      <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                          <FileText className="h-5 w-5 mr-2 text-blue-500" />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <FileText className="h-4 w-4 text-slate-500" />
                           Ticket Information
                         </h4>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span className="text-gray-600 font-medium">Status</span>
-                            <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ticket.status)}`}>
+                        <dl className="mt-4 space-y-3 text-sm">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <dt className="text-slate-500">Status</dt>
+                            <dd className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-semibold ${getStatusColor(ticket.status)}`}>
                               {getStatusIcon(ticket.status)}
-                              <span className="ml-1 capitalize">{ticket.status.replace('_', ' ')}</span>
-                            </span>
+                              {ticket.status.replace('_', ' ')}
+                            </dd>
                           </div>
-                          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span className="text-gray-600 font-medium">Priority</span>
-                            <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(ticket.priority)}`}>
-                              <span className="w-2 h-2 rounded-full bg-current mr-1" />
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <dt className="text-slate-500">Priority</dt>
+                            <dd className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-semibold ${getPriorityColor(ticket.priority)}`}>
+                              <span className="h-2 w-2 rounded-full bg-current" />
                               {ticket.priority}
-                            </span>
+                            </dd>
                           </div>
-                          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span className="text-gray-600 font-medium">Category</span>
-                            <span className="text-gray-900 font-semibold capitalize">{ticket.category}</span>
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <dt className="text-slate-500">Category</dt>
+                            <dd className="font-semibold text-slate-900 capitalize">{ticket.category}</dd>
                           </div>
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-gray-600 font-medium">Created</span>
-                            <span className="text-gray-900">{formatDate(ticket.createdAt)}</span>
+                          <div className="flex items-center justify-between">
+                            <dt className="text-slate-500">Created</dt>
+                            <dd className="font-medium text-slate-900">{formatDate(ticket.createdAt)}</dd>
                           </div>
-                        </div>
+                        </dl>
                       </div>
 
-                      {/* Location & Contact */}
-                      <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                          <MapPin className="h-5 w-5 mr-2 text-green-500" />
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <MapPin className="h-4 w-4 text-green-500" />
                           Location & Contact
                         </h4>
-                        <div className="space-y-3">
+                        <dl className="mt-4 space-y-3 text-sm">
                           {ticket.location?.room && (
-                            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                              <span className="text-gray-600 font-medium">Room</span>
-                              <span className="text-gray-900 font-semibold">{ticket.location.room}</span>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                              <dt className="text-slate-500">Room</dt>
+                              <dd className="font-semibold text-slate-900">{ticket.location.room}</dd>
                             </div>
                           )}
                           {ticket.location?.floor && (
-                            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                              <span className="text-gray-600 font-medium">Floor</span>
-                              <span className="text-gray-900 font-semibold">{ticket.location.floor}</span>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                              <dt className="text-slate-500">Floor</dt>
+                              <dd className="font-semibold text-slate-900">{ticket.location.floor}</dd>
                             </div>
                           )}
                           {ticket.location?.building && (
-                            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                              <span className="text-gray-600 font-medium">Building</span>
-                              <span className="text-gray-900 font-semibold">{ticket.location.building}</span>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                              <dt className="text-slate-500">Building</dt>
+                              <dd className="font-semibold text-slate-900">{ticket.location.building}</dd>
                             </div>
                           )}
                           {ticket.contactPhone && (
-                            <div className="flex justify-between items-center py-2">
-                              <span className="text-gray-600 font-medium">Contact</span>
-                              <span className="text-gray-900 font-semibold">{ticket.contactPhone}</span>
+                            <div className="flex items-center justify-between">
+                              <dt className="text-slate-500">Contact</dt>
+                              <dd className="font-semibold text-slate-900">{ticket.contactPhone}</dd>
                             </div>
                           )}
-                        </div>
+                        </dl>
                       </div>
                     </div>
 
-                    {/* Assigned To Section */}
                     {ticket.assignedTo && (
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
-                        <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
-                          <Users className="h-5 w-5 mr-2 text-blue-600" />
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+                          <Users className="h-4 w-4 text-blue-600" />
                           Assigned To
                         </h4>
-                        <div className="flex items-center">
-                          <div className="p-3 bg-blue-100 rounded-xl mr-4">
+                        <div className="mt-4 flex items-center gap-3">
+                          <div className="rounded-2xl bg-white/70 p-3">
                             <User className="h-6 w-6 text-blue-600" />
                           </div>
                           <div>
-                            <p className="text-lg font-bold text-blue-900">
+                            <p className="font-semibold text-blue-900">
                               {ticket.assignedTo.firstName} {ticket.assignedTo.lastName}
                             </p>
                             <p className="text-blue-700">{ticket.assignedTo.email}</p>
@@ -296,29 +284,28 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
                       </div>
                     )}
 
-                    {/* Resolution Section */}
                     {ticket.resolution && (
-                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6">
-                        <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
-                          <Award className="h-5 w-5 mr-2 text-green-600" />
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                          <Award className="h-4 w-4 text-emerald-600" />
                           Resolution
                         </h4>
-                        <div className="space-y-4">
-                          <div className="bg-white rounded-lg p-4 border border-green-200">
-                            <p className="text-gray-900 font-medium mb-2">Solution:</p>
-                            <p className="text-gray-700">{ticket.resolution.solution}</p>
+                        <div className="mt-4 space-y-3">
+                          <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                            <p className="text-sm font-medium text-slate-900">Solution</p>
+                            <p className="text-sm text-slate-600">{ticket.resolution.solution}</p>
                           </div>
                           {ticket.resolution.rating && (
-                            <div className="flex items-center">
-                              <span className="text-green-700 font-medium mr-3">Rating:</span>
-                              <div className="flex">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-emerald-800">Rating</span>
+                              <div className="flex items-center">
                                 {[...Array(5)].map((_, i) => (
                                   <Star
                                     key={i}
                                     className={`h-5 w-5 ${
                                       i < ticket.resolution.rating
-                                        ? 'text-yellow-400 fill-current'
-                                        : 'text-gray-300'
+                                        ? 'text-amber-400 fill-current'
+                                        : 'text-slate-300'
                                     }`}
                                   />
                                 ))}
@@ -326,9 +313,9 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
                             </div>
                           )}
                           {ticket.resolution.feedback && (
-                            <div className="bg-white rounded-lg p-4 border border-green-200">
-                              <p className="text-green-700 font-medium mb-2">Feedback:</p>
-                              <p className="text-gray-700">{ticket.resolution.feedback}</p>
+                            <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                              <p className="text-sm font-medium text-emerald-800">Feedback</p>
+                              <p className="text-sm text-slate-600">{ticket.resolution.feedback}</p>
                             </div>
                           )}
                         </div>
@@ -345,36 +332,36 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
                     exit={{ opacity: 0, y: -20 }}
                     className="space-y-6"
                   >
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200 p-6">
-                      <h4 className="text-lg font-semibold text-purple-900 mb-4 flex items-center">
-                        <Activity className="h-5 w-5 mr-2 text-purple-600" />
+                    <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4">
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-900 mb-4">
+                        <Activity className="h-4 w-4 text-purple-600" />
                         Ticket Timeline
                       </h4>
                       
                       <div className="space-y-4">
                         {ticket.timeline && ticket.timeline.length > 0 ? (
                           ticket.timeline.map((entry, index) => (
-                            <div key={index} className="flex items-start space-x-4">
+                            <div key={index} className="flex items-start gap-3">
                               <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-white rounded-full border-2 border-purple-200 flex items-center justify-center">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-purple-200 bg-white">
                                   {getTimelineIcon(entry.action)}
                                 </div>
                                 {index < ticket.timeline.length - 1 && (
-                                  <div className="w-0.5 h-8 bg-purple-200 ml-4"></div>
+                                  <div className="ml-4 h-8 w-0.5 bg-purple-200"></div>
                                 )}
                               </div>
-                              <div className="flex-1 bg-white rounded-lg p-4 border border-purple-200">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h5 className="font-semibold text-gray-900 capitalize">
+                              <div className="flex-1 rounded-2xl border border-purple-200 bg-white p-4">
+                                <div className="mb-1 flex items-center justify-between">
+                                  <h5 className="text-sm font-semibold text-slate-900 capitalize">
                                     {entry.action.replace('_', ' ')}
                                   </h5>
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-slate-500">
                                     {formatDate(entry.timestamp)}
                                   </span>
                                 </div>
-                                <p className="text-gray-600 text-sm">{entry.description}</p>
+                                <p className="text-sm text-slate-600">{entry.description}</p>
                                 {entry.performedBy && (
-                                  <p className="text-xs text-purple-600 mt-2">
+                                  <p className="mt-2 text-xs text-purple-600">
                                     by {entry.performedBy.firstName} {entry.performedBy.lastName}
                                   </p>
                                 )}
@@ -383,8 +370,8 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
                           ))
                         ) : (
                           <div className="text-center py-8">
-                            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500">No timeline entries yet</p>
+                            <Activity className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                            <p className="text-sm text-slate-500">No timeline entries yet</p>
                           </div>
                         )}
                       </div>
@@ -543,6 +530,7 @@ const TicketDetailsModal = ({ isOpen, onClose, ticket, onStatusUpdate, onReopenR
                 </div>
               </div>
             </div>
+          </div>
           </motion.div>
         </motion.div>
       )}

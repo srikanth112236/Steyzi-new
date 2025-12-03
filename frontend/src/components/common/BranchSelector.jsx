@@ -36,14 +36,29 @@ const BranchSelector = () => {
       if (safeBranches.length === 1) {
         dispatch(setSelectedBranch(safeBranches[0]));
       } else if (safeBranches.length > 1 && !selectedBranch) {
-        // If multiple branches and none selected, select the first one
-        dispatch(setSelectedBranch(safeBranches[0]));
+        // If multiple branches and none selected, select the default or first one
+        const defaultBranch = safeBranches.find(b => b.isDefault);
+        dispatch(setSelectedBranch(defaultBranch || safeBranches[0]));
+      } else if (selectedBranch && !safeBranches.find(b => b._id === selectedBranch._id)) {
+        // If selected branch no longer exists, select default or first
+        const defaultBranch = safeBranches.find(b => b.isDefault);
+        dispatch(setSelectedBranch(defaultBranch || safeBranches[0] || null));
       }
     } else if (user?.role === 'admin') {
       // Admins can see all branches
       setAvailableBranches(safeBranches);
+      
+      // Auto-select default branch if none selected, or if selected branch doesn't exist
+      if (!selectedBranch && safeBranches.length > 0) {
+        const defaultBranch = safeBranches.find(b => b.isDefault);
+        dispatch(setSelectedBranch(defaultBranch || safeBranches[0]));
+      } else if (selectedBranch && !safeBranches.find(b => b._id === selectedBranch._id)) {
+        // If selected branch no longer exists, select default or first
+        const defaultBranch = safeBranches.find(b => b.isDefault);
+        dispatch(setSelectedBranch(defaultBranch || safeBranches[0] || null));
+      }
     }
-  }, [branches, user, dispatch]);
+  }, [branches, user, dispatch, selectedBranch]);
 
 
   // Don't render for roles other than admin and maintainer

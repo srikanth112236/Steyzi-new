@@ -46,6 +46,20 @@ const branchSlice = createSlice({
     setBranches: (state, action) => {
       state.branches = Array.isArray(action.payload) ? action.payload : [];
     },
+    addBranch: (state, action) => {
+      // Add a new branch to the branches array if it doesn't already exist
+      const newBranch = action.payload;
+      if (newBranch && newBranch._id) {
+        const exists = state.branches.some(b => b._id === newBranch._id);
+        if (!exists) {
+          state.branches = [...state.branches, newBranch];
+          // Auto-select the new branch if it's the default or if no branch is selected
+          if (newBranch.isDefault || !state.selectedBranch) {
+            state.selectedBranch = newBranch;
+          }
+        }
+      }
+    },
     clearBranches: (state) => {
       state.branches = [];
     },
@@ -92,6 +106,7 @@ export const {
   setSelectedBranch,
   clearSelectedBranch,
   setBranches,
+  addBranch,
   clearBranches,
   initializeBranches,
 } = branchSlice.actions;

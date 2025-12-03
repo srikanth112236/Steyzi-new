@@ -75,12 +75,23 @@ const Residents = () => {
     pending: 0,
     movedOut: 0
   });
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+  // Load viewMode from localStorage, default to 'grid'
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('residents_viewMode');
+    return saved || 'grid';
+  });
   const [sortBy, setSortBy] = useState('firstName');
   const [sortOrder, setSortOrder] = useState('asc');
   const [itemsPerPage, setItemsPerPage] = useState(12); // 12 for grid, 10 for table
 
   const navigate = useNavigate();
+
+  // Save viewMode to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('residents_viewMode', viewMode);
+    const newItemsPerPage = viewMode === 'grid' ? 12 : 10;
+    setItemsPerPage(newItemsPerPage);
+  }, [viewMode]);
 
   // Fetch residents with comprehensive handling
   const fetchResidents = async () => {
@@ -236,7 +247,12 @@ const Residents = () => {
         fetchStats();
         return { success: true, message: data.message };
       } else {
-        return { success: false, message: data.message || 'Operation failed' };
+        // Return detailed error information
+        return { 
+          success: false, 
+          message: data.message || 'Operation failed',
+          statusCode: data.statusCode || 500
+        };
       }
     } catch (error) {
       console.error('Error submitting resident:', error);
@@ -504,7 +520,7 @@ const Residents = () => {
                 <th className="px-4 py-3 text-left align-middle">
                   <button
                     onClick={() => handleSort('firstName')}
-                    className="flex items-center space-x-1 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+                    className="flex items-center space-x-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
                   >
                     <span>Resident</span>
                     <ArrowUpDown className="h-3.5 w-3.5" />
@@ -513,7 +529,7 @@ const Residents = () => {
                 <th className="px-4 py-3 text-left align-middle">
                   <button
                     onClick={() => handleSort('email')}
-                    className="flex items-center space-x-1 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+                    className="flex items-center space-x-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
                   >
                     <span>Contact</span>
                     <ArrowUpDown className="h-3.5 w-3.5" />
@@ -522,7 +538,7 @@ const Residents = () => {
                 <th className="px-4 py-3 text-left align-middle">
                   <button
                     onClick={() => handleSort('roomNumber')}
-                    className="flex items-center space-x-1 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+                    className="flex items-center space-x-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
                   >
                     <span>Room</span>
                     <ArrowUpDown className="h-3.5 w-3.5" />
@@ -531,7 +547,7 @@ const Residents = () => {
                 <th className="px-4 py-3 text-left align-middle">
                   <button
                     onClick={() => handleSort('status')}
-                    className="flex items-center space-x-1 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+                    className="flex items-center space-x-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
                   >
                     <span>Status</span>
                     <ArrowUpDown className="h-3.5 w-3.5" />
@@ -540,13 +556,13 @@ const Residents = () => {
                 <th className="px-4 py-3 text-left align-middle">
                   <button
                     onClick={() => handleSort('checkInDate')}
-                    className="flex items-center space-x-1 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+                    className="flex items-center space-x-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
                   >
                     <span>Check-in</span>
                     <ArrowUpDown className="h-3.5 w-3.5" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left align-middle text-xs font-semibold text-gray-700">Actions</th>
+                <th className="px-3 py-3 text-center align-middle text-xs font-semibold text-gray-700 w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -556,40 +572,39 @@ const Residents = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => handleResidentView(resident)}
+                  className="hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle cursor-pointer" onClick={() => handleResidentView(resident)}>
                     <div className="flex items-center space-x-2.5">
                       <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
                         {getResidentAvatar(resident)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-sm text-gray-900 truncate leading-tight">{resident.firstName} {resident.lastName}</div>
+                        <div className="font-semibold text-sm text-gray-900 truncate leading-tight hover:text-blue-600 transition-colors">{resident.firstName} {resident.lastName}</div>
                         <div className="text-xs text-gray-500 truncate leading-tight mt-0.5">{resident.phone}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle cursor-pointer hover:text-blue-600 transition-colors" onClick={() => handleResidentView(resident)}>
                     <div className="text-xs font-medium text-gray-900 truncate max-w-[200px]" title={resident.email}>{resident.email}</div>
                   </td>
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle cursor-pointer" onClick={() => handleResidentView(resident)}>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
                       {resident.roomNumber ? `Room ${resident.roomNumber}` : 'Unassigned'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle cursor-pointer" onClick={() => handleResidentView(resident)}>
                     <div className="inline-flex items-center">
                       {getStatusBadge(resident.status)}
                     </div>
                   </td>
-                  <td className="px-4 py-3 align-middle">
+                  <td className="px-4 py-3 align-middle cursor-pointer hover:text-blue-600 transition-colors" onClick={() => handleResidentView(resident)}>
                     <div className="text-xs font-medium text-gray-900 whitespace-nowrap">
                       {resident.checkInDate ? new Date(resident.checkInDate).toLocaleDateString() : 'N/A'}
                     </div>
                   </td>
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex items-center space-x-1.5">
+                  <td className="px-3 py-3 align-middle">
+                    <div className="flex items-center justify-start space-x-1" onClick={(e) => e.stopPropagation()}>
                       <PermissionAction
                         module="resident_management"
                         submodule="residents"
@@ -600,10 +615,10 @@ const Residents = () => {
                         }}
                       >
                         <button
-                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                          className="inline-flex items-center justify-center w-7 h-7 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-all duration-200 hover:scale-110"
+                          title="View Details"
                         >
-                          <Eye className="h-3.5 w-3.5 mr-1" />
-                          View
+                          <Eye className="h-3.5 w-3.5" />
                         </button>
                       </PermissionAction>
                       <PermissionAction
@@ -616,10 +631,10 @@ const Residents = () => {
                         }}
                       >
                         <button
-                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors"
+                          className="inline-flex items-center justify-center w-7 h-7 text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-all duration-200 hover:scale-110"
+                          title="Edit Resident"
                         >
-                          <Edit className="h-3.5 w-3.5 mr-1" />
-                          Edit
+                          <Edit className="h-3.5 w-3.5" />
                         </button>
                       </PermissionAction>
                       <PermissionAction
@@ -632,10 +647,10 @@ const Residents = () => {
                         }}
                       >
                         <button
-                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                          className="inline-flex items-center justify-center w-7 h-7 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-all duration-200 hover:scale-110"
+                          title="Delete Resident"
                         >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          Delete
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </PermissionAction>
                     </div>
@@ -738,8 +753,8 @@ const Residents = () => {
           </div>
         </div>
 
-        {/* Premium Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Compact Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <motion.div
             initial={{ opacity: 0, y: 30, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -754,44 +769,22 @@ const Residents = () => {
               y: -5,
               transition: { duration: 0.2 }
             }}
-            className="relative group bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-100 rounded-2xl p-6 border border-blue-200/50 hover:border-blue-300/70 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
+            className="relative group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200 hover:border-blue-300 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
           >
-            {/* Background Pattern */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-200/20 to-transparent rounded-bl-3xl" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-indigo-200/15 to-transparent rounded-tr-2xl" />
-
             <div className="relative flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <motion.div
-                    className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl"
-                    whileHover={{ rotate: 10, scale: 1.1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Users className="h-6 w-6 text-white" />
-                  </motion.div>
-                  <div>
-                    <p className="text-sm font-bold text-blue-900/80 uppercase tracking-wide">Total Residents</p>
-                    <p className="text-3xl font-black text-blue-900 group-hover:text-indigo-900 transition-colors duration-300">
-                      {stats.total}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                  <Users className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-xs text-blue-700/70 font-medium">All registered residents</p>
+                <div>
+                  <p className="text-xs font-semibold text-blue-900/80 uppercase tracking-wide">Total Residents</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {stats.total}
+                  </p>
+                </div>
               </div>
             </div>
-
-            {/* Progress Indicator */}
-            <div className="absolute bottom-4 right-4">
-              <div className="w-16 h-2 bg-blue-200/50 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: '100%' }}
-                  transition={{ duration: 1, delay: 0.5 }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-blue-700/70 mt-2">All registered residents</p>
           </motion.div>
 
           <motion.div
@@ -809,42 +802,22 @@ const Residents = () => {
               y: -5,
               transition: { duration: 0.2 }
             }}
-            className="relative group bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100 rounded-2xl p-6 border border-emerald-200/50 hover:border-emerald-300/70 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
+            className="relative group bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-4 border border-emerald-200 hover:border-emerald-300 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-200/20 to-transparent rounded-bl-3xl" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-green-200/15 to-transparent rounded-tr-2xl" />
-
             <div className="relative flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <motion.div
-                    className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl"
-                    whileHover={{ rotate: 10, scale: 1.1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <CheckCircle className="h-6 w-6 text-white" />
-                  </motion.div>
-                  <div>
-                    <p className="text-sm font-bold text-emerald-900/80 uppercase tracking-wide">Active Residents</p>
-                    <p className="text-3xl font-black text-emerald-900 group-hover:text-green-900 transition-colors duration-300">
-                      {stats.active}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center shadow-md">
+                  <CheckCircle className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-xs text-emerald-700/70 font-medium">Currently staying</p>
+                <div>
+                  <p className="text-xs font-semibold text-emerald-900/80 uppercase tracking-wide">Active Residents</p>
+                  <p className="text-2xl font-bold text-emerald-900">
+                    {stats.active}
+                  </p>
+                </div>
               </div>
             </div>
-
-            <div className="absolute bottom-4 right-4">
-              <div className="w-16 h-2 bg-emerald-200/50 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: stats.total > 0 ? `${(stats.active / stats.total) * 100}%` : '0%' }}
-                  transition={{ duration: 1, delay: 0.6 }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-emerald-700/70 mt-2">Currently staying</p>
           </motion.div>
 
           <motion.div
@@ -862,42 +835,22 @@ const Residents = () => {
               y: -5,
               transition: { duration: 0.2 }
             }}
-            className="relative group bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 rounded-2xl p-6 border border-amber-200/50 hover:border-amber-300/70 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
+            className="relative group bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4 border border-amber-200 hover:border-amber-300 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-200/20 to-transparent rounded-bl-3xl" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-orange-200/15 to-transparent rounded-tr-2xl" />
-
             <div className="relative flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <motion.div
-                    className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl"
-                    whileHover={{ rotate: 10, scale: 1.1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Clock className="h-6 w-6 text-white" />
-                  </motion.div>
-                  <div>
-                    <p className="text-sm font-bold text-amber-900/80 uppercase tracking-wide">Pending Check-in</p>
-                    <p className="text-3xl font-black text-amber-900 group-hover:text-orange-900 transition-colors duration-300">
-                      {stats.pending}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md">
+                  <Clock className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-xs text-amber-700/70 font-medium">Awaiting arrival</p>
+                <div>
+                  <p className="text-xs font-semibold text-amber-900/80 uppercase tracking-wide">Pending Check-in</p>
+                  <p className="text-2xl font-bold text-amber-900">
+                    {stats.pending}
+                  </p>
+                </div>
               </div>
             </div>
-
-            <div className="absolute bottom-4 right-4">
-              <div className="w-16 h-2 bg-amber-200/50 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-amber-500 to-orange-600 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: stats.total > 0 ? `${(stats.pending / stats.total) * 100}%` : '0%' }}
-                  transition={{ duration: 1, delay: 0.7 }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-amber-700/70 mt-2">Awaiting arrival</p>
           </motion.div>
 
           <motion.div
@@ -915,205 +868,150 @@ const Residents = () => {
               y: -5,
               transition: { duration: 0.2 }
             }}
-            className="relative group bg-gradient-to-br from-rose-50 via-pink-50 to-rose-100 rounded-2xl p-6 border border-rose-200/50 hover:border-rose-300/70 shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden"
+            className="relative group bg-gradient-to-br from-rose-50 to-pink-50 rounded-lg p-4 border border-rose-200 hover:border-rose-300 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-rose-200/20 to-transparent rounded-bl-3xl" />
-            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-pink-200/15 to-transparent rounded-tr-2xl" />
-
             <div className="relative flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <motion.div
-                    className="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl"
-                    whileHover={{ rotate: 10, scale: 1.1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <LogOut className="h-6 w-6 text-white" />
-                  </motion.div>
-                  <div>
-                    <p className="text-sm font-bold text-rose-900/80 uppercase tracking-wide">Moved Out</p>
-                    <p className="text-3xl font-black text-rose-900 group-hover:text-pink-900 transition-colors duration-300">
-                      {stats.movedOut}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-lg flex items-center justify-center shadow-md">
+                  <LogOut className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-xs text-rose-700/70 font-medium">This month</p>
+                <div>
+                  <p className="text-xs font-semibold text-rose-900/80 uppercase tracking-wide">Moved Out</p>
+                  <p className="text-2xl font-bold text-rose-900">
+                    {stats.movedOut}
+                  </p>
+                </div>
               </div>
             </div>
-
-            <div className="absolute bottom-4 right-4">
-              <div className="w-16 h-2 bg-rose-200/50 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-rose-500 to-pink-600 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: stats.total > 0 ? `${(stats.movedOut / stats.total) * 100}%` : '0%' }}
-                  transition={{ duration: 1, delay: 0.8 }}
-                />
-              </div>
-            </div>
+            <p className="text-xs text-rose-700/70 mt-2">This month</p>
           </motion.div>
         </div>
 
-        {/* Premium Search & Filters */}
+        {/* Compact Search & Filters */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-200/60 backdrop-blur-sm"
+          className="bg-white rounded-lg shadow-md p-4 mb-6 border border-gray-200"
         >
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Enhanced Search */}
-            <div className="flex-1 max-w-2xl">
-              <motion.div
-                className="relative group"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <motion.div
-                    animate={{
-                      scale: searchTerm ? [1, 1.1, 1] : 1,
-                      rotate: searchTerm ? [0, 10, -10, 0] : 0
-                    }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <Search className="h-5 w-5 text-blue-500 group-hover:text-blue-600 transition-colors duration-300" />
-                  </motion.div>
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Compact Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   type="text"
                   placeholder="Search by name, email, or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 text-base border-2 border-gray-200/60 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-300 bg-gradient-to-r from-gray-50/50 to-white shadow-sm hover:shadow-md focus:shadow-lg backdrop-blur-sm"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
                 />
                 {searchTerm && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
+                  <button
                     onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   >
-                    <X className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors duration-200" />
-                  </motion.button>
+                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors" />
+                  </button>
                 )}
-              </motion.div>
+              </div>
             </div>
 
-            {/* Enhanced Filters */}
-            <div className="flex flex-wrap items-center gap-4">
+            {/* Compact Filters */}
+            <div className="flex flex-wrap items-center gap-3">
               {/* Status Filter */}
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-44 h-12 bg-gradient-to-r from-white to-gray-50 border-2 border-gray-200/60 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-4 focus:ring-blue-500/20">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px] h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      statusFilter === 'active' ? 'bg-emerald-500' :
+                      statusFilter === 'pending' ? 'bg-amber-500' :
+                      statusFilter === 'inactive' ? 'bg-gray-500' :
+                      statusFilter === 'moved_out' ? 'bg-rose-500' : 'bg-blue-500'
+                    }`} />
+                    <SelectValue placeholder="All Status" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-2 border-gray-200/60 shadow-xl">
+                  <SelectItem value="all" className="rounded-lg">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${
-                        statusFilter === 'active' ? 'bg-emerald-500' :
-                        statusFilter === 'pending' ? 'bg-amber-500' :
-                        statusFilter === 'inactive' ? 'bg-gray-500' :
-                        statusFilter === 'moved_out' ? 'bg-rose-500' : 'bg-blue-500'
-                      }`} />
-                      <SelectValue placeholder="All Status" />
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span>All Status</span>
                     </div>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 border-gray-200/60 shadow-xl">
-                    <SelectItem value="all" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        <span>All Status</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="active" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                        <span>Active</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-amber-500" />
-                        <span>Pending</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="inactive" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-500" />
-                        <span>Inactive</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="moved_out" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-rose-500" />
-                        <span>Moved Out</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </motion.div>
+                  </SelectItem>
+                  <SelectItem value="active" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                      <span>Active</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pending" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500" />
+                      <span>Pending</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="inactive" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-500" />
+                      <span>Inactive</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="moved_out" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-rose-500" />
+                      <span>Moved Out</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
               {/* Gender Filter */}
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Select value={genderFilter} onValueChange={setGenderFilter}>
-                  <SelectTrigger className="w-44 h-12 bg-gradient-to-r from-white to-gray-50 border-2 border-gray-200/60 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 focus:ring-4 focus:ring-purple-500/20">
+              <Select value={genderFilter} onValueChange={setGenderFilter}>
+                <SelectTrigger className="w-[140px] h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                    <SelectValue placeholder="All Gender" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-2 border-gray-200/60 shadow-xl">
+                  <SelectItem value="all" className="rounded-lg">
                     <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-purple-500" />
-                      <SelectValue placeholder="All Gender" />
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <span>All Gender</span>
                     </div>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-2 border-gray-200/60 shadow-xl">
-                    <SelectItem value="all" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-gray-500" />
-                        <span>All Gender</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="male" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        <span>Male</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="female" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-pink-500" />
-                        <span>Female</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="other" className="rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-purple-500" />
-                        <span>Other</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </motion.div>
+                  </SelectItem>
+                  <SelectItem value="male" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span>Male</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="female" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-pink-500" />
+                      <span>Female</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="other" className="rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500" />
+                      <span>Other</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
               {/* Export Button */}
-              <motion.button
+              <button
                 onClick={handleExport}
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                }}
-                whileTap={{ scale: 0.95 }}
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl font-medium"
+                className="inline-flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm font-medium"
               >
-                <motion.div
-                  whileHover={{ rotate: 360 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <Download className="h-5 w-5 mr-2" />
-                </motion.div>
-                <span>Export Data</span>
-              </motion.button>
+                <Download className="h-4 w-4" />
+                <span>Export</span>
+              </button>
             </div>
           </div>
 
@@ -1179,28 +1077,28 @@ const Residents = () => {
           )}
         </motion.div>
 
-        {/* Enhanced Residents Display */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        {/* Compact Residents Display */}
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <p className="text-gray-600 font-medium">Loading residents...</p>
             </div>
           ) : residents.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Users className="h-10 w-10 text-gray-400" />
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No residents found</h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No residents found</h3>
+              <p className="text-sm text-gray-600 mb-4 max-w-md mx-auto">
                 {searchTerm ? 'Try adjusting your search criteria or filters.' : 'Get started by adding your first resident to this branch.'}
               </p>
               {!searchTerm && (
                 <button
                   onClick={() => setShowForm(true)}
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm font-medium"
                 >
-                  <Plus className="h-5 w-5 mr-2" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Add Your First Resident
                 </button>
               )}
@@ -1237,27 +1135,20 @@ const Residents = () => {
                       scale: 0.98,
                       transition: { duration: 0.15 }
                     }}
-                    className="group bg-white border border-gray-200 rounded-xl p-3 hover:shadow-lg transition-all duration-300 hover:border-blue-300 relative overflow-hidden cursor-pointer"
+                    className="group bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all duration-300 hover:border-blue-300 relative overflow-hidden cursor-pointer"
                     onClick={() => handleResidentView(resident)}
                   >
-                    {/* Compact Glow Effect */}
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-br from-blue-400/5 via-indigo-400/3 to-purple-400/2 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-500"
-                      initial={{ scale: 0.9 }}
-                      whileHover={{ scale: 1.05 }}
-                    />
-
                     {/* Compact Header */}
-                    <div className="relative flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-2.5 flex-1 min-w-0">
-                        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+                    <div className="relative flex items-start justify-between mb-2.5">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
                           {getResidentAvatar(resident)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-900 transition-colors leading-tight">
+                          <div className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-900 transition-colors">
                             {resident.firstName} {resident.lastName}
                           </div>
-                          <div className="flex items-center gap-1 mt-1">
+                          <div className="flex items-center gap-1 mt-0.5">
                             {getPriorityBadge(resident)}
                           </div>
                         </div>
@@ -1267,32 +1158,34 @@ const Residents = () => {
                       </div>
                     </div>
 
-                    {/* Compact Info Cards */}
-                    <div className="relative space-y-2 mb-3">
-                      <div className="flex items-center p-1.5 bg-gray-50 rounded-lg border border-gray-200/60 group-hover:border-blue-200 transition-colors">
-                        <Mail className="w-3.5 h-3.5 mr-2 text-blue-500 flex-shrink-0" />
-                        <span className="text-xs text-gray-700 truncate font-medium flex-1" title={resident.email}>
-                          {resident.email}
-                        </span>
-                      </div>
+                    {/* Compact Info */}
+                    <div className="relative space-y-1.5 mb-2.5">
+                      {resident.email && (
+                        <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 group-hover:border-blue-200 transition-colors">
+                          <Mail className="w-3 h-3 mr-1.5 text-blue-500 flex-shrink-0" />
+                          <span className="text-xs text-gray-700 truncate flex-1" title={resident.email}>
+                            {resident.email}
+                          </span>
+                        </div>
+                      )}
 
-                      <div className="flex items-center p-1.5 bg-gray-50 rounded-lg border border-gray-200/60 group-hover:border-green-200 transition-colors">
-                        <Phone className="w-3.5 h-3.5 mr-2 text-green-500 flex-shrink-0" />
+                      <div className="flex items-center p-1.5 bg-gray-50 rounded-md border border-gray-200 group-hover:border-green-200 transition-colors">
+                        <Phone className="w-3 h-3 mr-1.5 text-green-500 flex-shrink-0" />
                         <span className="text-xs text-gray-700 font-medium">{resident.phone}</span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-1.5">
-                        <div className="flex items-center p-1.5 bg-blue-50 rounded-md border border-blue-200/50">
-                          <Bed className="w-3 h-3 mr-1.5 text-blue-600 flex-shrink-0" />
+                        <div className="flex items-center p-1.5 bg-blue-50 rounded-md border border-blue-200">
+                          <Bed className="w-3 h-3 mr-1 text-blue-600 flex-shrink-0" />
                           <span className="text-xs text-blue-700 font-semibold truncate">
                             {resident.roomNumber ? `Room ${resident.roomNumber}` : 'Unassigned'}
                           </span>
                         </div>
 
-                        <div className="flex items-center p-1.5 bg-orange-50 rounded-md border border-orange-200/50">
-                          <Calendar className="w-3 h-3 mr-1.5 text-orange-600 flex-shrink-0" />
+                        <div className="flex items-center p-1.5 bg-orange-50 rounded-md border border-orange-200">
+                          <Calendar className="w-3 h-3 mr-1 text-orange-600 flex-shrink-0" />
                           <span className="text-xs text-orange-700 font-semibold truncate">
-                            {resident.checkInDate ? new Date(resident.checkInDate).toLocaleDateString() : 'N/A'}
+                            {resident.checkInDate ? new Date(resident.checkInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
                           </span>
                         </div>
                       </div>

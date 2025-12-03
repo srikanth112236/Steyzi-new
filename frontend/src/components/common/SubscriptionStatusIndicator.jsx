@@ -10,14 +10,14 @@ import { FiAlertCircle, FiCheck, FiClock, FiXCircle } from 'react-icons/fi';
 const SubscriptionStatusIndicator = () => {
   const navigate = useNavigate();
   const { subscription, user } = useSelector((state) => state.auth);
-  const [daysRemaining, setDaysRemaining] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
     if (!subscription) return;
 
-    // Calculate days remaining
-    const calculateDaysRemaining = () => {
+    // Calculate exact time remaining (days, hours, minutes)
+    const calculateTimeRemaining = () => {
       let endDate;
 
       if (subscription.billingCycle === 'trial' && subscription.trialEndDate) {
@@ -28,31 +28,51 @@ const SubscriptionStatusIndicator = () => {
 
       if (endDate) {
         const now = new Date();
-        const diffTime = endDate - now;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        setDaysRemaining(diffDays);
+        const diffMs = endDate - now;
 
-        // Show banner if expired or expiring soon (within 7 days)
-        if (diffDays <= 7) {
+        if (diffMs > 0) {
+          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+          const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+          setTimeRemaining({ days, hours, minutes, totalHours, totalDays, expired: false });
+
+          // Show banner if:
+          // 1. Trial is active (always show for active trials)
+          // 2. Expired or expiring soon (within 7 days)
+          // 3. Subscription expiring soon (within 7 days)
+          if (subscription.billingCycle === 'trial' && totalDays > 0) {
+            // Always show for active trials
+            setShowBanner(true);
+          } else if (totalDays <= 7) {
+            // Show for expiring subscriptions
+            setShowBanner(true);
+          } else {
+            setShowBanner(false);
+          }
+        } else {
+          setTimeRemaining({ days: 0, hours: 0, minutes: 0, totalHours: 0, totalDays: 0, expired: true });
           setShowBanner(true);
         }
       }
     };
 
-    calculateDaysRemaining();
+    calculateTimeRemaining();
 
-    // Update every hour
-    const interval = setInterval(calculateDaysRemaining, 1000 * 60 * 60);
+    // Update every minute for accurate countdown
+    const interval = setInterval(calculateTimeRemaining, 60000);
     return () => clearInterval(interval);
   }, [subscription]);
 
-  // Don't show for superadmin, support, or sales roles
-  if (user?.role === 'superadmin' || user?.role === 'support' ||
+  // Don't show for superadmin, support, maintainer, or sales roles
+  if (user?.role === 'superadmin' || user?.role === 'support' || user?.role === 'maintainer' ||
       user?.salesRole === 'sales_manager' || user?.salesRole === 'sub_sales') {
     return null;
   }
 
-  if (!subscription || !showBanner) return null;
+  if (!subscription || !showBanner || !timeRemaining) return null;
 
   const getStatusConfig = () => {
     if (!subscription.status) {
@@ -66,7 +86,7 @@ const SubscriptionStatusIndicator = () => {
       };
     }
 
-    if (subscription.status === 'expired' || daysRemaining < 0) {
+    if (subscription.status === 'expired' || timeRemaining.expired) {
       return {
         color: 'bg-red-50 border-red-200 text-red-800',
         icon: FiXCircle,
@@ -78,7 +98,7 @@ const SubscriptionStatusIndicator = () => {
     }
 
     if (subscription.billingCycle === 'trial') {
-      if (daysRemaining <= 0) {
+      if (timeRemaining.expired) {
         return {
           color: 'bg-orange-50 border-orange-200 text-orange-800',
           icon: FiAlertCircle,
@@ -89,33 +109,96 @@ const SubscriptionStatusIndicator = () => {
         };
       }
 
+      // Format time remaining message
+      const formatTimeRemaining = () => {
+        if (timeRemaining.totalDays >= 1) {
+          if (timeRemaining.days === 1 && timeRemaining.hours === 0) {
+            return '1 day';
+          }
+          return `${timeRemaining.days} day${timeRemaining.days !== 1 ? 's' : ''}${timeRemaining.hours > 0 ? ` ${timeRemaining.hours} hour${timeRemaining.hours !== 1 ? 's' : ''}` : ''}`;
+        } else if (timeRemaining.totalHours >= 1) {
+          return `${timeRemaining.hours} hour${timeRemaining.hours !== 1 ? 's' : ''}${timeRemaining.minutes > 0 ? ` ${timeRemaining.minutes} minute${timeRemaining.minutes !== 1 ? 's' : ''}` : ''}`;
+        } else {
+          return `${timeRemaining.minutes} minute${timeRemaining.minutes !== 1 ? 's' : ''}`;
+        }
+      };
+
+      const timeText = formatTimeRemaining();
+
+      // Show different messages based on time remaining
+      if (timeRemaining.totalDays < 1) {
+        // Less than 1 day - show hours/minutes
+        return {
+          color: 'bg-red-50 border-red-200 text-red-800',
+          icon: FiAlertCircle,
+          title: 'Trial Ending Soon',
+          message: `Your free trial expires in ${timeText}. Upgrade now to continue using all features without restrictions.`,
+          action: 'Upgrade Now',
+          actionColor: 'bg-red-600 hover:bg-red-700'
+        };
+      }
+
+      if (timeRemaining.totalDays <= 1) {
+        return {
+          color: 'bg-red-50 border-red-200 text-red-800',
+          icon: FiAlertCircle,
+          title: 'Trial Ending Soon',
+          message: `Your free trial expires in ${timeText}. Upgrade now to continue using all features.`,
+          action: 'Upgrade Now',
+          actionColor: 'bg-red-600 hover:bg-red-700'
+        };
+      }
+
+      if (timeRemaining.totalDays <= 3) {
+        return {
+          color: 'bg-orange-50 border-orange-200 text-orange-800',
+          icon: FiAlertCircle,
+          title: 'Trial Ending Soon',
+          message: `Your free trial expires in ${timeText}. Upgrade now to continue using all features.`,
+          action: 'Upgrade Now',
+          actionColor: 'bg-orange-600 hover:bg-orange-700'
+        };
+      }
+
+      if (timeRemaining.totalDays <= 7) {
+        return {
+          color: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+          icon: FiClock,
+          title: 'Trial Ending Soon',
+          message: `Your free trial expires in ${timeText}. Upgrade to continue using all features.`,
+          action: 'Upgrade',
+          actionColor: 'bg-yellow-600 hover:bg-yellow-700'
+        };
+      }
+
+      // Active trial with more than 7 days remaining
       return {
-        color: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-        icon: FiClock,
-        title: `Trial Ending Soon`,
-        message: `Your trial expires in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Upgrade to continue using all features.`,
-        action: 'Upgrade',
-        actionColor: 'bg-yellow-600 hover:bg-yellow-700'
+        color: 'bg-green-50 border-green-200 text-green-800',
+        icon: FiCheck,
+        title: 'Free Trial Active',
+        message: `Your free trial is active with ${timeText} remaining. Enjoy all premium features!`,
+        action: 'View Plans',
+        actionColor: 'bg-green-600 hover:bg-green-700'
       };
     }
 
-    if (daysRemaining <= 3) {
+    if (timeRemaining.totalDays <= 3) {
       return {
         color: 'bg-orange-50 border-orange-200 text-orange-800',
         icon: FiAlertCircle,
         title: 'Subscription Expiring Soon',
-        message: `Your subscription expires in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Renew now to avoid service interruption.`,
+        message: `Your subscription expires in ${timeRemaining.totalDays} day${timeRemaining.totalDays !== 1 ? 's' : ''}. Renew now to avoid service interruption.`,
         action: 'Renew',
         actionColor: 'bg-orange-600 hover:bg-orange-700'
       };
     }
 
-    if (daysRemaining <= 7) {
+    if (timeRemaining.totalDays <= 7) {
       return {
         color: 'bg-blue-50 border-blue-200 text-blue-800',
         icon: FiClock,
         title: 'Subscription Renewal Reminder',
-        message: `Your subscription expires in ${daysRemaining} days. Consider renewing to ensure uninterrupted service.`,
+        message: `Your subscription expires in ${timeRemaining.totalDays} days. Consider renewing to ensure uninterrupted service.`,
         action: 'Renew',
         actionColor: 'bg-blue-600 hover:bg-blue-700'
       };

@@ -224,9 +224,9 @@ const PGConfigurationModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Modal Header - Sticky */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
               <Building2 className="h-4 w-4 text-white" />
@@ -244,56 +244,57 @@ const PGConfigurationModal = ({
           </button>
         </div>
 
-        {/* Branch Selection */}
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-            <MapPin className="h-3 w-3 mr-2 text-green-600" />
-            Select Branch
-          </h3>
-          {loading ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            </div>
-          ) : branches.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {branches.map((branch) => (
-                <div
-                  key={branch._id}
-                  onClick={() => setSelectedBranch(branch)}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedBranch?._id === branch._id
-                      ? 'border-blue-500 bg-blue-50 shadow-sm'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      branch.isDefault ? 'bg-yellow-500 text-white' : 'bg-gray-200'
-                    }`}>
-                      <Building2 className="h-3 w-3" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-semibold text-gray-900 truncate">{branch.name}</h4>
-                      <p className="text-xs text-gray-500 truncate">{branch.address.city}, {branch.address.state}</p>
-                    </div>
-                  </div>
-                  {branch.isDefault && (
-                    <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded inline-block">
-                      Default
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center text-gray-500 py-4">
-              No branches found. Please create a branch first.
-            </div>
-          )}
-        </div>
-
-        {/* Sharing Types Section */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Branch Selection */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+              <MapPin className="h-3 w-3 mr-2 text-green-600" />
+              Select Branch
+            </h3>
+            {loading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            ) : branches.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {branches.map((branch) => (
+                  <div
+                    key={branch._id}
+                    onClick={() => setSelectedBranch(branch)}
+                    className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                      selectedBranch?._id === branch._id
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        branch.isDefault ? 'bg-yellow-500 text-white' : 'bg-gray-200'
+                      }`}>
+                        <Building2 className="h-3 w-3" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">{branch.name}</h4>
+                        <p className="text-xs text-gray-500 truncate">{branch.address.city}, {branch.address.state}</p>
+                      </div>
+                    </div>
+                    {branch.isDefault && (
+                      <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded inline-block">
+                        Default
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                No branches found. Please create a branch first.
+              </div>
+            )}
+          </div>
+
+          {/* Sharing Types Section */}
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-gray-900">Sharing Types</h3>
@@ -397,44 +398,44 @@ const PGConfigurationModal = ({
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Warning Message */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
-            <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-yellow-800">
-                <strong>Note:</strong> These sharing types will be used for room allocation and pricing.
-                You can modify them later in PG settings.
-              </p>
+            {/* Warning Message */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
+              <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs text-yellow-800">
+                  <strong>Note:</strong> These sharing types will be used for room allocation and pricing.
+                  You can modify them later in PG settings.
+                </p>
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100 bg-gray-50 px-6 py-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-200 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !selectedBranch}
-              className={`flex items-center space-x-2 px-5 py-2 rounded-lg transition-all duration-200 text-sm ${
-                !selectedBranch
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg'
-              }`}
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-              ) : (
-                <Save className="h-3 w-3" />
-              )}
-              <span>Save Configuration</span>
-            </button>
-          </div>
+        {/* Action Buttons - Sticky Footer */}
+        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-200 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !selectedBranch}
+            className={`flex items-center space-x-2 px-5 py-2 rounded-lg transition-all duration-200 text-sm ${
+              !selectedBranch
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg'
+            }`}
+          >
+            {loading ? (
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+            ) : (
+              <Save className="h-3 w-3" />
+            )}
+            <span>Save Configuration</span>
+          </button>
         </div>
       </div>
     </div>

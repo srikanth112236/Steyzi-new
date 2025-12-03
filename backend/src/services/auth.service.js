@@ -4,6 +4,27 @@ const EmailService = require('./email.service');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+const getTokenExpiryMeta = (token) => {
+  try {
+    const decoded = jwt.decode(token);
+    if (!decoded?.exp) {
+      return { expiresIn: null, expiresAt: null };
+    }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiresIn = Math.max(decoded.exp - currentTime, 0);
+    const expiresAt = new Date(decoded.exp * 1000);
+
+    return {
+      expiresIn,
+      expiresAt
+    };
+  } catch (error) {
+    console.error('Error decoding token expiry metadata:', error);
+    return { expiresIn: null, expiresAt: null };
+  }
+};
+
 class AuthService {
   /**
    * Register new superadmin
@@ -244,18 +265,10 @@ class AuthService {
       // Save without validation to avoid salesRole validation issues
       await user.save({ validateBeforeSave: false });
 
-      // Generate tokens
-      const accessToken = jwt.sign(
-        { id: user._id, email: user.email, role: user.role },
-        process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
-        { expiresIn: '15m' }
-      );
-
-      const refreshToken = jwt.sign(
-        { id: user._id, tokenVersion: user.tokenVersion },
-        process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-jwt-key-change-this-in-production',
-        { expiresIn: '7d' }
-      );
+      // Generate tokens with extended expiry
+      const accessToken = user.generateAuthToken();
+      const refreshToken = user.generateRefreshToken();
+      const accessTokenMeta = getTokenExpiryMeta(accessToken);
 
       // Check onboarding status
       const onboardingStatus = await this.checkOnboardingStatus(user._id);
@@ -396,8 +409,24 @@ class AuthService {
           }).populate('subscriptionPlanId');
 
           if (!activeSubscription) {
-            // No active subscription - automatically activate free trial
-            console.log('🔄 AuthService: No active subscription found, activating free trial for user:', user._id);
+            // Check if user had a trial before that expired
+            let previousTrials = [];
+            let hadExpiredTrial = false;
+            try {
+              previousTrials = await UserSubscription.find({
+                userId: user._id,
+                billingCycle: 'trial'
+              }).sort({ endDate: -1 });
+
+              hadExpiredTrial = previousTrials.length > 0 && 
+                               previousTrials[0].endDate < new Date() &&
+                               previousTrials[0].status !== 'cancelled';
+            } catch (err) {
+              console.error('Error checking previous trials:', err);
+            }
+
+            // No active subscription - try to activate free trial only if they haven't used it before
+            console.log('🔄 AuthService: No active subscription found, checking trial eligibility for user:', user._id);
             try {
               const trialResult = await SubscriptionManagementService.activateFreeTrial(user._id, user._id);
 
@@ -458,14 +487,15 @@ class AuthService {
                   };
                 }
               } else {
-                // Trial activation failed - return free plan
+                // Trial activation failed - return free plan with trial expired flag
                 console.log('❌ AuthService: Free trial activation failed:', trialResult.message);
+                const trialExpired = trialResult.code === 'TRIAL_EXPIRED' || hadExpiredTrial;
                 subscriptionInfo = {
                   status: 'free',
                   planId: null,
                   startDate: null,
                   endDate: null,
-                  trialEndDate: null,
+                  trialEndDate: hadExpiredTrial && previousTrials.length > 0 ? previousTrials[0].trialEndDate : null,
                   autoRenew: false,
                   totalBeds: 5,
                   totalBranches: 1,
@@ -475,6 +505,8 @@ class AuthService {
                   trialDaysRemaining: null,
                   isExpiringSoon: false,
                   isTrialActive: false,
+                  trialExpired: trialExpired,
+                  hadTrialExpired: hadExpiredTrial,
                   restrictions: {
                     maxBeds: 5,
                     maxBranches: 1,
@@ -485,12 +517,27 @@ class AuthService {
               }
             } catch (trialError) {
               console.error('❌ AuthService: Error activating free trial:', trialError);
+              // Check if user had a trial before that expired
+              let hadExpiredTrial = false;
+              let previousTrials = [];
+              try {
+                previousTrials = await UserSubscription.find({
+                  userId: user._id,
+                  billingCycle: 'trial'
+                }).sort({ endDate: -1 });
+                hadExpiredTrial = previousTrials.length > 0 && 
+                                 previousTrials[0].endDate < new Date() &&
+                                 previousTrials[0].status !== 'cancelled';
+              } catch (err) {
+                console.error('Error checking previous trials:', err);
+              }
+              
               subscriptionInfo = {
                 status: 'free',
                 planId: null,
                 startDate: null,
                 endDate: null,
-                trialEndDate: null,
+                trialEndDate: hadExpiredTrial && previousTrials.length > 0 ? previousTrials[0].trialEndDate : null,
                 autoRenew: false,
                 totalBeds: 5,
                 totalBranches: 1,
@@ -500,6 +547,8 @@ class AuthService {
                 trialDaysRemaining: null,
                 isExpiringSoon: false,
                 isTrialActive: false,
+                trialExpired: hadExpiredTrial,
+                hadTrialExpired: hadExpiredTrial,
                 restrictions: {
                   maxBeds: 5,
                   maxBranches: 1,
@@ -582,6 +631,8 @@ class AuthService {
             trialDaysRemaining: null,
             isExpiringSoon: false,
             isTrialActive: false,
+            trialExpired: false,
+            hadTrialExpired: false,
             restrictions: {
               maxBeds: 5,
               maxBranches: 1,
@@ -618,7 +669,9 @@ class AuthService {
           },
           tokens: {
             accessToken,
-            refreshToken
+            refreshToken,
+            expiresIn: accessTokenMeta.expiresIn,
+            expiresAt: accessTokenMeta.expiresAt
           }
         },
         statusCode: 200
@@ -718,18 +771,10 @@ class AuthService {
       // Save without validation to avoid salesRole validation issues
       await user.save({ validateBeforeSave: false });
 
-      // Generate tokens
-      const accessToken = jwt.sign(
-        { id: user._id, email: user.email, role: user.role },
-        process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
-        { expiresIn: '15m' }
-      );
-
-      const refreshToken = jwt.sign(
-        { id: user._id, tokenVersion: user.tokenVersion },
-        process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-jwt-key-change-this-in-production',
-        { expiresIn: '7d' }
-      );
+      // Generate tokens with extended expiry
+      const accessToken = user.generateAuthToken();
+      const refreshToken = user.generateRefreshToken();
+      const accessTokenMeta = getTokenExpiryMeta(accessToken);
 
       console.log('✅ AuthService: Support login successful');
       console.log('👤 Support user role:', user.role);
@@ -751,7 +796,9 @@ class AuthService {
           },
           tokens: {
             accessToken,
-            refreshToken
+            refreshToken,
+            expiresIn: accessTokenMeta.expiresIn,
+            expiresAt: accessTokenMeta.expiresAt
           }
         },
         statusCode: 200
@@ -777,12 +824,14 @@ class AuthService {
       // Verify refresh token
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-jwt-key-change-this-in-production');
       
-      if (decoded.type !== 'refresh') {
+      if (decoded.type !== undefined && decoded.type !== 'refresh') {
         return {
           success: false,
           message: 'Invalid refresh token',
           statusCode: 401
         };
+      } else if (decoded.type === undefined) {
+        console.warn('Refresh token received without explicit type flag');
       }
 
       // Find user
@@ -795,14 +844,26 @@ class AuthService {
         };
       }
 
+      const expectedTokenVersion = user.tokenVersion || 0;
+      if (decoded.tokenVersion !== undefined && decoded.tokenVersion !== expectedTokenVersion) {
+        return {
+          success: false,
+          message: 'Invalid refresh token version',
+          statusCode: 401
+        };
+      }
+
       // Generate new access token
       const newAccessToken = user.generateAuthToken();
+      const accessTokenMeta = getTokenExpiryMeta(newAccessToken);
 
       return {
         success: true,
         message: 'Token refreshed successfully',
         data: {
-          accessToken: newAccessToken
+          accessToken: newAccessToken,
+          expiresIn: accessTokenMeta.expiresIn,
+          expiresAt: accessTokenMeta.expiresAt
         },
         statusCode: 200
       };
@@ -1075,10 +1136,14 @@ class AuthService {
    * Logout user
    * @returns {Promise<Object>} - Logout result
    */
-  async logout() {
+  async logout(userId) {
     try {
-      // In a production environment, you might want to blacklist the token
-      // For now, we'll just return success as the client should remove the token
+      if (userId) {
+        await User.findByIdAndUpdate(userId, {
+          $inc: { tokenVersion: 1 }
+        });
+      }
+
       return {
         success: true,
         message: 'Logged out successfully',
@@ -1645,7 +1710,7 @@ class AuthService {
       const accessToken = jwt.sign(
         jwtPayload,
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
       const refreshToken = jwt.sign(
@@ -1653,6 +1718,7 @@ class AuthService {
         process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
       );
+      const accessTokenMeta = getTokenExpiryMeta(accessToken);
 
       // Log successful login attempt
       await this.logLoginAttempt(user._id, true, loginInfo);
@@ -1707,7 +1773,9 @@ class AuthService {
           user: userData,
           tokens: {
             accessToken,
-            refreshToken
+            refreshToken,
+            expiresIn: accessTokenMeta.expiresIn,
+            expiresAt: accessTokenMeta.expiresAt
           }
         },
         statusCode: 200

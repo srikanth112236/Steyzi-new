@@ -226,125 +226,168 @@ const Tickets = () => {
 
   const getPriorityColor = (priority) => {
     const colors = {
-      low: 'bg-green-50 text-green-700 border-green-200',
-      medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+      low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      medium: 'bg-amber-50 text-amber-700 border-amber-200',
       high: 'bg-orange-50 text-orange-700 border-orange-200',
-      urgent: 'bg-red-50 text-red-700 border-red-200'
+      urgent: 'bg-rose-50 text-rose-700 border-rose-200'
     };
     return colors[priority] || 'bg-gray-50 text-gray-700 border-gray-200';
   };
 
+  const statCards = [
+    {
+      key: 'total',
+      label: 'Total Tickets',
+      value: stats.total || 0,
+      accent: 'from-blue-500/20 to-blue-600/20',
+      icon: FileText,
+      chip: '+12% vs last month',
+      chipColor: 'text-blue-300'
+    },
+    {
+      key: 'open',
+      label: 'Open',
+      value: stats.open || 0,
+      accent: 'from-sky-500/20 to-sky-600/20',
+      icon: AlertCircle,
+      chip: 'Need attention',
+      chipColor: 'text-sky-200'
+    },
+    {
+      key: 'inProgress',
+      label: 'In Progress',
+      value: stats.inProgress || 0,
+      accent: 'from-amber-500/20 to-orange-600/20',
+      icon: Clock,
+      chip: 'On team queue',
+      chipColor: 'text-amber-200'
+    },
+    {
+      key: 'resolved',
+      label: 'Resolved',
+      value: stats.resolved || 0,
+      accent: 'from-emerald-500/20 to-emerald-600/20',
+      icon: CheckCircle,
+      chip: '72h avg resolve',
+      chipColor: 'text-emerald-200'
+    },
+    {
+      key: 'closed',
+      label: 'Closed',
+      value: stats.closed || 0,
+      accent: 'from-slate-500/20 to-slate-700/20',
+      icon: XCircle,
+      chip: 'Archived cases',
+      chipColor: 'text-slate-200'
+    }
+  ];
+
+  const quickStatusFilters = [
+    { value: '', label: 'All' },
+    { value: 'open', label: 'Open' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'closed', label: 'Closed' }
+  ];
+
   const TicketCard = ({ ticket }) => (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1"
+      className="group relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
     >
-      {/* Status Indicator Bar */}
-      <div className={`absolute top-0 left-0 right-0 h-1 ${getStatusColor(ticket.status).replace('border', 'bg').replace('text', 'bg').replace('bg-gray', 'bg-blue').replace('bg-red', 'bg-red').replace('bg-green', 'bg-green').replace('bg-yellow', 'bg-yellow').replace('bg-orange', 'bg-orange')}`} />
-      
-      <div className="p-6">
-        {/* Header with Gradient Background */}
-        <div className="relative mb-6">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl opacity-50" />
-          <div className="relative flex items-start justify-between">
-            <div className="flex-1 pr-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                {ticket.title}
-              </h3>
-              <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
-                {ticket.description}
-              </p>
-            </div>
-            <div className="flex flex-col items-end space-y-2">
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(ticket.status)}`}>
-                {getStatusIcon(ticket.status)}
-                <span className="ml-1.5 capitalize">{ticket.status.replace('_', ' ')}</span>
-              </span>
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${getPriorityColor(ticket.priority)}`}>
-                <span className="w-2 h-2 rounded-full bg-current mr-2" />
-                {ticket.priority}
-              </span>
+      <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="space-y-4 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+              <span>#{ticket._id.slice(-6)}</span>
               {ticket.isReopened && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">
                   🔄 Reopened
                 </span>
               )}
             </div>
+            <h3 className="mt-2 text-lg font-semibold text-slate-900 line-clamp-1">{ticket.title}</h3>
+            <p className="text-sm text-slate-600 line-clamp-2">{ticket.description}</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusColor(ticket.status)}`}>
+              {getStatusIcon(ticket.status)}
+              {ticket.status.replace('_', ' ')}
+            </span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getPriorityColor(ticket.priority)}`}>
+              <span className="h-2 w-2 rounded-full bg-current" />
+              {ticket.priority}
+            </span>
           </div>
         </div>
 
-        {/* Enhanced Details Grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-            <Building2 className="h-4 w-4 mr-3 text-blue-500" />
+        <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+            <Building2 className="h-4 w-4 text-blue-500" />
             <div>
-              <p className="text-xs text-gray-500 font-medium">Category</p>
-              <p className="text-sm font-semibold text-gray-900 capitalize">{ticket.category}</p>
+              <p className="text-[11px] uppercase text-slate-400">Category</p>
+              <p className="font-medium capitalize text-slate-900">{ticket.category}</p>
             </div>
           </div>
-          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-            <Calendar className="h-4 w-4 mr-3 text-green-500" />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+            <Calendar className="h-4 w-4 text-emerald-500" />
             <div>
-              <p className="text-xs text-gray-500 font-medium">Created</p>
-              <p className="text-sm font-semibold text-gray-900">{ticket.formattedCreatedAt}</p>
+              <p className="text-[11px] uppercase text-slate-400">Created</p>
+              <p className="font-medium text-slate-900">{ticket.formattedCreatedAt}</p>
             </div>
           </div>
-          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-            <MapPin className="h-4 w-4 mr-3 text-purple-500" />
-            <div>
-              <p className="text-xs text-gray-500 font-medium">Location</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {ticket.location?.room && `Room ${ticket.location.room}`}
-                {ticket.location?.floor && ` | Floor ${ticket.location.floor}`}
+          <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+            <MapPin className="h-4 w-4 text-purple-500" />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase text-slate-400">Location</p>
+              <p className="font-medium text-slate-900 truncate">
+                {[ticket.location?.room && `Room ${ticket.location.room}`, ticket.location?.floor && `Floor ${ticket.location.floor}`, ticket.location?.building && ticket.location.building]
+                  .filter(Boolean)
+                  .join(' • ') || '—'}
               </p>
             </div>
           </div>
-          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-            <User className="h-4 w-4 mr-3 text-orange-500" />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+            <User className="h-4 w-4 text-orange-500" />
             <div>
-              <p className="text-xs text-gray-500 font-medium">Created By</p>
-              <p className="text-sm font-semibold text-gray-900">{ticket.user?.firstName} {ticket.user?.lastName}</p>
+              <p className="text-[11px] uppercase text-slate-400">Created By</p>
+              <p className="font-medium text-slate-900">
+                {ticket.user?.firstName} {ticket.user?.lastName}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            Updated {ticket.formattedUpdatedAt || ticket.formattedCreatedAt}
+          </div>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => handleViewTicket(ticket)}
-              className="inline-flex items-center px-4 py-2 text-sm font-semibold text-green-600 bg-green-50 rounded-xl hover:bg-green-100 hover:text-green-700 transition-all duration-200 shadow-sm"
+              className="rounded-full border border-slate-200 p-2 text-slate-500 transition-colors hover:border-blue-500 hover:text-blue-600"
             >
-              <Eye className="h-4 w-4 mr-2" />
-              View
+              <Eye className="h-4 w-4" />
             </button>
-            
             {ticket.isEditable && (
               <button
                 onClick={() => handleEditTicket(ticket)}
-                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 hover:text-blue-700 transition-all duration-200 shadow-sm"
+                className="rounded-full border border-slate-200 p-2 text-slate-500 transition-colors hover:border-blue-500 hover:text-blue-600"
               >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
+                <Edit className="h-4 w-4" />
               </button>
             )}
-            
             {ticket.isDeletable && (
               <button
                 onClick={() => handleDeleteTicket(ticket)}
-                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 hover:text-red-700 transition-all duration-200 shadow-sm"
+                className="rounded-full border border-slate-200 p-2 text-slate-500 transition-colors hover:border-rose-500 hover:text-rose-600"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                <Trash2 className="h-4 w-4" />
               </button>
             )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <div className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
-              #{ticket._id.slice(-6)}
-            </div>
           </div>
         </div>
       </div>
@@ -353,235 +396,188 @@ const Tickets = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Support Tickets</h1>
-          <p className="text-gray-600 mt-1">Manage support tickets for your PG</p>
-        </div>
-        <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-          <div className="flex items-center bg-white rounded-lg border border-gray-200 p-1">
+      <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-900 p-6 sm:p-8 text-white shadow-2xl">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Operations / Support</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Tickets Command Center</h1>
+            <p className="mt-2 max-w-2xl text-base text-slate-300">
+              Monitor ticket health, triage incoming issues and keep every resident update in one compact workspace.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-3 py-1">
+                <Clock className="h-3.5 w-3.5" />
+                Auto refresh 15s
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-3 py-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                SLA tracker enabled
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center rounded-full border border-white/20 bg-white/5 p-1">
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                  viewMode === 'cards' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-200'
+                }`}
+              >
+                Cards
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-200'
+                }`}
+              >
+                Table
+              </button>
+            </div>
             <button
-              onClick={() => setViewMode('cards')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                viewMode === 'cards' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              onClick={handleAddTicket}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
             >
-              Cards
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                viewMode === 'table' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Table
+              <Plus className="h-4 w-4" />
+              Create Ticket
             </button>
           </div>
-          <button
-            onClick={handleAddTicket}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Ticket
-          </button>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {statCards.map((card, index) => (
+            <motion.div
+              key={card.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className={`rounded-2xl border border-white/10 bg-gradient-to-br ${card.accent} p-4 shadow-inner`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-slate-300">{card.label}</p>
+                  <p className="mt-2 text-3xl font-semibold">{card.value}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-2">
+                  <card.icon className="h-5 w-5 text-white" />
+                </div>
+              </div>
+              <p className={`mt-4 text-[11px] font-medium ${card.chipColor}`}>{card.chip}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="group relative bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="relative flex items-center">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-              <FileText className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-blue-100">Total Tickets</p>
-              <p className="text-3xl font-bold text-white">{stats.total || 0}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="group relative bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="relative flex items-center">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-              <AlertCircle className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-yellow-100">Open</p>
-              <p className="text-3xl font-bold text-white">{stats.open || 0}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="group relative bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="relative flex items-center">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-              <Clock className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-orange-100">In Progress</p>
-              <p className="text-3xl font-bold text-white">{stats.inProgress || 0}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="group relative bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-green-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="relative flex items-center">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-              <CheckCircle className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-green-100">Resolved</p>
-              <p className="text-3xl font-bold text-white">{stats.resolved || 0}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="group relative bg-gradient-to-br from-gray-500 to-gray-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="relative flex items-center">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-              <XCircle className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-100">Closed</p>
-              <p className="text-3xl font-bold text-white">{stats.closed || 0}</p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+      <div className="rounded-3xl border border-slate-100 bg-white/70 p-6 shadow-lg backdrop-blur-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="w-full flex-1">
+            <div className="relative rounded-2xl border border-slate-200 bg-slate-50">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search tickets..."
+                placeholder="Search title, ticket id or resident..."
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full rounded-2xl border-0 bg-transparent py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
               />
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-4 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300"
             >
-              <Filter className="h-5 w-5 mr-2" />
+              <Filter className="h-4 w-4" />
               Filters
-              {showFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+              {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             <button
               onClick={clearFilters}
-              className="px-4 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-500 hover:border-slate-300"
             >
               Clear
             </button>
-            <button className="flex items-center px-4 py-3 text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-              <Download className="h-5 w-5 mr-2" />
+            <button className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">
+              <Download className="h-4 w-4" />
               Export
             </button>
           </div>
         </div>
 
-        {/* Filter Options */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {quickStatusFilters.map((item) => (
+            <button
+              key={item.value || 'all'}
+              onClick={() => setFilters({ ...filters, status: item.value })}
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                filters.status === item.value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <AnimatePresence>
           {showFilters && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-6 pt-6 border-t border-gray-200"
+              className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 md:grid-cols-3"
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Status</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Status</label>
+                <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+                  <SelectTrigger className="w-full rounded-2xl border-slate-200">
+                    <SelectValue placeholder="All status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                  <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Priority</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Priority</label>
+                <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
+                  <SelectTrigger className="w-full rounded-2xl border-slate-200">
+                    <SelectValue placeholder="All priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Priority</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                  <Select value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Categories</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="billing">Billing</SelectItem>
-                      <SelectItem value="complaint">Complaint</SelectItem>
-                      <SelectItem value="suggestion">Suggestion</SelectItem>
-                      <SelectItem value="emergency">Emergency</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Category</label>
+                <Select value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
+                  <SelectTrigger className="w-full rounded-2xl border-slate-200">
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="billing">Billing</SelectItem>
+                    <SelectItem value="complaint">Complaint</SelectItem>
+                    <SelectItem value="suggestion">Suggestion</SelectItem>
+                    <SelectItem value="emergency">Emergency</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </motion.div>
           )}

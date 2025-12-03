@@ -1,3 +1,6 @@
+
+
+
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
@@ -78,7 +81,7 @@ import SubscriptionTest from './components/debug/SubscriptionTest';
 import SubscriptionDebug from './components/debug/SubscriptionDebug';
 import SubscriptionTestPage from './pages/admin/SubscriptionTestPage';
 import SubscriptionSelection from './components/admin/SubscriptionSelection';
-import SubscriptionHistory from './pages/admin/SubscriptionHistory';
+import SubscriptionHistoryPage from './pages/admin/SubscriptionHistory';
 import UserManagement from './components/superadmin/UserManagement';
 import NotificationsPage from './pages/admin/Notifications';
 import PgReports from './pages/admin/Reports';
@@ -97,9 +100,6 @@ import CostCalculator from './pages/admin/CostCalculator';
 import Expenses from './pages/admin/Expenses';
 import Salaries from './pages/admin/Salaries';
 import ExpenseManagement from './components/superadmin/ExpenseManagement';
-
-// Import Subscription Pages
-import SubscriptionHistory from './pages/admin/SubscriptionHistory';
 
 // Import Sales Pages
 import SalesDashboard from './pages/sales/Dashboard';
@@ -124,6 +124,36 @@ const App = () => {
   const [forceRender, setForceRender] = useState(false);
 
   const { isInitialized: subscriptionInitialized } = useSubscriptionManager();
+
+  // CRITICAL: Check token validity on app startup
+  useEffect(() => {
+    const checkTokenOnStartup = () => {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const currentTime = Date.now() / 1000;
+          const isExpired = payload.exp < (currentTime - 30);
+          
+          if (isExpired) {
+            console.log('🚫 App startup: Token expired, clearing auth');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+          } else {
+            console.log('✅ App startup: Token is valid');
+          }
+        } catch (error) {
+          console.log('❌ App startup: Invalid token format, clearing auth');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+        }
+      }
+    };
+
+    checkTokenOnStartup();
+  }, []); // Run only once on app mount
 
   useEffect(() => {
     console.log('🎬 App render state:', { user: !!user, loading, hasCheckedAuth });
@@ -250,7 +280,7 @@ const App = () => {
         } />
         <Route path="subscription-history" element={
           <ProtectedRoute requireOnboarding={false}>
-            <SubscriptionHistory />
+            <SubscriptionHistoryPage />
           </ProtectedRoute>
         } />
         <Route path="residents" element={
@@ -361,7 +391,7 @@ const App = () => {
         } />
         <Route path="subscription-history" element={
           <ProtectedRoute requireOnboarding={false}>
-            <SubscriptionHistory />
+            <SubscriptionHistoryPage />
           </ProtectedRoute>
         } />
       </Route>

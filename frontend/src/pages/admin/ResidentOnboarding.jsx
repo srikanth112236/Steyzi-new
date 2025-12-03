@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   Sparkles,
   X,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
@@ -43,6 +45,8 @@ const ResidentOnboarding = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResident, setSelectedResident] = useState(null);
   const [showAllResidents, setShowAllResidents] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8; // 8 cards per page
   
   // Step 2: Room Type Selection
   const [sharingTypes, setSharingTypes] = useState([]);
@@ -162,6 +166,11 @@ const ResidentOnboarding = () => {
       fetchAvailableRooms();
     }
   }, [selectedSharingType]);
+
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, showAllResidents]);
 
   // Update calculated rent when per day cost changes
   useEffect(() => {
@@ -467,18 +476,16 @@ const ResidentOnboarding = () => {
       amount: amount
     }));
 
-    // Update payment status based on amount
-    if (amount && parseFloat(amount) > 0) {
-      setPaymentStatus(prev => ({
-        ...prev,
-        rent: 'paid'
-      }));
-    } else {
+    // Only update status if amount is cleared (set to pending)
+    // Don't auto-set to 'paid' - let user manually select the status
+    if (!amount || parseFloat(amount) <= 0) {
       setPaymentStatus(prev => ({
         ...prev,
         rent: 'pending'
       }));
     }
+    // If amount exists but status is 'not_required', keep it as 'not_required'
+    // Otherwise, don't change the status - user must manually select 'paid' or 'pending'
   };
 
   // Handle advance amount changes
@@ -488,18 +495,16 @@ const ResidentOnboarding = () => {
       amount: amount
     }));
 
-    // Update payment status based on amount
-    if (amount && parseFloat(amount) > 0) {
-      setPaymentStatus(prev => ({
-        ...prev,
-        advance: 'paid'
-      }));
-    } else {
+    // Only update status if amount is cleared (set to pending)
+    // Don't auto-set to 'paid' - let user manually select the status
+    if (!amount || parseFloat(amount) <= 0) {
       setPaymentStatus(prev => ({
         ...prev,
         advance: 'pending'
       }));
     }
+    // If amount exists but status is 'not_required', keep it as 'not_required'
+    // Otherwise, don't change the status - user must manually select 'paid' or 'pending'
   };
 
   const handleOnboardingSubmit = async () => {
@@ -1119,81 +1124,89 @@ const ResidentOnboarding = () => {
     }
   };
 
-  const renderStep1 = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="space-y-3"
-    >
-      {/* All-in-One Row Header */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        {/* Title with Icon */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-            <User className="h-4 w-4 text-white" />
-          </div>
-          <h2 className="text-base font-semibold text-gray-900 whitespace-nowrap">Select Resident</h2>
-        </div>
+  const renderStep1 = () => {
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredResidents.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedResidents = filteredResidents.slice(startIndex, endIndex);
 
-        {/* Toggle Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAllResidents(false)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
-              !showAllResidents
-                ? 'bg-blue-500 text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
-            }`}
-          >
-            <UserCheck className="h-3.5 w-3.5" />
-            Unassigned
-          </button>
-          <button
-            onClick={() => setShowAllResidents(true)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
-              showAllResidents
-                ? 'bg-blue-500 text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            All
-          </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative flex-1 min-w-[250px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="Search by name, phone, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white text-xs"
-          />
-        </div>
-      </div>
-
-      {/* Modern Grid Layout - 4 Cards Per Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
-        {loading ? (
-          <div className="col-span-full text-center py-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent mx-auto mb-2"></div>
-            <p className="text-gray-600 text-xs">Loading residents...</p>
-          </div>
-        ) : filteredResidents.length === 0 ? (
-          <div className="col-span-full text-center py-6">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-2 shadow-sm">
-              <Users className="h-6 w-6 text-gray-400" />
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="space-y-3"
+      >
+        {/* All-in-One Row Header */}
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          {/* Title with Icon */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+              <User className="h-4 w-4 text-white" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">No residents found</h3>
-            <p className="text-gray-600 text-xs">
-              {showAllResidents ? 'No residents available' : 'All residents are already assigned'}
-            </p>
+            <h2 className="text-base font-semibold text-gray-900 whitespace-nowrap">Select Resident</h2>
           </div>
-        ) : (
-          filteredResidents.map((resident) => {
+
+          {/* Toggle Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAllResidents(false)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
+                !showAllResidents
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+              }`}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Unassigned
+            </button>
+            <button
+              onClick={() => setShowAllResidents(true)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
+                showAllResidents
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              All
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative flex-1 min-w-[250px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search by name, phone, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white text-xs"
+            />
+          </div>
+        </div>
+
+        {/* Modern Grid Layout - 8 Cards (4 columns x 2 rows) */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {loading ? (
+            <div className="col-span-full text-center py-6">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent mx-auto mb-2"></div>
+              <p className="text-gray-600 text-xs">Loading residents...</p>
+            </div>
+          ) : filteredResidents.length === 0 ? (
+            <div className="col-span-full text-center py-6">
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-2 shadow-sm">
+                <Users className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">No residents found</h3>
+              <p className="text-gray-600 text-xs">
+                {showAllResidents ? 'No residents available' : 'All residents are already assigned'}
+              </p>
+            </div>
+          ) : (
+            paginatedResidents.map((resident) => {
             const isAssigned = resident.roomId && resident.bedNumber;
             
             return (
@@ -1270,10 +1283,54 @@ const ResidentOnboarding = () => {
               </motion.div>
             );
           })
+          )}
+        </div>
+
+        {/* Pagination Controls */}
+        {filteredResidents.length > itemsPerPage && (
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+            <div className="text-xs text-gray-600">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredResidents.length)} of {filteredResidents.length} residents
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Previous</span>
+              </button>
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-7 h-7 text-xs font-medium rounded-lg transition-all ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </motion.div>
-  );
+    );
+  };
 
   const renderStep2 = () => (
     <motion.div
@@ -2732,93 +2789,102 @@ const ResidentOnboarding = () => {
     }
   };
 
-  // Compact Enhanced Step Progress Component
-  const StepProgress = () => (
-    <div className="relative w-full mb-4">
-      {/* Compact Back Button Section */}
-      <div className="flex justify-between items-center mb-3">
-        {currentStep > 1 ? (
-          <button
-            onClick={goBack}
-            className="flex items-center text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white px-2 py-1 rounded-md transition-all"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-            Back
-          </button>
-        ) : (
-          <div></div>
-        )}
-        <div className="text-xs font-medium text-gray-500">
-          {Math.round((currentStep / 7) * 100)}% Complete
+  // Compact Enhanced Step Progress Component - Modern Design
+  const StepProgress = () => {
+    const steps = [
+      { step: 1, label: 'Resident' },
+      { step: 2, label: 'Room Type' },
+      { step: 3, label: 'Room' },
+      { step: 4, label: 'Bed' },
+      { step: 5, label: 'Payment' },
+      { step: 6, label: 'Confirm' },
+      { step: 7, label: 'Complete' }
+    ];
+
+    return (
+      <div className="relative w-full mb-4">
+        {/* Compact Back Button Section */}
+        <div className="flex justify-between items-center mb-3">
+          {currentStep > 1 ? (
+            <button
+              onClick={goBack}
+              className="flex items-center text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white px-2 py-1 rounded-md transition-all"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+              Back
+            </button>
+          ) : (
+            <div></div>
+          )}
+          <div className="text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">
+            {Math.round((currentStep / 7) * 100)}% Complete
+          </div>
+        </div>
+
+        {/* Modern Step Indicator */}
+        <div className="relative">
+          {/* Progress Line Background */}
+          <div className="absolute top-5 left-0 right-0 h-0.5 bg-gray-200 rounded-full"></div>
+          
+          {/* Progress Line Fill */}
+          <div 
+            className="absolute top-5 left-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+          ></div>
+
+          {/* Steps */}
+          <div className="relative flex items-center justify-between">
+            {steps.map((item) => {
+              const isCompleted = item.step < currentStep;
+              const isActive = item.step === currentStep;
+
+              return (
+                <div 
+                  key={item.step} 
+                  className="flex flex-col items-center relative z-10 flex-1"
+                >
+                  {/* Step Circle */}
+                  <div 
+                    className={`
+                      w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold
+                      transition-all duration-300 ease-in-out
+                      ${
+                        isCompleted
+                          ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md shadow-green-200' 
+                          : isActive
+                          ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200 scale-110 ring-4 ring-blue-100' 
+                          : 'bg-white border-2 border-gray-300 text-gray-400'
+                      }
+                    `}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      <span>{item.step}</span>
+                    )}
+                  </div>
+                  
+                  {/* Step Label */}
+                  <span 
+                    className={`
+                      text-[10px] mt-1.5 text-center font-medium
+                      ${
+                        isCompleted || isActive
+                          ? 'text-gray-900 font-semibold' 
+                          : 'text-gray-500'
+                      }
+                    `}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-
-      <div className="flex items-center justify-between space-x-1">
-        {[
-          { step: 1, label: 'Resident' },
-          { step: 2, label: 'Room Type' },
-          { step: 3, label: 'Room' },
-          { step: 4, label: 'Bed' },
-          { step: 5, label: 'Payment' },
-          { step: 6, label: 'Confirm' },
-          { step: 7, label: 'Complete' }
-        ].map((item) => (
-          <div 
-            key={item.step} 
-            className="flex flex-col items-center relative flex-1"
-          >
-            <div 
-              className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold
-                transition-all duration-300 ease-in-out
-                ${
-                  item.step < currentStep 
-                    ? 'bg-green-500 text-white' 
-                    : item.step === currentStep 
-                    ? 'bg-blue-500 text-white scale-110' 
-                    : 'bg-gray-200 text-gray-500'
-                }
-                shadow-sm
-                relative z-10
-              `}
-            >
-              {item.step < currentStep ? (
-                <CheckCircle className="w-4 h-4" />
-              ) : (
-                item.step
-              )}
-            </div>
-            <span 
-              className={`
-                text-[10px] mt-1 text-center 
-                ${
-                  item.step <= currentStep 
-                    ? 'text-gray-900 font-semibold' 
-                    : 'text-gray-500'
-                }
-              `}
-            >
-              {item.label}
-            </span>
-            {item.step < 7 && (
-              <div 
-                className={`
-                  absolute top-4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                  h-0.5 w-full 
-                  ${
-                    item.step < currentStep 
-                      ? 'bg-green-500' 
-                      : 'bg-gray-200'
-                  }
-                  z-0
-                `}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Modify the return statement to include the new StepProgress
   return (

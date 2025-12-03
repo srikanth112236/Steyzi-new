@@ -37,6 +37,7 @@ import { selectSelectedBranch, selectBranches, initializeBranches, setBranches }
 import { selectPgConfigured, updateAuthState } from '../../store/slices/authSlice';
 import DefaultBranchModal from '../../components/admin/DefaultBranchModal';
 import PGConfigurationModal from '../../components/admin/PGConfigurationModal';
+import WelcomeSection from '../../components/common/WelcomeSection';
 import maintainerService from '../../services/maintainer.service';
 
 const SetupWizard = ({ onComplete }) => {
@@ -190,16 +191,16 @@ const SetupWizard = ({ onComplete }) => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="text-center space-y-6 py-8">
+          <div className="text-center space-y-6 py-4">
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
               <Building2 className="h-10 w-10 text-white" />
             </div>
-              <div>
+            <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">Welcome to PG Setup</h2>
               <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
                 Let's get your PG management system up and running! We'll guide you through setting up your first branch and configuring sharing types.
               </p>
-                </div>
+            </div>
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-lg mx-auto">
               <h3 className="font-semibold text-blue-900 mb-2">What we'll do:</h3>
               <ul className="text-sm text-blue-800 space-y-1 text-left">
@@ -207,116 +208,132 @@ const SetupWizard = ({ onComplete }) => {
                 <li>• Create your default branch</li>
                 <li>• Configure sharing types and pricing</li>
               </ul>
-              </div>
-                </div>
+            </div>
+          </div>
         );
 
       case 2:
         return (
-          <div className="space-y-6 py-6">
-            <div className="text-center mb-6">
+          <div className="space-y-6 py-4">
+            <div className="text-center mb-4">
               <h2 className="text-xl font-bold text-gray-900 mb-2">Add Your Team</h2>
               <p className="text-gray-600">Create maintainer accounts for your PG management team</p>
-              </div>
+            </div>
               
             {maintainers.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="h-8 w-8 text-gray-400" />
+              <div className="text-center py-6">
+                <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <Users className="h-7 w-7 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Maintainers Yet</h3>
-                <p className="text-gray-600 mb-6">You need at least one maintainer to manage your PG operations.</p>
+                <h3 className="text-base font-semibold text-gray-900 mb-1.5">No Maintainers Yet</h3>
+                <p className="text-sm text-gray-600 mb-5 max-w-sm mx-auto">You need at least one maintainer to manage your PG operations.</p>
                 <button
                   onClick={() => setShowMaintainerModal(true)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium text-sm shadow-sm hover:shadow-md flex items-center space-x-2 mx-auto"
                 >
-                  Add Your First Maintainer
+                  <Plus className="h-4 w-4" />
+                  <span>Add Your First Maintainer</span>
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Maintainers ({maintainers.length})</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">Your Maintainers</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{maintainers.length} {maintainers.length === 1 ? 'maintainer' : 'maintainers'} added</p>
+                  </div>
                   <button
                     onClick={() => setShowMaintainerModal(true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm font-medium flex items-center space-x-1.5 shadow-sm hover:shadow-md"
                   >
-                    + Add Another
+                    <Plus className="h-4 w-4" />
+                    <span>Add Another</span>
                   </button>
-            </div>
-            
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
-                  {maintainers.map((maintainer) => (
-                    <div key={maintainer._id || maintainer.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users className="h-5 w-5 text-blue-600" />
                 </div>
-              <div>
-                        <div className="font-medium text-gray-900">
-                          {(maintainer.user?.firstName || maintainer.firstName || 'Unknown')} {(maintainer.user?.lastName || maintainer.lastName || '')}
+            
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {maintainers.map((maintainer, index) => {
+                    const firstName = maintainer.user?.firstName || maintainer.firstName || 'Unknown';
+                    const lastName = maintainer.user?.lastName || maintainer.lastName || '';
+                    const email = maintainer.user?.email || maintainer.email || '';
+                    const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+                    
+                    return (
+                      <motion.div
+                        key={maintainer._id || maintainer.id || index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white font-semibold text-sm">{initials}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-gray-900 truncate">
+                            {firstName} {lastName}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate mt-0.5">{email}</div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Active"></div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
-                        <div className="text-sm text-gray-500">{maintainer.user?.email || maintainer.email}</div>
-            </div>
-              </div>
-                  ))}
-              </div>
-            </div>
             )}
           </div>
         );
       
       case 3:
         return (
-          <div className="space-y-6 py-6">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Create Your Default Branch</h2>
-              <p className="text-gray-600">Set up your first PG branch with a maintainer</p>
-            </div>
-            
+          <div className="py-4">
             {maintainers.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="h-8 w-8 text-yellow-600" />
+              <div className="text-center py-6">
+                <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle className="h-6 w-6 text-yellow-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Maintainers Required</h3>
-                <p className="text-gray-600 mb-6">Please add at least one maintainer before creating a branch.</p>
-                  <button
+                <h3 className="text-base font-semibold text-gray-900 mb-2">Maintainers Required</h3>
+                <p className="text-sm text-gray-600 mb-5">Add at least one maintainer first</p>
+                <button
                   onClick={() => setCurrentStep(2)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-medium"
+                >
                   Go Back to Add Maintainers
-                  </button>
-                  </div>
+                </button>
+              </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="h-8 w-8 text-green-600" />
-                  </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Create Branch</h3>
-                <p className="text-gray-600 mb-6">You have {maintainers.length} maintainer{maintainers.length !== 1 ? 's' : ''} ready. Let's create your first branch!</p>
+              <div className="text-center py-4">
+                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-7 w-7 text-green-600" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Ready to Create Branch</h3>
                 <button
                   onClick={() => setShowBranchModal(true)}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium text-sm shadow-sm hover:shadow-md flex items-center space-x-2 mx-auto"
                 >
-                  Create Default Branch
+                  <Plus className="h-4 w-4" />
+                  <span>Create Default Branch</span>
                 </button>
-                </div>
+              </div>
             )}
-                  </div>
+          </div>
         );
 
       case 4:
         return (
-          <div className="text-center space-y-6 py-8">
+          <div className="text-center space-y-6 py-4">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto">
               <Settings className="h-10 w-10 text-white" />
-                  </div>
-                  <div>
+            </div>
+            <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">Configure Your PG</h2>
               <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
                 Set up sharing types and pricing for your PG. This will be used for room allocation and billing.
               </p>
-                  </div>
+            </div>
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 max-w-lg mx-auto">
               <h3 className="font-semibold text-purple-900 mb-2">Configuration includes:</h3>
               <ul className="text-sm text-purple-800 space-y-1 text-left">
@@ -324,12 +341,12 @@ const SetupWizard = ({ onComplete }) => {
                 <li>• Pricing for each sharing type</li>
                 <li>• Room allocation settings</li>
               </ul>
-                  </div>
+            </div>
             {showConfigModal ? (
-              <div className="flex items-center space-x-2 text-purple-600">
+              <div className="flex items-center justify-center space-x-2 text-purple-600">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
                 <span className="font-medium">Opening Configuration...</span>
-                </div>
+              </div>
             ) : (
               <button
                 onClick={() => setShowConfigModal(true)}
@@ -338,7 +355,7 @@ const SetupWizard = ({ onComplete }) => {
                 Start Configuration
               </button>
             )}
-            </div>
+          </div>
         );
       
       default:
@@ -363,18 +380,20 @@ const SetupWizard = ({ onComplete }) => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-          {/* Header with close button */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+      {/* Modal Backdrop with proper spacing */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+        {/* Modal Container - Optimized and properly sized */}
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          {/* Header with close button - Fixed */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Building2 className="h-5 w-5 text-white" />
               </div>
-            <div>
+              <div>
                 <h2 className="text-xl font-bold text-gray-900">PG Setup Wizard</h2>
                 <p className="text-sm text-gray-600">Step {currentStep} of {totalSteps}</p>
-            </div>
+              </div>
             </div>
             <button
               onClick={handleWizardClose}
@@ -384,8 +403,8 @@ const SetupWizard = ({ onComplete }) => {
             </button>
           </div>
           
-          {/* Progress Indicator */}
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          {/* Progress Indicator - Fixed */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex items-center">
@@ -412,14 +431,16 @@ const SetupWizard = ({ onComplete }) => {
             </div>
           </div>
 
-          {/* Content */}
-          <div className="max-h-[60vh] overflow-y-auto">
-            {renderStepContent()}
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 py-6 min-h-0">
+            <div className="max-h-full">
+              {renderStepContent()}
+            </div>
           </div>
 
-          {/* Footer with navigation */}
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-              <button
+          {/* Footer with navigation - Sticky at bottom */}
+          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+            <button
               onClick={handleWizardClose}
               className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200"
             >
@@ -431,13 +452,13 @@ const SetupWizard = ({ onComplete }) => {
                 <button
                   onClick={handlePrevious}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition duration-200"
-              >
-                Previous
-              </button>
-            )}
-            
+                >
+                  Previous
+                </button>
+              )}
+              
               {currentStep < totalSteps ? (
-              <button
+                <button
                   onClick={handleNext}
                   disabled={!canProceedToNext()}
                   className={`px-6 py-2 rounded-lg font-medium transition duration-200 ${
@@ -445,21 +466,21 @@ const SetupWizard = ({ onComplete }) => {
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
-              >
-                Next
-              </button>
-            ) : (
-              <button
+                >
+                  Next
+                </button>
+              ) : (
+                <button
                   onClick={() => setShowConfigModal(true)}
                   className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200 font-medium"
-              >
-                Complete Setup
-              </button>
-            )}
+                >
+                  Complete Setup
+                </button>
+              )}
             </div>
           </div>
-          </div>
         </div>
+      </div>
         
       {/* Modals */}
       {/* We'll add the maintainer modal here */}
@@ -500,7 +521,7 @@ const SetupWizard = ({ onComplete }) => {
   );
 };
 
-// Simple maintainer form component
+// Simple maintainer form component with proper validations
 const MaintainerQuickForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -508,10 +529,104 @@ const MaintainerQuickForm = ({ onSubmit, onCancel }) => {
     email: '',
     phone: ''
   });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Validation functions
+  const validateField = (name, value) => {
+    let error = '';
+
+    switch (name) {
+      case 'firstName':
+        if (!value.trim()) {
+          error = 'First name is required';
+        } else if (value.trim().length < 2) {
+          error = 'First name must be at least 2 characters';
+        } else if (value.trim().length > 50) {
+          error = 'First name cannot exceed 50 characters';
+        }
+        break;
+      case 'lastName':
+        if (!value.trim()) {
+          error = 'Last name is required';
+        } else if (value.trim().length < 2) {
+          error = 'Last name must be at least 2 characters';
+        } else if (value.trim().length > 50) {
+          error = 'Last name cannot exceed 50 characters';
+        }
+        break;
+      case 'email':
+        if (!value.trim()) {
+          error = 'Email is required';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+          error = 'Please enter a valid email address';
+        }
+        break;
+      case 'phone':
+        if (!value.trim()) {
+          error = 'Phone number is required';
+        } else if (!/^[0-9]{10}$/.test(value.trim())) {
+          error = 'Phone number must be exactly 10 digits';
+        }
+        break;
+      default:
+        break;
+    }
+
+    return error;
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Remove non-numeric characters for phone field
+    let processedValue = value;
+    if (name === 'phone') {
+      processedValue = value.replace(/\D/g, '').slice(0, 10);
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
+    
+    // Validate on change if field has been touched
+    if (touched[name]) {
+      const error = validateField(name, processedValue);
+      setErrors(prev => ({ ...prev, [name]: error }));
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    const error = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    Object.keys(formData).forEach(key => {
+      const error = validateField(key, formData[key]);
+      if (error) {
+        newErrors[key] = error;
+      }
+    });
+    setErrors(newErrors);
+    setTouched({
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true
+    });
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -536,13 +651,31 @@ const MaintainerQuickForm = ({ onSubmit, onCancel }) => {
           email: '',
           phone: ''
         });
+        setErrors({});
+        setTouched({});
         onSubmit(maintainerData);
       } else {
         toast.error(response.message || 'Failed to add maintainer');
       }
     } catch (error) {
       console.error('Error adding maintainer:', error);
-      toast.error('Failed to add maintainer');
+      
+      // Handle API error responses
+      if (error.response?.data?.errors) {
+        setErrors(error.response.data.errors);
+        const errorMessages = Object.values(error.response.data.errors).filter(Boolean);
+        if (errorMessages.length > 0) {
+          toast.error(errorMessages[0]);
+        }
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to add maintainer';
+        toast.error(errorMessage);
+        
+        // Set field-specific errors if provided
+        if (error.response?.data?.errors) {
+          setErrors(error.response.data.errors);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -552,68 +685,149 @@ const MaintainerQuickForm = ({ onSubmit, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            First Name <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
-            required
+            name="firstName"
             value={formData.firstName}
-            onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="First name"
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`w-full px-4 py-2.5 border rounded-lg transition-all ${
+              errors.firstName
+                ? 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                : touched.firstName && !errors.firstName
+                ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+                : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            }`}
+            placeholder="Enter first name"
           />
+          {/* Fixed height error container to prevent layout shift */}
+          <div className="h-6 mt-1">
+            {errors.firstName && (
+              <p className="text-sm text-red-600 flex items-center animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+                <span>{errors.firstName}</span>
+              </p>
+            )}
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Last Name <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
-            required
+            name="lastName"
             value={formData.lastName}
-            onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Last name"
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`w-full px-4 py-2.5 border rounded-lg transition-all ${
+              errors.lastName
+                ? 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                : touched.lastName && !errors.lastName
+                ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+                : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            }`}
+            placeholder="Enter last name"
           />
+          {/* Fixed height error container to prevent layout shift */}
+          <div className="h-6 mt-1">
+            {errors.lastName && (
+              <p className="text-sm text-red-600 flex items-center animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+                <span>{errors.lastName}</span>
+              </p>
+            )}
+          </div>
         </div>
-        </div>
+      </div>
         
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Email <span className="text-red-500">*</span>
+        </label>
         <input
           type="email"
-          required
+          name="email"
           value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Email address"
+          onChange={handleChange}
+          onBlur={handleBlur}
+          className={`w-full px-4 py-2.5 border rounded-lg transition-all ${
+            errors.email
+              ? 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+              : touched.email && !errors.email
+              ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+              : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+          }`}
+          placeholder="example@email.com"
         />
+        {/* Fixed height error container to prevent layout shift */}
+        <div className="h-6 mt-1">
+          {errors.email && (
+            <p className="text-sm text-red-600 flex items-center animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span>{errors.email}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Phone Number <span className="text-red-500">*</span>
+        </label>
         <input
           type="tel"
-          required
+          name="phone"
           value={formData.phone}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Phone number"
-          pattern="[0-9]{10}"
+          onChange={handleChange}
+          onBlur={handleBlur}
+          maxLength={10}
+          className={`w-full px-4 py-2.5 border rounded-lg transition-all ${
+            errors.phone
+              ? 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+              : touched.phone && !errors.phone
+              ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+              : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+          }`}
+          placeholder="10-digit phone number"
         />
-    </div>
+        {/* Fixed height container for error/hint to prevent layout shift */}
+        <div className="h-6 mt-1">
+          {errors.phone ? (
+            <p className="text-sm text-red-600 flex items-center animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span>{errors.phone}</span>
+            </p>
+          ) : touched.phone && !errors.phone ? (
+            <p className="text-xs text-gray-500">Enter 10 digits only</p>
+          ) : null}
+        </div>
+      </div>
 
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200"
+          className="px-5 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200 font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 disabled:opacity-50"
+          className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center space-x-2"
         >
-          {loading ? 'Adding...' : 'Add Maintainer'}
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Adding...</span>
+            </>
+          ) : (
+            <span>Add Maintainer</span>
+          )}
         </button>
       </div>
     </form>
@@ -744,12 +958,24 @@ const Dashboard = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (!user) {
+    // Get user from Redux or localStorage as fallback
+    const currentUser = user || (() => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (!currentUser) {
       navigate('/admin/login');
       return;
     }
 
-    if (!['admin', 'maintainer'].includes(user?.role)) {
+    const userRole = currentUser?.role;
+    if (!userRole || !['admin', 'maintainer'].includes(userRole)) {
+      console.error('Access denied - User role:', userRole, 'User:', currentUser);
       toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
@@ -953,7 +1179,17 @@ const Dashboard = () => {
     }
   };
 
-  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
+  // Get user from Redux or localStorage as fallback
+  const currentUser = user || (() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (!currentUser || !currentUser?.role || !['admin', 'maintainer'].includes(currentUser.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -969,26 +1205,10 @@ const Dashboard = () => {
   // Never show setup if setup is completed or PG is configured
   if (!setupCompleted && !pgConfigured && hasNoBranches && !loading && !isFirstLoad && !showSetupWizard && !forceShowWizard) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
-          <div className="w-24 h-24 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
-            <Building2 className="h-12 w-12 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Get Started with Your PG Management
-          </h2>
-          <p className="text-gray-600 mb-6">
-            It looks like you haven't added any branches yet. Let's set up your first Paying Guest establishment.
-          </p>
-          <button
-            onClick={handleOpenSetupWizard}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Set Up Your First Branch</span>
-          </button>
-        </div>
-      </div>
+      <WelcomeSection
+        userName={currentUser?.firstName || currentUser?.email?.split('@')[0] || 'PG Owner'}
+        onGetStarted={handleOpenSetupWizard}
+      />
     );
   }
 

@@ -8,7 +8,7 @@ import { FiCalendar, FiCreditCard, FiPackage, FiCheck, FiX, FiClock } from 'reac
  * Subscription History Page
  * Shows user's subscription history and payment records
  */
-const SubscriptionHistory = () => {
+const SubscriptionHistoryPage = () => {
   const { user, subscription: currentSubscription } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
   const [subscriptionHistory, setSubscriptionHistory] = useState([]);
@@ -413,4 +413,4 @@ const SubscriptionHistory = () => {
   );
 };
 
-export default SubscriptionHistory;
+export default SubscriptionHistoryPage;

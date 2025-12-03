@@ -15,6 +15,96 @@ const api = axios.create({
 // Track refresh token requests to prevent multiple simultaneous calls
 let isRefreshing = false;
 let failedQueue = [];
+let forcedLogoutInProgress = false;
+
+const decodeTokenPayload = (token) => {
+  try {
+    if (!token) return null;
+    const [, payload = ''] = token.split('.');
+    return JSON.parse(atob(payload));
+  } catch (error) {
+    console.error('Failed to decode token payload:', error);
+    return null;
+  }
+};
+
+const persistAccessTokenMetadata = ({ accessToken, expiresAt, expiresIn }) => {
+  try {
+    if (expiresAt) {
+      const timestamp = new Date(expiresAt).getTime();
+      if (!Number.isNaN(timestamp)) {
+        localStorage.setItem('tokenExpiry', timestamp.toString());
+        return;
+      }
+    }
+
+    if (expiresIn) {
+      const timestamp = Date.now() + expiresIn * 1000;
+      localStorage.setItem('tokenExpiry', timestamp.toString());
+      return;
+    }
+
+    if (accessToken) {
+      const payload = decodeTokenPayload(accessToken);
+      if (payload?.exp) {
+        localStorage.setItem('tokenExpiry', (payload.exp * 1000).toString());
+        return;
+      }
+    }
+
+    localStorage.removeItem('tokenExpiry');
+  } catch (error) {
+    console.error('Failed to persist token metadata:', error);
+    localStorage.removeItem('tokenExpiry');
+  }
+};
+
+const clearAuthStorage = () => {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  localStorage.removeItem('tokenExpiry');
+};
+
+const getStoredUser = () => {
+  const userStr = localStorage.getItem('user');
+  return userStr ? JSON.parse(userStr) : null;
+};
+
+const handleForcedLogout = ({ message, status, redirectPath } = {}) => {
+  if (forcedLogoutInProgress) {
+    return;
+  }
+
+  forcedLogoutInProgress = true;
+  const storedUser = getStoredUser();
+  clearAuthStorage();
+
+  const detail = {
+    message: message || 'Your session has expired. Please log in again.',
+    status: status || 401,
+    reason: 'session_invalid',
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    window.dispatchEvent(new CustomEvent('tokenExpired', { detail }));
+    window.dispatchEvent(new CustomEvent('apiError', { detail }));
+  } catch (error) {
+    console.error('Failed to dispatch forced logout events:', error);
+  }
+
+  const fallbackRedirect = storedUser?.role === 'superadmin' ? '/login' : '/admin/login';
+  const targetRedirect = redirectPath || fallbackRedirect;
+
+  if (typeof window !== 'undefined' && window.location) {
+    window.location.href = targetRedirect;
+  }
+
+  setTimeout(() => {
+    forcedLogoutInProgress = false;
+  }, 1000);
+};
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach(prom => {
@@ -53,42 +143,17 @@ api.interceptors.response.use(
       console.log('🔒 401 Unauthorized error detected');
       console.log('📄 Error response:', error.response?.data);
       
-      // Check if it's an "Invalid token" error
-      const isInvalidToken = error.response?.data?.message === 'Invalid token.' || 
-                           error.response?.data?.message === 'Invalid token' ||
-                           error.response?.data?.message?.includes('Invalid token');
+      const responseMessage = error.response?.data?.message || '';
+      const normalizedMessage = responseMessage.toLowerCase();
+      const isInvalidOrExpired = normalizedMessage.includes('invalid token') ||
+        normalizedMessage.includes('token expired');
       
-      if (isInvalidToken) {
-        console.log('🚫 Invalid token detected, triggering token expiry modal');
-        
-        // Dispatch custom event to trigger token expiry modal
-        const tokenExpiryEvent = new CustomEvent('tokenExpired', {
-          detail: {
-            message: 'Your session has expired. Please log in again.',
-            error: error.response?.data,
-            status: error.response?.status,
-            timestamp: new Date().toISOString()
-          }
+      if (isInvalidOrExpired) {
+        console.log('🚫 Invalid/expired token detected, forcing logout');
+        handleForcedLogout({
+          message: responseMessage || 'Your session has expired. Please log in again.',
+          status: error.response?.status
         });
-        window.dispatchEvent(tokenExpiryEvent);
-        
-        // Also dispatch API error event for broader error handling
-        const apiErrorEvent = new CustomEvent('apiError', {
-          detail: {
-            status: error.response?.status,
-            message: error.response?.data?.message || 'Session expired',
-            error: error.response?.data,
-            timestamp: new Date().toISOString()
-          }
-        });
-        window.dispatchEvent(apiErrorEvent);
-        
-        // Clear auth data immediately
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        
-        // Don't retry the request
         return Promise.reject(error);
       }
       
@@ -119,8 +184,9 @@ api.interceptors.response.use(
           refreshToken,
         });
 
-        const { accessToken } = response.data.data;
+        const { accessToken, expiresAt, expiresIn } = response.data.data;
         localStorage.setItem('accessToken', accessToken);
+        persistAccessTokenMetadata({ accessToken, expiresAt, expiresIn });
 
         console.log('✅ Token refresh successful');
         isRefreshing = false;
@@ -223,6 +289,7 @@ class AuthService {
         // Store tokens in localStorage
         localStorage.setItem('accessToken', response.data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', response.data.data.tokens.refreshToken);
+        persistAccessTokenMetadata(response.data.data.tokens);
         
         // Store user data
         localStorage.setItem('user', JSON.stringify(response.data.data.user));
@@ -265,6 +332,7 @@ class AuthService {
         // Store tokens in localStorage
         localStorage.setItem('accessToken', response.data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', response.data.data.tokens.refreshToken);
+        persistAccessTokenMetadata(response.data.data.tokens);
 
         // Store user data
         localStorage.setItem('user', JSON.stringify(response.data.data.user));
@@ -306,6 +374,7 @@ class AuthService {
         // Store tokens in localStorage
         localStorage.setItem('accessToken', response.data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', response.data.data.tokens.refreshToken);
+        persistAccessTokenMetadata(response.data.data.tokens);
         
         // Store user data
         localStorage.setItem('user', JSON.stringify(response.data.data.user));

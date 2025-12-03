@@ -19,6 +19,50 @@ class ResidentService {
       console.log('🏠 ResidentService: Creating new resident');
       console.log('📊 Resident Data:', residentData);
 
+      // Check for duplicate email if email is provided (system-wide within same PG)
+      if (residentData.email && residentData.email.trim()) {
+        const cleanEmail = residentData.email.toLowerCase().trim();
+        const existingByEmail = await Resident.findOne({
+          email: cleanEmail,
+          pgId: residentData.pgId,
+          isActive: true
+        });
+        
+        if (existingByEmail) {
+          return {
+            success: false,
+            message: 'This email is already registered to another resident',
+            statusCode: 409
+          };
+        }
+      }
+
+      // Check for duplicate phone (system-wide within same PG)
+      if (residentData.phone && residentData.phone.trim()) {
+        const cleanPhone = residentData.phone.replace(/\D/g, '');
+        if (cleanPhone.length === 10) {
+          const existingByPhone = await Resident.findOne({
+            phone: cleanPhone,
+            pgId: residentData.pgId,
+            isActive: true
+          });
+          
+          if (existingByPhone) {
+            return {
+              success: false,
+              message: 'This phone number is already registered to another resident',
+              statusCode: 409
+            };
+          }
+        } else {
+          return {
+            success: false,
+            message: 'Phone number must be exactly 10 digits',
+            statusCode: 400
+          };
+        }
+      }
+
       // Check if room is available if roomId is provided
       if (residentData.roomId && residentData.bedNumber) {
         const isRoomAvailable = await this.checkRoomAvailability(
@@ -33,6 +77,28 @@ class ResidentService {
             statusCode: 400
           };
         }
+      }
+
+      // Convert workAddress object to string if it's an object
+      if (residentData.workDetails?.workAddress && typeof residentData.workDetails.workAddress === 'object') {
+        const addr = residentData.workDetails.workAddress;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        residentData.workDetails.workAddress = addressParts.join(', ');
+      }
+
+      // Convert emergencyContact.address object to string if it's an object
+      if (residentData.emergencyContact?.address && typeof residentData.emergencyContact.address === 'object') {
+        const addr = residentData.emergencyContact.address;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        residentData.emergencyContact.address = addressParts.join(', ');
       }
 
       // Create resident
@@ -118,7 +184,7 @@ class ResidentService {
       const Payment = require('../models/payment.model');
       const residentsWithPaymentStatus = await Promise.all(
         residents.map(async (resident) => {
-          // Check if there's already a payment for current month
+          // Check if there's already a payment for current month and get its actual status
           const existingPayment = await Payment.findOne({
             residentId: resident._id,
             month: currentMonth,
@@ -128,7 +194,20 @@ class ResidentService {
 
           // Convert to plain object and add payment status
           const residentObj = resident.toObject();
-          residentObj.hasCurrentMonthPayment = !!existingPayment;
+          // Only mark as paid if payment exists AND status is 'paid'
+          residentObj.hasCurrentMonthPayment = existingPayment && existingPayment.status === 'paid';
+          residentObj.currentMonthPaymentStatus = existingPayment ? existingPayment.status : null;
+          
+          // Update paymentStatus based on actual payment status if payment exists
+          if (existingPayment) {
+            // If there's a current month payment, use its status
+            if (existingPayment.status === 'paid') {
+              residentObj.paymentStatus = 'paid';
+            } else if (existingPayment.status === 'pending') {
+              residentObj.paymentStatus = 'pending';
+            }
+            // Otherwise keep the resident's existing paymentStatus
+          }
           
           return residentObj;
         })
@@ -286,7 +365,15 @@ class ResidentService {
       );
       
       residentData.currentMonthPayment = currentMonthPayment;
-      residentData.paymentStatus = currentMonthPayment ? 'paid' : 'pending';
+      // Use the actual payment status from the payment record, not just check if it exists
+      // If payment exists and status is 'paid', show 'paid', otherwise show the actual status or 'pending'
+      if (currentMonthPayment) {
+        residentData.paymentStatus = currentMonthPayment.status === 'paid' ? 'paid' : 
+                                     currentMonthPayment.status || 'pending';
+      } else {
+        // Check if resident has a paymentStatus field that might indicate pending payments
+        residentData.paymentStatus = resident.paymentStatus || 'pending';
+      }
 
       // Enhanced payment and deposit information for offboarding
       residentData.paymentSummary = {
@@ -386,6 +473,139 @@ class ResidentService {
       console.log('🔄 ResidentService: Updating resident:', residentId);
       console.log('📊 Update Data:', updateData);
 
+      // Get the existing resident to check current values
+      const existingResident = await Resident.findById(residentId);
+      if (!existingResident) {
+        return {
+          success: false,
+          message: 'Resident not found',
+          statusCode: 404
+        };
+      }
+
+      // Check for duplicate email if email is being changed
+      if (updateData.email && updateData.email.trim() && updateData.email.toLowerCase().trim() !== existingResident.email?.toLowerCase()) {
+        const existingByEmail = await Resident.findOne({
+          email: updateData.email.toLowerCase().trim(),
+          pgId: existingResident.pgId,
+          isActive: true,
+          _id: { $ne: residentId } // Exclude current resident
+        });
+        
+        if (existingByEmail) {
+          return {
+            success: false,
+            message: 'This email is already registered to another resident',
+            statusCode: 409
+          };
+        }
+      }
+
+      // Check for duplicate phone if phone is being changed
+      if (updateData.phone && updateData.phone.trim()) {
+        const cleanPhone = updateData.phone.replace(/\D/g, '');
+        const existingCleanPhone = existingResident.phone ? existingResident.phone.replace(/\D/g, '') : '';
+        
+        if (cleanPhone.length === 10) {
+          // Only check for duplicates if phone has actually changed
+          if (cleanPhone !== existingCleanPhone) {
+            const existingByPhone = await Resident.findOne({
+              phone: cleanPhone,
+              pgId: existingResident.pgId,
+              isActive: true,
+              _id: { $ne: residentId } // Exclude current resident
+            });
+            
+            if (existingByPhone) {
+              return {
+                success: false,
+                message: 'This phone number is already registered to another resident',
+                statusCode: 409
+              };
+            }
+          }
+          // Update the phone to cleaned version
+          updateData.phone = cleanPhone;
+        } else {
+          return {
+            success: false,
+            message: 'Phone number must be exactly 10 digits',
+            statusCode: 400
+          };
+        }
+      }
+
+      // Convert workAddress object to string if it's an object
+      if (updateData.workDetails?.workAddress && typeof updateData.workDetails.workAddress === 'object') {
+        const addr = updateData.workDetails.workAddress;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        updateData.workDetails.workAddress = addressParts.join(', ');
+      }
+
+      // Convert emergencyContact.address object to string if it's an object
+      if (updateData.emergencyContact?.address && typeof updateData.emergencyContact.address === 'object') {
+        const addr = updateData.emergencyContact.address;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        updateData.emergencyContact.address = addressParts.join(', ');
+      }
+
+      // Update resident
+      const updatedResident = await Resident.findByIdAndUpdate(
+        residentId,
+        {
+          ...updateData,
+          updatedBy: userId
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedResident) {
+        return {
+          success: false,
+          message: 'Resident not found',
+          statusCode: 404
+        };
+      }
+
+      // Populate related data
+      await updatedResident.populate([
+        { path: 'roomId', select: 'roomNumber floorId' },
+        { path: 'branchId', select: 'name' }
+      ]);
+
+      console.log('✅ ResidentService: Resident updated successfully');
+      
+      return {
+        success: true,
+        data: updatedResident,
+        message: 'Resident updated successfully',
+        statusCode: 200
+      };
+    } catch (error) {
+      console.error('❌ ResidentService: Update resident error:', error);
+      return {
+        success: false,
+        message: 'Failed to update resident',
+        error: error.message,
+        statusCode: 500
+      };
+    }
+  }
+
+  // Legacy method - keeping for backward compatibility
+  async updateResidentLegacy(residentId, updateData, userId) {
+    try {
+      console.log('🔄 ResidentService: Updating resident:', residentId);
+      console.log('📊 Update Data:', updateData);
+
       const resident = await Resident.findById(residentId);
       
       if (!resident) {
@@ -394,6 +614,67 @@ class ResidentService {
           message: 'Resident not found',
           statusCode: 404
         };
+      }
+
+      // Check for duplicate email if email is being changed
+      if (updateData.email && updateData.email.trim() && updateData.email.toLowerCase().trim() !== resident.email?.toLowerCase()) {
+        const existingByEmail = await Resident.findOne({
+          email: updateData.email.toLowerCase().trim(),
+          pgId: resident.pgId,
+          isActive: true,
+          _id: { $ne: residentId } // Exclude current resident
+        });
+        
+        if (existingByEmail) {
+          return {
+            success: false,
+            message: 'This email is already registered to another resident',
+            statusCode: 409
+          };
+        }
+      }
+
+      // Check for duplicate phone if phone is being changed
+      if (updateData.phone && updateData.phone.trim()) {
+        const cleanPhone = updateData.phone.replace(/\D/g, '');
+        if (cleanPhone.length === 10 && cleanPhone !== resident.phone) {
+          const existingByPhone = await Resident.findOne({
+            phone: cleanPhone,
+            pgId: resident.pgId,
+            isActive: true,
+            _id: { $ne: residentId } // Exclude current resident
+          });
+          
+          if (existingByPhone) {
+            return {
+              success: false,
+              message: 'This phone number is already registered to another resident',
+              statusCode: 409
+            };
+          }
+        }
+      }
+
+      // Convert workAddress object to string if it's an object
+      if (updateData.workDetails?.workAddress && typeof updateData.workDetails.workAddress === 'object') {
+        const addr = updateData.workDetails.workAddress;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        updateData.workDetails.workAddress = addressParts.join(', ');
+      }
+
+      // Convert emergencyContact.address object to string if it's an object
+      if (updateData.emergencyContact?.address && typeof updateData.emergencyContact.address === 'object') {
+        const addr = updateData.emergencyContact.address;
+        const addressParts = [];
+        if (addr.street) addressParts.push(addr.street);
+        if (addr.city) addressParts.push(addr.city);
+        if (addr.state) addressParts.push(addr.state);
+        if (addr.pincode) addressParts.push(addr.pincode);
+        updateData.emergencyContact.address = addressParts.join(', ');
       }
 
       // Check if room is available if room assignment is being changed
@@ -2121,6 +2402,10 @@ class ResidentService {
 
       // Create advance payment record if advance payment exists
       if (onboardingData.advancePayment && onboardingData.advancePayment.amount > 0) {
+        // Use the status from onboardingData, default to 'pending' if not provided
+        const advanceStatus = onboardingData.advancePayment.status || 
+                              (onboardingData.paymentStatus?.advance || 'pending');
+        
         const advancePayment = new Payment({
           residentId: resident._id,
           roomId: resident.roomId,
@@ -2129,20 +2414,24 @@ class ResidentService {
           amount: onboardingData.advancePayment.amount,
           paymentDate: onboardingData.advancePayment.date || currentDate,
           paymentMethod: 'other', // Default for onboarding payments
-          status: 'paid',
+          status: advanceStatus, // Use the actual status from onboarding data
           month: 'Advance', // Special month for advance payments
           year: currentYear,
-          notes: `Advance payment - Receipt: ${onboardingData.advancePayment.receiptNumber || 'N/A'}`,
+          notes: `Advance payment - Receipt: ${onboardingData.advancePayment.receiptNumber || 'N/A'} - Status: ${advanceStatus}`,
           markedBy: userId,
           isActive: true
         });
 
         await advancePayment.save();
-        console.log('✅ Advance payment record created:', advancePayment._id);
+        console.log('✅ Advance payment record created:', advancePayment._id, 'Status:', advanceStatus);
       }
 
       // Create rent payment record if rent payment exists
       if (onboardingData.rentPayment && onboardingData.rentPayment.amount > 0) {
+        // Use the status from onboardingData, default to 'pending' if not provided
+        const rentStatus = onboardingData.rentPayment.status || 
+                           (onboardingData.paymentStatus?.rent || 'pending');
+        
         const rentPayment = new Payment({
           residentId: resident._id,
           roomId: resident.roomId,
@@ -2151,16 +2440,16 @@ class ResidentService {
           amount: onboardingData.rentPayment.amount,
           paymentDate: onboardingData.rentPayment.date || currentDate,
           paymentMethod: 'other', // Default for onboarding payments
-          status: 'paid',
+          status: rentStatus, // Use the actual status from onboarding data
           month: currentMonth,
           year: currentYear,
-          notes: `Rent payment - Receipt: ${onboardingData.rentPayment.receiptNumber || 'N/A'}`,
+          notes: `Rent payment - Receipt: ${onboardingData.rentPayment.receiptNumber || 'N/A'} - Status: ${rentStatus}`,
           markedBy: userId,
           isActive: true
         });
 
         await rentPayment.save();
-        console.log('✅ Rent payment record created:', rentPayment._id);
+        console.log('✅ Rent payment record created:', rentPayment._id, 'Status:', rentStatus);
       }
 
       console.log('✅ Onboarding payment records created successfully');

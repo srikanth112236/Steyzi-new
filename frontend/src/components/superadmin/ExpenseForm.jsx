@@ -20,7 +20,7 @@ const expenseTypes = [
   { value: 'miscellaneous', label: 'Miscellaneous' }
 ];
 
-const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
+const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel, isModal = false }) => {
   const [formData, setFormData] = useState({
     type: expense?.type || '',
     amount: expense?.amount || '',
@@ -55,7 +55,9 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) {
+      e.preventDefault();
+    }
     setError('');
     setLoading(true);
 
@@ -111,27 +113,25 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
     }
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        {isEditMode ? 'Edit Expense' : 'Add New Expense'}
-      </h2>
-
+  const formContent = (
+    <>
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-600">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="type">Expense Type *</Label>
+      <form onSubmit={handleSubmit} className="space-y-4" id="expense-form">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="type" className="text-xs font-medium text-gray-700">
+              Expense Type <span className="text-red-500">*</span>
+            </Label>
             <Select
               value={formData.type}
               onValueChange={(value) => handleChange('type', value)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Select expense type" />
               </SelectTrigger>
               <SelectContent>
@@ -144,8 +144,10 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount (₹) *</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="amount" className="text-xs font-medium text-gray-700">
+              Amount (₹) <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="amount"
               type="number"
@@ -154,13 +156,16 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
               value={formData.amount}
               onChange={(e) => handleChange('amount', e.target.value)}
               placeholder="Enter amount"
+              className="h-9 text-sm"
               required
             />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="date">Expense Date *</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="date" className="text-xs font-medium text-gray-700">
+            Expense Date <span className="text-red-500">*</span>
+          </Label>
           <div className="relative">
             <Input
               id="date"
@@ -168,7 +173,7 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
               value={format(formData.date, 'PPP')}
               readOnly
               onClick={() => setShowCalendar(!showCalendar)}
-              className="cursor-pointer"
+              className="cursor-pointer h-9 text-sm"
               placeholder="Select date"
             />
             {showCalendar && (
@@ -190,55 +195,80 @@ const ExpenseForm = ({ expense = null, onExpenseAdded, onCancel }) => {
               </>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">Cannot select future dates</p>
+          <p className="text-[10px] text-gray-500">Cannot select future dates</p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="category">Category (Optional)</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="category" className="text-xs font-medium text-gray-700">
+            Category <span className="text-gray-400 text-[10px]">(Optional)</span>
+          </Label>
           <Input
             id="category"
             type="text"
             value={formData.category}
             onChange={(e) => handleChange('category', e.target.value)}
             placeholder="Enter category"
+            className="h-9 text-sm"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Description *</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="description" className="text-xs font-medium text-gray-700">
+            Description <span className="text-red-500">*</span>
+          </Label>
           <Textarea
             id="description"
             value={formData.description}
             onChange={(e) => handleChange('description', e.target.value)}
             placeholder="Enter expense description"
             rows={4}
+            className="text-sm resize-none"
             required
             maxLength={500}
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-[10px] text-gray-500">
             {formData.description.length}/500 characters
           </p>
         </div>
-
-        <div className="flex justify-end space-x-4 pt-4">
-          {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-          )}
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : isEditMode ? 'Update Expense' : 'Add Expense'}
-          </Button>
-        </div>
       </form>
+    </>
+  );
+
+  // If modal mode, return just the form content (buttons are in parent modal)
+  if (isModal) {
+    return formContent;
+  }
+
+  // Otherwise, return full form with buttons (for backward compatibility)
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
+      <h2 className="text-xl font-bold text-gray-900 mb-4">
+        {isEditMode ? 'Edit Expense' : 'Add New Expense'}
+      </h2>
+      {formContent}
+      <div className="flex justify-end space-x-3 pt-4 border-t mt-4">
+        {onCancel && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={loading}
+            className="h-9 px-4 text-sm"
+          >
+            Cancel
+          </Button>
+        )}
+        <Button
+          type="submit"
+          form="expense-form"
+          disabled={loading}
+          className="h-9 px-4 text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
+        >
+          {loading ? 'Saving...' : isEditMode ? 'Update Expense' : 'Add Expense'}
+        </Button>
+      </div>
     </div>
   );
 };
 
 export default ExpenseForm;
-

@@ -22,40 +22,122 @@ class MaintainerController {
         pgId
       } = req.body;
 
+      // Input validation
+      if (!firstName || !lastName || !email || !phone) {
+        return res.status(400).json({
+          success: false,
+          message: 'All required fields must be provided',
+          errors: {
+            firstName: !firstName ? 'First name is required' : null,
+            lastName: !lastName ? 'Last name is required' : null,
+            email: !email ? 'Email is required' : null,
+            phone: !phone ? 'Phone number is required' : null
+          }
+        });
+      }
+
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+          errors: {
+            email: 'Please enter a valid email address'
+          }
+        });
+      }
+
+      // Phone validation (10 digits)
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number format',
+          errors: {
+            phone: 'Phone number must be exactly 10 digits'
+          }
+        });
+      }
+
+      // Name validation
+      if (firstName.trim().length < 2 || firstName.trim().length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'First name must be between 2 and 50 characters',
+          errors: {
+            firstName: 'First name must be between 2 and 50 characters'
+          }
+        });
+      }
+
+      if (lastName.trim().length < 2 || lastName.trim().length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Last name must be between 2 and 50 characters',
+          errors: {
+            lastName: 'Last name must be between 2 and 50 characters'
+          }
+        });
+      }
+
       // Set default password as firstName#2025 if no password provided
       const defaultPassword = password || `${firstName}#2025`;
 
       console.log('🔍 Maintainer Creation Request:', {
-        email,
-        phone,
-        firstName,
-        lastName,
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         pgId: pgId || req.user.pgId,
         passwordSet: password ? 'provided' : `default: ${defaultPassword}`
       });
 
-      // Check if user already exists
-      const existingUser = await User.findOne({ 
-        $or: [
-          { email: { $regex: new RegExp(`^${email}$`, 'i') } }, 
-          { phone: phone }
-        ],
-        pgId: pgId || req.user.pgId
+      // Check if email already exists in the entire system (not just within PG)
+      const existingEmail = await User.findOne({ 
+        email: { $regex: new RegExp(`^${email.trim()}$`, 'i') }
       });
 
-      console.log('🕵️ Existing User Check:', {
-        existingUser: !!existingUser,
-        existingEmail: existingUser?.email,
-        existingPhone: existingUser?.phone
+      // Check if phone already exists in the entire system (not just within PG)
+      const existingPhone = await User.findOne({ 
+        phone: phone.trim()
       });
 
-      if (existingUser) {
+      console.log('🕵️ Existing User Check (System-wide):', {
+        existingEmail: !!existingEmail,
+        existingPhone: !!existingPhone,
+        emailMatch: existingEmail?.email,
+        phoneMatch: existingPhone?.phone
+      });
+
+      // Return specific error messages
+      if (existingEmail && existingPhone) {
         return res.status(400).json({
           success: false,
-          message: 'User with this email or phone already exists in your PG',
-          details: {
-            existingEmail: existingUser.email === email,
-            existingPhone: existingUser.phone === phone
+          message: 'Email and phone number already exist in the system',
+          errors: {
+            email: 'This email is already registered',
+            phone: 'This phone number is already registered'
+          }
+        });
+      }
+
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already exists in the system',
+          errors: {
+            email: 'This email is already registered. Please use a different email address.'
+          }
+        });
+      }
+
+      if (existingPhone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists in the system',
+          errors: {
+            phone: 'This phone number is already registered. Please use a different phone number.'
           }
         });
       }
@@ -64,12 +146,12 @@ class MaintainerController {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(defaultPassword, salt);
 
-      // Create user
+      // Create user with trimmed and normalized data
       const user = new User({
-        firstName,
-        lastName,
-        email,
-        phone,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
         role: 'maintainer',
         password: hashedPassword,
         pgId: pgId || req.user.pgId  // Use provided PG ID or user's PG ID
@@ -117,6 +199,33 @@ class MaintainerController {
       });
     } catch (error) {
       console.error('Error creating maintainer:', error);
+      
+      // Handle MongoDB duplicate key errors
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        const fieldName = field === 'email' ? 'email' : field === 'phone' ? 'phone' : field;
+        return res.status(400).json({
+          success: false,
+          message: `${fieldName === 'email' ? 'Email' : 'Phone number'} already exists in the system`,
+          errors: {
+            [fieldName]: `This ${fieldName === 'email' ? 'email' : 'phone number'} is already registered`
+          }
+        });
+      }
+      
+      // Handle validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = {};
+        Object.keys(error.errors).forEach(key => {
+          validationErrors[key] = error.errors[key].message;
+        });
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: validationErrors
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Failed to create maintainer',

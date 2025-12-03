@@ -98,23 +98,26 @@ const ResidentProfile = () => {
         const currentMonth = currentDate.toLocaleString('en-US', { month: 'long' });
         const currentYear = currentDate.getFullYear();
         
-        // Check if there's already a payment for current month
+        // Check if there's already a payment for current month and its actual status
         try {
           const paymentResponse = await api.get(`/payments/resident/${id}`);
           if (paymentResponse.data.success) {
             const payments = paymentResponse.data.data || [];
-            const hasCurrentMonthPayment = payments.some(payment => 
+            const currentMonthPayment = payments.find(payment => 
               payment.month === currentMonth && 
               payment.year === currentYear && 
               payment.isActive === true
             );
             
             // Add current month payment status to resident data
-            residentData.hasCurrentMonthPayment = hasCurrentMonthPayment;
+            // Only mark as paid if the payment actually has status 'paid'
+            residentData.hasCurrentMonthPayment = currentMonthPayment && currentMonthPayment.status === 'paid';
+            residentData.currentMonthPaymentStatus = currentMonthPayment ? currentMonthPayment.status : null;
           }
         } catch (error) {
           console.error('Error checking current month payment:', error);
           residentData.hasCurrentMonthPayment = false;
+          residentData.currentMonthPaymentStatus = null;
         }
         
         setResident(residentData);
@@ -681,7 +684,12 @@ const ResidentProfile = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-medium text-gray-600">Current Status:</span>
-                          <span>{getPaymentStatusBadge(resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment ? 'paid' : resident.paymentStatus)}</span>
+                          <span>{getPaymentStatusBadge(
+                            resident.paymentStatus === 'paid' || 
+                            (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid') 
+                              ? 'paid' 
+                              : (resident.currentMonthPaymentStatus || resident.paymentStatus || 'pending')
+                          )}</span>
                         </div>
                         {resident.lastPaymentDate && (
                           <div className="flex justify-between items-center">

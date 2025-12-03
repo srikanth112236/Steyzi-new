@@ -215,6 +215,10 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
   lockUntil: Date,
+  tokenVersion: {
+    type: Number,
+    default: 0
+  },
   
   // Profile
   avatar: {
@@ -454,7 +458,7 @@ userSchema.methods.generateAuthToken = function() {
     },
           process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
     { 
-      expiresIn: process.env.JWT_EXPIRES_IN || '15m'
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
     }
   );
 };
@@ -464,7 +468,8 @@ userSchema.methods.generateRefreshToken = function() {
   return jwt.sign(
     { 
       id: this._id,
-      type: 'refresh'
+      type: 'refresh',
+      tokenVersion: this.tokenVersion || 0
     },
           process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-jwt-key-change-this-in-production',
     { 

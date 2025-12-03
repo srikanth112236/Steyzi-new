@@ -16,7 +16,9 @@ import {
   LogOut,
   UserPlus,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { 
@@ -29,6 +31,7 @@ import {
 import ResidentDetails from '../../components/admin/ResidentDetails';
 import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
 import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 
 const MovedOut = () => {
   const { user } = useSelector((state) => state.auth);
@@ -70,12 +73,28 @@ const MovedOut = () => {
 
       console.log('🔍 Fetching moved out residents with params:', params.toString());
 
-      const response = await fetch(`/api/residents?${params}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Response is not JSON:', text.substring(0, 100));
+        throw new Error('Response is not JSON');
+      }
       
       const data = await response.json();
       
@@ -104,12 +123,29 @@ const MovedOut = () => {
       const params = new URLSearchParams({
         branchId: selectedBranch._id
       });
-      const response = await fetch(`/api/residents/stats/overview?${params}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/stats/overview?${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error fetching stats:', response.status, errorText);
+        return; // Silently fail for stats
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Stats response is not JSON:', text.substring(0, 100));
+        return; // Silently fail for stats
+      }
+      
       const data = await response.json();
       if (data.success) {
         const statsData = data.data;
@@ -150,13 +186,31 @@ const MovedOut = () => {
     if (!residentToDelete) return;
     
     try {
-      const response = await fetch(`/api/residents/${residentToDelete._id}`, {
+      const apiBase = getApiBaseUrl();
+      const response = await fetch(`${apiBase}/residents/${residentToDelete._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error deleting resident:', response.status, errorText);
+        toast.error(`Failed to delete resident: ${response.status}`);
+        return;
+      }
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Delete response is not JSON:', text.substring(0, 100));
+        toast.error('Unexpected response from server');
+        return;
+      }
       
       const data = await response.json();
       
@@ -287,7 +341,17 @@ const MovedOut = () => {
     );
   };
 
-  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
+  // Get user from Redux or localStorage as fallback
+  const currentUser = user || (() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (!currentUser || !currentUser?.role || !['admin', 'maintainer'].includes(currentUser.role)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

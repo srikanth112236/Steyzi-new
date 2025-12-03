@@ -158,13 +158,24 @@ const PgReports = () => {
   ];
 
   useEffect(() => {
-    // Check authentication
-    if (!user) {
+    // Check authentication - get user from Redux or localStorage as fallback
+    const currentUser = user || (() => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (!currentUser) {
       navigate('/admin/login');
       return;
     }
 
-    if (!['admin', 'maintainer'].includes(user?.role)) {
+    const userRole = currentUser?.role;
+    if (!userRole || !['admin', 'maintainer'].includes(userRole)) {
+      console.error('Access denied - User role:', userRole, 'User:', currentUser);
       toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
@@ -174,8 +185,15 @@ const PgReports = () => {
     setDefaultDateRange();
   }, [user, navigate]);
 
+  // Refresh report when branch changes
   useEffect(() => {
-    if (reportOptions) {
+    if (selectedBranch && reportOptions) {
+      generateReport();
+    }
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    if (reportOptions && selectedBranch) {
       generateReport();
     }
   }, [activeTab, filters, reportOptions]);
@@ -205,9 +223,15 @@ const PgReports = () => {
   };
 
   const generateReport = async () => {
+    // Don't fetch if no branch is selected
+    if (!selectedBranch) {
+      console.log('⚠️ No branch selected, skipping report generation');
+      return;
+    }
+
     try {
       setLoading(true);
-      const withBranch = { ...filters, branchId: selectedBranch?._id };
+      const withBranch = { ...filters, branchId: selectedBranch._id };
       console.log('🔍 Generating report:', { activeTab, filters: withBranch });
       
       const response = await reportService.generateReportByType(activeTab, withBranch);
@@ -219,19 +243,25 @@ const PgReports = () => {
         setReportData(response.data || response);
         await loadAnalytics(withBranch);
       } else {
+        console.error('❌ Report generation failed:', response.message);
         toast.error(response.message || 'Failed to generate report');
+        setReportData(null);
       }
     } catch (error) {
       console.error('❌ Error generating report:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to generate report');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to generate report';
+      toast.error(errorMessage);
+      setReportData(null);
     } finally {
       setLoading(false);
     }
   };
 
   const loadAnalytics = async (inputFilters = filters) => {
+    if (!selectedBranch) return;
+    
     try {
-      const withBranch = { ...inputFilters, branchId: selectedBranch?._id };
+      const withBranch = { ...inputFilters, branchId: selectedBranch._id };
       const response = await reportService.getReportAnalytics(activeTab, withBranch);
       
       if (response.success) {
@@ -240,6 +270,7 @@ const PgReports = () => {
     } catch (error) {
       console.error('⚠️ Error loading analytics:', error);
       // Don't show error toast for analytics, it's optional
+      setAnalyticsData(null);
     }
   };
 
@@ -375,10 +406,15 @@ const PgReports = () => {
 
     const currentTab = reportTabs.find(tab => tab.id === activeTab);
 
-    // Filter out zero values for better display
+    // Filter out zero values for better display, but always show important keys
+    const importantKeys = ['total', 'totalRooms', 'totalBeds', 'occupiedBeds', 'availableBeds', 'occupancyRate', 'immediate', 'noticePeriod', 'averageNoticeDays', 'thisMonth', 'lastMonth'];
     const nonZeroStats = Object.entries(stats).filter(([key, value]) => {
       if (typeof value === 'number') {
-        return value > 0 || key === 'total'; // Always show total
+        // Always show important keys even if zero
+        if (importantKeys.includes(key)) {
+          return true;
+        }
+        return value > 0;
       }
       return false;
     });
@@ -415,8 +451,9 @@ const PgReports = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
         {Object.entries(stats).map(([key, value], index) => {
           if (typeof value === 'number') {
-            const isPercentage = key.includes('Rate') || key.includes('percentage');
-            const isCurrency = key.includes('Amount') || key.includes('Revenue') || key.includes('total');
+            const isPercentage = key.includes('Rate') || key.includes('percentage') || key === 'occupancyRate';
+            // Only show currency for payment-related or offboarding total (which is revenue)
+            const isCurrency = (key.includes('Amount') || key.includes('Revenue') || (key === 'total' && activeTab === 'offboarding')) && !key.includes('Rooms') && !key.includes('Beds');
             const isZero = value === 0;
             
             // Get icon and color based on key
@@ -440,7 +477,17 @@ const PgReports = () => {
                 totalRevenue: { icon: DollarSign, color: 'from-emerald-400 to-teal-500', bgColor: 'bg-emerald-50' },
                 averageRent: { icon: Target, color: 'from-purple-400 to-pink-500', bgColor: 'bg-purple-50' },
                 thisMonth: { icon: Calendar, color: 'from-blue-400 to-indigo-500', bgColor: 'bg-blue-50' },
-                lastMonth: { icon: Calendar, color: 'from-gray-400 to-slate-500', bgColor: 'bg-gray-50' }
+                lastMonth: { icon: Calendar, color: 'from-gray-400 to-slate-500', bgColor: 'bg-gray-50' },
+                // Offboarding specific
+                immediate: { icon: Zap, color: 'from-red-400 to-pink-500', bgColor: 'bg-red-50' },
+                noticePeriod: { icon: Clock, color: 'from-yellow-400 to-orange-500', bgColor: 'bg-yellow-50' },
+                averageNoticeDays: { icon: Calendar, color: 'from-blue-400 to-indigo-500', bgColor: 'bg-blue-50' },
+                // Occupancy specific
+                totalRooms: { icon: Building2, color: 'from-indigo-400 to-purple-500', bgColor: 'bg-indigo-50' },
+                totalBeds: { icon: Users, color: 'from-blue-400 to-indigo-500', bgColor: 'bg-blue-50' },
+                occupiedBeds: { icon: CheckCircle, color: 'from-green-400 to-emerald-500', bgColor: 'bg-green-50' },
+                availableBeds: { icon: UserPlus, color: 'from-gray-400 to-slate-500', bgColor: 'bg-gray-50' },
+                occupancyRate: { icon: BarChart3, color: 'from-purple-400 to-pink-500', bgColor: 'bg-purple-50' }
               };
               return configs[statKey] || { icon: BarChart3, color: 'from-blue-400 to-indigo-500', bgColor: 'bg-blue-50' };
             };
@@ -1212,7 +1259,17 @@ const PgReports = () => {
     );
   };
 
-  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
+  // Get user from Redux or localStorage as fallback for render check
+  const currentUserForRender = user || (() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (!currentUserForRender || !currentUserForRender?.role || !['admin', 'maintainer'].includes(currentUserForRender.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -1222,7 +1279,13 @@ const PgReports = () => {
 
   if (!selectedBranch) {
     return (
-      <div className="p-6 text-center text-gray-600">Please select a branch from the header to view reports.</div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-lg border border-gray-200 p-8 max-w-md">
+          <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Branch Selected</h2>
+          <p className="text-gray-600 mb-4">Please select a branch from the header to view reports.</p>
+        </div>
+      </div>
     );
   }
 
@@ -1238,6 +1301,22 @@ const PgReports = () => {
             </div>
             
             <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  if (selectedBranch) {
+                    generateReport();
+                    toast.success('Report refreshed');
+                  } else {
+                    toast.error('Please select a branch first');
+                  }
+                }}
+                disabled={loading}
+                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+              
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"

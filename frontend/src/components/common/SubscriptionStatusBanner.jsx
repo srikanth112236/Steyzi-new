@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { AlertTriangle, Clock, Zap, Crown, X, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { useSubscriptionManager } from '../../hooks/useSubscriptionManager';
 import toast from 'react-hot-toast';
@@ -8,6 +9,7 @@ import toast from 'react-hot-toast';
  * Shows trial expiry warnings, usage limits, and subscription status alerts
  */
 const SubscriptionStatusBanner = () => {
+  const { user } = useSelector((state) => state.auth);
   const {
     subscription,
     getSubscriptionSummary,
@@ -21,6 +23,11 @@ const SubscriptionStatusBanner = () => {
 
   const summary = getSubscriptionSummary();
   const health = getSubscriptionHealth();
+
+  // Don't show banner for maintainers
+  if (user?.role === 'maintainer') {
+    return null;
+  }
 
   // Auto-expand for critical issues
   useEffect(() => {

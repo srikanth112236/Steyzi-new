@@ -161,7 +161,13 @@ const PGManagement = () => {
   };
 
   const handleFloorSubmit = async (e) => {
-    e.preventDefault();
+    // Note: e.preventDefault() is already called in FloorModal
+    // This function is called after validation passes
+    
+    if (!selectedBranch) {
+      toast.error('Please select a branch first');
+      return;
+    }
     
     try {
       const floorData = {
@@ -186,6 +192,7 @@ const PGManagement = () => {
       console.error('Error saving floor:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save floor';
       toast.error(errorMessage);
+      throw error; // Re-throw so modal can handle it
     }
   };
 
@@ -315,11 +322,14 @@ const PGManagement = () => {
 
   // Update bed numbers when numberOfBeds changes
   const handleNumberOfBedsChange = (value) => {
-    const newNumberOfBeds = parseInt(value);
+    const newNumberOfBeds = parseInt(value) || 1;
+    // Regenerate bed numbers when number of beds changes
+    const autoBedNumbers = generateBedNumbers(roomFormData.roomNumber || '', newNumberOfBeds);
+    
     setRoomFormData({
       ...roomFormData,
       numberOfBeds: newNumberOfBeds,
-      bedNumbers: roomFormData.bedNumbers.slice(0, newNumberOfBeds)
+      bedNumbers: autoBedNumbers
     });
   };
 
@@ -439,8 +449,8 @@ const PGManagement = () => {
     else if (sharingType === '3-sharing') numberOfBeds = 3;
     else if (sharingType === '4-sharing') numberOfBeds = 4;
     
-    // Auto-generate bed numbers based on room number
-    const autoBedNumbers = generateBedNumbers(roomFormData.roomNumber, numberOfBeds);
+    // Auto-generate bed numbers based on current room number (use the room number from state)
+    const autoBedNumbers = generateBedNumbers(roomFormData.roomNumber || '', numberOfBeds);
     
     setRoomFormData(prev => ({
       ...prev,
@@ -467,7 +477,8 @@ const PGManagement = () => {
 
   // Auto-fill bed numbers when room number changes
   const handleRoomNumberChange = (roomNumber) => {
-    const autoBedNumbers = generateBedNumbers(roomFormData.numberOfBeds ? roomFormData.roomNumber : roomNumber, roomFormData.numberOfBeds);
+    // Use the new roomNumber parameter, not the old one from state
+    const autoBedNumbers = generateBedNumbers(roomNumber, roomFormData.numberOfBeds || 1);
     
     setRoomFormData(prev => ({
       ...prev,
@@ -623,50 +634,92 @@ const PGManagement = () => {
                 </div>
 
                 {/* Compact Floors List */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {floors.map((floor) => (
-                    <div key={floor._id} className="group bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all duration-300 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-white" />
+                {floors.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                    <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <h4 className="text-lg font-semibold text-gray-700 mb-1">No Floors Yet</h4>
+                    <p className="text-sm text-gray-500 mb-4">Get started by creating your first floor</p>
+                    <button
+                      onClick={() => {
+                        setShowFloorModal(true);
+                        setEditingFloor(null);
+                        setFloorFormData({ name: '', totalRooms: 1 });
+                      }}
+                      className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Your First Floor</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {floors.map((floor) => (
+                      <div 
+                        key={floor._id} 
+                        className="group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-xl hover:border-blue-400 transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden"
+                      >
+                        {/* Gradient accent bar */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+                        
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                              <Building2 className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-gray-900 text-base truncate">{floor.name}</h4>
+                              <p className="text-xs text-gray-500 mt-0.5">Floor</p>
+                            </div>
                           </div>
-                          <h4 className="font-bold text-gray-900">{floor.name}</h4>
+                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleFloorEdit(floor)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200 hover:scale-110"
+                              title="Edit floor"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleFloorDelete(floor._id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-all duration-200 hover:scale-110"
+                              title="Delete floor"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <button
-                            onClick={() => handleFloorEdit(floor)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200 hover:scale-110"
-                            title="Edit floor"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => handleFloorDelete(floor._id)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-all duration-200 hover:scale-110"
-                            title="Delete floor"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                          <span className="text-xs font-medium text-gray-600">Total Rooms</span>
-                          <span className="text-sm font-bold text-blue-600">{floor.totalRooms}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span className="flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Created
-                          </span>
-                          <span>{new Date(floor.createdAt).toLocaleDateString()}</span>
+                        {/* Stats */}
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+                            <div className="flex items-center space-x-2">
+                              <Home className="h-4 w-4 text-blue-600" />
+                              <span className="text-xs font-medium text-gray-700">Total Rooms</span>
+                            </div>
+                            <span className="text-sm font-bold text-blue-600 bg-white px-2 py-0.5 rounded-md shadow-sm">
+                              {floor.totalRooms}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1.5" />
+                              Created
+                            </span>
+                            <span className="font-medium">
+                              {new Date(floor.createdAt).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-6">

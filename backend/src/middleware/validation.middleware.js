@@ -76,7 +76,15 @@ const validateSalesManagerCreation = (req, res, next) => {
         'string.email': 'Please provide a valid email address',
         'string.empty': 'Email is required'
       }),
-    phone: Joi.string().pattern(/^[0-9]{10}$/).required()
+    phone: Joi.string().custom((value, helpers) => {
+      // Remove +91 prefix if present and validate
+      const cleaned = value.replace(/^\+91/, '').trim();
+      if (!/^[0-9]{10}$/.test(cleaned)) {
+        return helpers.error('string.pattern.base');
+      }
+      // Return with +91 prefix
+      return `+91${cleaned}`;
+    }, 'Phone validation').required()
       .messages({
         'string.pattern.base': 'Phone number must be 10 digits',
         'string.empty': 'Phone number is required'
@@ -118,7 +126,15 @@ const validateSalesManagerUpdate = (req, res, next) => {
       .messages({
         'string.email': 'Please provide a valid email address'
       }),
-    phone: Joi.string().pattern(/^[0-9]{10}$/)
+    phone: Joi.string().custom((value, helpers) => {
+      // Remove +91 prefix if present and validate
+      const cleaned = value.replace(/^\+91/, '').trim();
+      if (!/^[0-9]{10}$/.test(cleaned)) {
+        return helpers.error('string.pattern.base');
+      }
+      // Return with +91 prefix
+      return `+91${cleaned}`;
+    }, 'Phone validation')
       .messages({
         'string.pattern.base': 'Phone number must be 10 digits'
       }),

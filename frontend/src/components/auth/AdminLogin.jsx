@@ -30,18 +30,48 @@ const AdminLogin = () => {
     // Clear the navigation state
     window.history.replaceState({}, document.title);
 
-    // Redirect if already logged in as admin or maintainer
-    if (user && ['admin', 'maintainer'].includes(user?.role)) {
-      // Check if user needs trial activation and store flag for AdminLayout
-      const needsTrial = user.subscription &&
-        (!user.subscription.planId ||
-         (user.subscription.billingCycle === 'trial' && new Date() > new Date(user.subscription.trialEndDate)));
+    // Check token validity directly to prevent conflicts and re-renders
+    const token = localStorage.getItem('accessToken');
+    let isTokenValid = false;
+    
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Date.now() / 1000;
+        isTokenValid = payload.exp >= (currentTime - 30);
+        
+        if (!isTokenValid) {
+          // Token expired, clear it
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+        }
+      } catch (error) {
+        // Invalid token, clear it
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+      }
+    }
 
-      if (needsTrial) {
-        // Store flag in sessionStorage for AdminLayout to check
-        sessionStorage.setItem('showTrialModal', 'true');
+    // Only redirect if token is valid and user is authenticated
+    if (isTokenValid && user && ['admin', 'maintainer'].includes(user?.role)) {
+      // Check if user needs trial activation and store flag for AdminLayout
+      // Only show trial modal for admin role, not maintainer
+      if (user?.role === 'admin') {
+        const needsTrial = user.subscription &&
+          (!user.subscription.planId ||
+           (user.subscription.billingCycle === 'trial' && new Date() > new Date(user.subscription.trialEndDate)));
+
+        if (needsTrial) {
+          // Store flag in sessionStorage for AdminLayout to check
+          sessionStorage.setItem('showTrialModal', 'true');
+        } else {
+          // Clear any existing flag
+          sessionStorage.removeItem('showTrialModal');
+        }
       } else {
-        // Clear any existing flag
+        // Clear any existing flag for maintainers
         sessionStorage.removeItem('showTrialModal');
       }
 
@@ -66,35 +96,48 @@ const AdminLogin = () => {
     try {
       const result = await dispatch(login(formData)).unwrap();
 
+      // Get user from result - handle both result.user and result.data.user structures
+      const userData = result.data?.user || result.user;
+      const userRole = userData?.role;
+
       console.log('🔍 AdminLogin: Login result:', {
         success: result.success,
-        userRole: result.user?.role,
-        userId: result.user?._id,
-        hasUser: !!result.user,
+        userRole: userRole,
+        userId: userData?._id,
+        hasUser: !!userData,
         fullResult: result
       });
 
-      // Check if user is admin or maintainer
-      if (!['admin', 'maintainer'].includes(result.user?.role)) {
-        console.log('❌ AdminLogin: Access denied for role:', result.user?.role);
+      // Check if user is admin or maintainer - also check Redux state as fallback
+      const roleToCheck = userRole || user?.role;
+      
+      if (!roleToCheck || !['admin', 'maintainer'].includes(roleToCheck)) {
+        console.log('❌ AdminLogin: Access denied for role:', roleToCheck, 'User data:', userData);
         toast.error('Access denied. This login is for PG Admins and Maintainers only.');
         return;
       }
 
-      console.log('✅ AdminLogin: Access granted for role:', result.user?.role);
+      console.log('✅ AdminLogin: Access granted for role:', roleToCheck);
 
-      toast.success(`Welcome back, ${result.user?.role === 'admin' ? 'Admin' : 'Maintainer'}!`);
+      toast.success(`Welcome back, ${roleToCheck === 'admin' ? 'Admin' : 'Maintainer'}!`);
 
       // Check if user needs trial activation and store flag for AdminLayout
-      const needsTrial = result.user.subscription &&
-        (!result.user.subscription.planId ||
-         (result.user.subscription.billingCycle === 'trial' && new Date() > new Date(result.user.subscription.trialEndDate)));
+      // Only show trial modal for admin role, not maintainer
+      const subscription = userData?.subscription || user?.subscription;
+      if (roleToCheck === 'admin') {
+        const needsTrial = subscription &&
+          (!subscription.planId ||
+           (subscription.billingCycle === 'trial' && new Date() > new Date(subscription.trialEndDate)));
 
-      if (needsTrial) {
-        // Store flag in sessionStorage for AdminLayout to check
-        sessionStorage.setItem('showTrialModal', 'true');
+        if (needsTrial) {
+          // Store flag in sessionStorage for AdminLayout to check
+          sessionStorage.setItem('showTrialModal', 'true');
+        } else {
+          // Clear any existing flag
+          sessionStorage.removeItem('showTrialModal');
+        }
       } else {
-        // Clear any existing flag
+        // Clear any existing flag for maintainers
         sessionStorage.removeItem('showTrialModal');
       }
 

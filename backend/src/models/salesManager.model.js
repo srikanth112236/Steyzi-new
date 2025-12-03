@@ -26,9 +26,12 @@ const SalesManagerSchema = new mongoose.Schema({
     trim: true,
     validate: {
       validator: function(v) {
-        return /^[0-9]{10}$/.test(v);
+        if (!v) return false;
+        // Remove +91 prefix if present and check if remaining is 10 digits
+        const cleaned = v.replace(/^\+91/, '').trim();
+        return /^[0-9]{10}$/.test(cleaned);
       },
-      message: 'Phone number must be 10 digits'
+      message: 'Phone number must be 10 digits (excluding country code)'
     }
   },
 

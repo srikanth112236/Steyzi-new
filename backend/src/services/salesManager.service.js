@@ -14,21 +14,50 @@ class SalesManagerService {
   async createSalesManager(salesManagerData, createdBy) {
     try {
       // Check if email already exists
-      const existingManager = await SalesManager.findOne({
-        email: salesManagerData.email
+      const existingManagerByEmail = await SalesManager.findOne({
+        email: salesManagerData.email.toLowerCase().trim()
       });
 
-      if (existingManager) {
+      if (existingManagerByEmail) {
         throw new Error('Sales Manager with this email already exists');
+      }
+
+      // Check if phone already exists (normalize phone number)
+      const phoneNumber = salesManagerData.phone?.replace(/[\s\-+]/g, '').trim();
+      if (phoneNumber) {
+        const existingManagerByPhone = await SalesManager.findOne({
+          $or: [
+            { phone: phoneNumber },
+            { phone: `+91${phoneNumber}` },
+            { phone: phoneNumber.replace(/^\+91/, '') }
+          ]
+        });
+
+        if (existingManagerByPhone) {
+          throw new Error('Sales Manager with this phone number already exists');
+        }
       }
 
       // Generate unique ID and temporary password
       const salesUniqueId = generateUniqueId();
       const tempPassword = generateUniquePassword();
 
+      // Normalize phone number - ensure it has +91 prefix
+      let normalizedPhone = salesManagerData.phone;
+      if (normalizedPhone) {
+        // Remove any existing +91 and spaces, then add +91 prefix
+        normalizedPhone = normalizedPhone.replace(/^\+91/, '').replace(/[\s\-]/g, '').trim();
+        if (normalizedPhone.length === 10 && /^[0-9]{10}$/.test(normalizedPhone)) {
+          normalizedPhone = `+91${normalizedPhone}`;
+        } else {
+          throw new Error('Phone number must be exactly 10 digits');
+        }
+      }
+
       // Create Sales Manager
       const salesManager = new SalesManager({
         ...salesManagerData,
+        phone: normalizedPhone,
         salesUniqueId,
         password: tempPassword,
         createdBy: createdBy._id,
@@ -90,6 +119,44 @@ class SalesManagerService {
       if (updateData.commissionRate !== undefined) {
         if (updateData.commissionRate < 0 || updateData.commissionRate > 100) {
           throw new Error('Commission rate must be between 0 and 100');
+        }
+      }
+
+      // Check if email already exists (excluding current manager)
+      if (updateData.email) {
+        const existingManagerByEmail = await SalesManager.findOne({
+          email: updateData.email.toLowerCase().trim(),
+          _id: { $ne: salesManagerId }
+        });
+
+        if (existingManagerByEmail) {
+          throw new Error('Sales Manager with this email already exists');
+        }
+      }
+
+      // Normalize phone number if provided - ensure it has +91 prefix
+      if (updateData.phone) {
+        let normalizedPhone = updateData.phone;
+        // Remove any existing +91 and spaces, then add +91 prefix
+        normalizedPhone = normalizedPhone.replace(/^\+91/, '').replace(/[\s\-]/g, '').trim();
+        if (normalizedPhone.length === 10 && /^[0-9]{10}$/.test(normalizedPhone)) {
+          normalizedPhone = `+91${normalizedPhone}`;
+        } else {
+          throw new Error('Phone number must be exactly 10 digits');
+        }
+        updateData.phone = normalizedPhone;
+
+        // Check if phone already exists (excluding current manager)
+        const existingManagerByPhone = await SalesManager.findOne({
+          _id: { $ne: salesManagerId },
+          $or: [
+            { phone: normalizedPhone },
+            { phone: normalizedPhone.replace(/^\+91/, '') }
+          ]
+        });
+
+        if (existingManagerByPhone) {
+          throw new Error('Sales Manager with this phone number already exists');
         }
       }
 

@@ -24,9 +24,31 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - prevent re-renders
   useEffect(() => {
-    if (isAuthenticated) {
+    // Check token validity directly to avoid Redux state conflicts
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Date.now() / 1000;
+        const isExpired = payload.exp < (currentTime - 30);
+        
+        if (!isExpired && isAuthenticated) {
+          navigate('/'); // Let RoleRedirect handle the routing
+        } else if (isExpired) {
+          // Token expired, clear it
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+        }
+      } catch (error) {
+        // Invalid token, clear it
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+      }
+    } else if (isAuthenticated) {
       navigate('/'); // Let RoleRedirect handle the routing
     }
   }, [isAuthenticated, navigate]);

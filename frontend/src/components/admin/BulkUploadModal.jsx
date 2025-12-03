@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, Loader2, AlertTriangle, XCircle, BarChart3 } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, Loader2, AlertTriangle, XCircle, BarChart3, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { getApiBaseUrl } from '../../utils/apiUrl';
@@ -12,6 +12,7 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
   const [previewData, setPreviewData] = useState(null);
   const [uploadResults, setUploadResults] = useState(null);
   const [showResultsModal, setShowResultsModal] = useState(false);
+  const [showColumnInfo, setShowColumnInfo] = useState(false);
   const fileInputRef = useRef(null);
 
   // Sample data for floors
@@ -236,6 +237,7 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
 
   const handleClose = () => {
     setUploadResults(null);
+    setShowColumnInfo(false);
     onClose();
   };
 
@@ -246,6 +248,7 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
     // Reset form
     setFile(null);
     setPreviewData(null);
+    setShowColumnInfo(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -267,48 +270,59 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <FileSpreadsheet className="h-6 w-6 text-blue-600" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+              <FileSpreadsheet className="h-5 w-5 text-white" />
+            </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Bulk Upload {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}</h2>
-              <p className="text-sm text-gray-600">Import {uploadType} data from Excel file</p>
+              <h2 className="text-lg font-bold text-gray-900">Bulk Upload {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}</h2>
+              <p className="text-xs text-gray-600">Import {uploadType} data from Excel file</p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition duration-200"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Upload Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Upload Type
             </label>
             <div className="flex space-x-4">
-              <label className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="radio"
                   value="floors"
                   checked={uploadType === 'floors'}
-                  onChange={(e) => setUploadType(e.target.value)}
+                  onChange={(e) => {
+                    setUploadType(e.target.value);
+                    setShowColumnInfo(false);
+                    resetForm();
+                  }}
                   className="text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Floors</span>
               </label>
-              <label className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="radio"
                   value="rooms"
                   checked={uploadType === 'rooms'}
-                  onChange={(e) => setUploadType(e.target.value)}
+                  onChange={(e) => {
+                    setUploadType(e.target.value);
+                    setShowColumnInfo(false);
+                    resetForm();
+                  }}
                   className="text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Rooms</span>
@@ -316,61 +330,108 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
             </div>
           </div>
 
-          {/* Download Sample */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium text-blue-900">Download Sample Template</h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  Download a sample Excel file with the correct format for {uploadType} data
+          {/* Download Sample Template - Compact */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Download Sample Template</h3>
+                <p className="text-xs text-gray-600">
+                  Get a ready-to-use Excel file with the correct format. Simply fill in your {uploadType} information and upload.
                 </p>
               </div>
               <button
                 onClick={downloadSample}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg text-sm ml-4 flex-shrink-0"
               >
                 <Download className="h-4 w-4" />
-                <span>Download Sample</span>
+                <span>Download</span>
               </button>
             </div>
             
-            {/* Expected columns info */}
-            <div className="mt-3 text-sm text-blue-700">
-              <p className="font-medium">Expected columns for {uploadType}:</p>
-              {uploadType === 'floors' ? (
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li><strong>floorName:</strong> Name of the floor (e.g., "Ground Floor")</li>
-                  <li><strong>totalRooms:</strong> Total number of rooms on this floor</li>
-                </ul>
-              ) : (
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li><strong>floorName:</strong> Name of the floor (must match existing floor)</li>
-                  <li><strong>roomNumber:</strong> Room number (e.g., "101", "102")</li>
-                  <li><strong>sharingType:</strong> Sharing type ("1-sharing", "2-sharing", "3-sharing", "4-sharing")</li>
-                  <li><strong>cost:</strong> Cost per bed (optional - will auto-assign based on sharing type)</li>
-                </ul>
-              )}
-              {uploadType === 'rooms' && (
-                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                  <p className="text-xs text-yellow-800">
-                    💡 <strong>Auto-allocation:</strong> Beds will be automatically created based on sharing type:
-                  </p>
-                  <ul className="text-xs text-yellow-700 mt-1 space-y-1">
-                    <li>• 1-sharing: 1 bed (101-A)</li>
-                    <li>• 2-sharing: 2 beds (101-A, 101-B)</li>
-                    <li>• 3-sharing: 3 beds (101-A, 101-B, 101-C)</li>
-                    <li>• 4-sharing: 4 beds (101-A, 101-B, 101-C, 101-D)</li>
-                  </ul>
-                  <p className="text-xs text-yellow-800 mt-1">
-                    💰 <strong>Default costs:</strong> 1-sharing: ₹8000, 2-sharing: ₹6000, 3-sharing: ₹5000, 4-sharing: ₹4000
-                  </p>
+            {/* Column Info - Collapsible */}
+            <div className="border-t border-blue-200 pt-3 mt-3">
+              <button
+                onClick={() => setShowColumnInfo(!showColumnInfo)}
+                className="flex items-center justify-between w-full text-left group"
+              >
+                <div className="flex items-center space-x-2">
+                  <Info className="h-4 w-4 text-blue-600 group-hover:text-blue-700" />
+                  <span className="text-sm font-medium text-gray-700">
+                    What information do I need to include?
+                  </span>
+                </div>
+                {showColumnInfo ? (
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+              
+              {showColumnInfo && (
+                <div className="mt-3 p-3 bg-white rounded-lg border border-blue-100">
+                  <p className="text-xs text-gray-600 mb-2">Your Excel file should include these columns:</p>
+                  {uploadType === 'floors' ? (
+                    <div className="space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Floor Name</span>
+                          <p className="text-xs text-gray-600">The name of your floor, like "Ground Floor" or "First Floor"</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Total Rooms</span>
+                          <p className="text-xs text-gray-600">How many rooms are on this floor (e.g., 8, 10, 12)</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Floor Name</span>
+                          <p className="text-xs text-gray-600">The floor where this room is located (must match an existing floor)</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Room Number</span>
+                          <p className="text-xs text-gray-600">The room number, like "101", "102", or "201"</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Sharing Type</span>
+                          <p className="text-xs text-gray-600">How many people share the room: "1-sharing", "2-sharing", "3-sharing", or "4-sharing"</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-900">Cost (Optional)</span>
+                          <p className="text-xs text-gray-600">The price per bed. If left empty, we'll use standard pricing based on sharing type</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-100">
+                        <p className="text-xs text-blue-800 font-medium mb-1">💡 Quick Tip:</p>
+                        <p className="text-xs text-blue-700">
+                          Beds are automatically created based on sharing type. For example, a "2-sharing" room will create 2 beds (Room 101-A and 101-B).
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          {/* File Upload */}
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+          {/* File Upload - Compact */}
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
             <input
               ref={fileInputRef}
               type="file"
@@ -381,36 +442,36 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
             
             {!file ? (
               <div>
-                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">Upload Excel File</p>
-                <p className="text-gray-600 mb-4">
-                  Drag and drop your Excel file here, or click to browse
+                <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-900 mb-1">Upload Excel File</p>
+                <p className="text-xs text-gray-600 mb-4">
+                  Drag and drop your file here, or click to browse
                 </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 text-sm shadow-md hover:shadow-lg"
                 >
                   Choose File
                 </button>
               </div>
             ) : (
               <div>
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">File Selected</p>
-                <p className="text-gray-600 mb-2">{file.name}</p>
-                <p className="text-sm text-gray-500 mb-4">
+                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-900 mb-1">File Selected</p>
+                <p className="text-xs text-gray-600 mb-2">{file.name}</p>
+                <p className="text-xs text-gray-500 mb-4">
                   File size: {(file.size / 1024).toFixed(1)} KB
                 </p>
-                <div className="flex items-center justify-center space-x-3">
+                <div className="flex items-center justify-center space-x-2">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition duration-200"
+                    className="px-3 py-1.5 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition duration-200"
                   >
-                    Change File
+                    Change
                   </button>
                   <button
                     onClick={resetForm}
-                    className="px-4 py-2 text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition duration-200"
+                    className="px-3 py-1.5 text-sm text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition duration-200"
                   >
                     Remove
                   </button>
@@ -419,22 +480,22 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
             )}
           </div>
 
-          {/* Preview Data */}
+          {/* Preview Data - Compact */}
           {previewData && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-900">Data Preview</h3>
-                <span className="text-sm text-gray-500">
-                  Showing first 5 rows of {previewData.totalRows} total rows
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-gray-900">Data Preview</h3>
+                <span className="text-xs text-gray-500">
+                  {previewData.totalRows} rows found
                 </span>
               </div>
               
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-200">
                       {previewData.headers.map((header, index) => (
-                        <th key={index} className="text-left py-2 px-3 font-medium text-gray-700">
+                        <th key={index} className="text-left py-1.5 px-2 font-medium text-gray-700">
                           {header}
                         </th>
                       ))}
@@ -444,7 +505,7 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
                     {previewData.preview.map((row, rowIndex) => (
                       <tr key={rowIndex} className="border-b border-gray-100">
                         {previewData.headers.map((header, colIndex) => (
-                          <td key={colIndex} className="py-2 px-3 text-gray-600">
+                          <td key={colIndex} className="py-1.5 px-2 text-gray-600">
                             {row[header] || '-'}
                           </td>
                         ))}
@@ -456,122 +517,121 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
             </div>
           )}
 
-          {/* Upload Progress */}
+          {/* Upload Progress - Compact */}
           {isUploading && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center space-x-3 mb-3">
-                <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
-                <span className="text-sm font-medium text-blue-900">Uploading...</span>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                <span className="text-xs font-medium text-blue-900">Uploading...</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-blue-700 mt-2">
+              <p className="text-xs text-blue-700 mt-1.5">
                 Please wait while we process your data...
               </p>
             </div>
           )}
+        </div>
 
-
-
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-            <button
-              onClick={handleClose}
-              disabled={isUploading}
-              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={!file || isUploading}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 disabled:opacity-50"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Uploading...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  <span>Upload {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}</span>
-                </>
-              )}
-            </button>
-          </div>
+        {/* Sticky Footer */}
+        <div className="flex items-center justify-end space-x-3 p-4 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+          <button
+            onClick={handleClose}
+            disabled={isUploading}
+            className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-200 text-sm disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={!file || isUploading}
+            className="flex items-center space-x-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition duration-200 shadow-md hover:shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span>Upload {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Upload Results Modal */}
+      {/* Upload Results Modal - Keep existing */}
       {showResultsModal && uploadResults && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-blue-50 flex-shrink-0">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
+                  <CheckCircle className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Upload Results</h2>
-                  <p className="text-sm text-gray-600">Summary of your bulk upload operation</p>
+                  <h2 className="text-lg font-bold text-gray-900">Upload Results</h2>
+                  <p className="text-xs text-gray-600">Summary of your bulk upload operation</p>
                 </div>
               </div>
               <button
                 onClick={handleResultsModalClose}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition duration-200"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Summary Statistics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">{uploadResults.totalRows}</div>
-                  <div className="text-sm text-green-700">Total Rows</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-green-600">{uploadResults.totalRows}</div>
+                  <div className="text-xs text-green-700">Total Rows</div>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{uploadResults.uploadedCount}</div>
-                  <div className="text-sm text-blue-700">Successfully Uploaded</div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-blue-600">{uploadResults.uploadedCount}</div>
+                  <div className="text-xs text-blue-700">Uploaded</div>
                 </div>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-yellow-600">{uploadResults.skippedCount}</div>
-                  <div className="text-sm text-yellow-700">Skipped (Duplicates)</div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-yellow-600">{uploadResults.skippedCount}</div>
+                  <div className="text-xs text-yellow-700">Skipped</div>
                 </div>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-red-600">{uploadResults.errors?.length || 0}</div>
-                  <div className="text-sm text-red-700">Errors</div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-red-600">{uploadResults.errors?.length || 0}</div>
+                  <div className="text-xs text-red-700">Errors</div>
                 </div>
               </div>
 
               {/* Duplicates Section */}
               {uploadResults.duplicates && uploadResults.duplicates.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                    <h3 className="text-lg font-semibold text-yellow-800">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <h3 className="text-sm font-semibold text-yellow-800">
                       Duplicates Found ({uploadResults.duplicates.length})
                     </h3>
                   </div>
-                  <p className="text-sm text-yellow-700 mb-3">
-                    The following items were skipped because they already exist in the system:
+                  <p className="text-xs text-yellow-700 mb-2">
+                    These items were skipped because they already exist:
                   </p>
-                  <div className="max-h-48 overflow-y-auto space-y-2">
+                  <div className="max-h-32 overflow-y-auto space-y-1.5">
                     {uploadResults.duplicates.map((dup, index) => (
-                      <div key={index} className="flex items-center space-x-3 p-2 bg-white rounded border border-yellow-200">
-                        <div className="w-6 h-6 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center text-xs font-semibold">
+                      <div key={index} className="flex items-center space-x-2 p-2 bg-white rounded border border-yellow-200">
+                        <div className="w-5 h-5 bg-yellow-100 text-yellow-800 rounded-full flex items-center justify-center text-xs font-semibold">
                           {dup.row}
                         </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{dup.name}</div>
-                          <div className="text-xs text-yellow-600">{dup.reason}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-gray-900 truncate">{dup.name}</div>
+                          <div className="text-xs text-yellow-600 truncate">{dup.reason}</div>
                         </div>
                       </div>
                     ))}
@@ -581,93 +641,52 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
 
               {/* Errors Section */}
               {uploadResults.errors && uploadResults.errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <h3 className="text-lg font-semibold text-red-800">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <h3 className="text-sm font-semibold text-red-800">
                       Errors ({uploadResults.errors.length})
                     </h3>
                   </div>
-                  <p className="text-sm text-red-700 mb-3">
-                    The following rows had issues and could not be processed:
+                  <p className="text-xs text-red-700 mb-2">
+                    These rows had issues and could not be processed:
                   </p>
-                  <div className="max-h-48 overflow-y-auto space-y-2">
+                  <div className="max-h-32 overflow-y-auto space-y-1.5">
                     {uploadResults.errors.map((error, index) => (
                       <div key={index} className="p-2 bg-white rounded border border-red-200">
-                        <div className="text-sm text-red-800">{error}</div>
+                        <div className="text-xs text-red-800">{error}</div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Room Statistics */}
-              {uploadType === 'rooms' && uploadResults.roomStats && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-blue-800">Room Statistics</h3>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">{uploadResults.roomStats.totalBeds}</div>
-                      <div className="text-xs text-blue-700">Total Beds</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">₹{Math.round(uploadResults.roomStats.averageCost)}</div>
-                      <div className="text-xs text-blue-700">Average Cost</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">{uploadResults.roomStats.totalRooms}</div>
-                      <div className="text-xs text-blue-700">Total Rooms</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">{Object.keys(uploadResults.roomStats.sharingTypeBreakdown || {}).length}</div>
-                      <div className="text-xs text-blue-700">Sharing Types</div>
-                    </div>
-                  </div>
-                  
-                  {uploadResults.roomStats.sharingTypeBreakdown && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-blue-800 mb-2">Sharing Type Breakdown:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(uploadResults.roomStats.sharingTypeBreakdown).map(([type, count]) => (
-                          <span key={type} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                            {type}: {count}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Success Message */}
               {uploadResults.uploadedCount > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-green-600" />
                     <div>
-                      <h3 className="font-semibold text-green-800">
+                      <h3 className="text-sm font-semibold text-green-800">
                         Successfully uploaded {uploadResults.uploadedCount} {uploadType}!
                       </h3>
-                      <p className="text-sm text-green-700">
+                      <p className="text-xs text-green-700">
                         Your data has been processed and added to the system.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleResultsModalClose}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
-                >
-                  Close
-                </button>
-              </div>
+            {/* Footer */}
+            <div className="flex items-center justify-end p-4 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+              <button
+                onClick={handleResultsModalClose}
+                className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition duration-200 shadow-md hover:shadow-lg text-sm"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -676,4 +695,4 @@ const BulkUploadModal = ({ isOpen, onClose, selectedBranch, onSuccess }) => {
   );
 };
 
-export default BulkUploadModal; 
+export default BulkUploadModal;

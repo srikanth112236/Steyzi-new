@@ -12,15 +12,24 @@ const ProtectedRoute = ({ children, requireOnboarding = false }) => {
   const location = useLocation();
 
   // Double-check authentication with direct token validation
+  // This is critical to catch expired tokens even if Redux state hasn't updated
   const isReallyAuthenticated = authService.isAuthenticated();
 
   console.log('🔍 ProtectedRoute: Auth check for path:', location.pathname);
   console.log('🔍 ProtectedRoute: Redux auth:', { isAuthenticated, user: !!user, userRole: user?.role });
   console.log('🔍 ProtectedRoute: Direct auth check:', isReallyAuthenticated);
 
-  // If not authenticated, redirect to appropriate login based on current path
+  // If not authenticated or token expired, redirect to appropriate login
+  // This ensures expired tokens are caught immediately
   if (!isReallyAuthenticated || !isAuthenticated || !user) {
-    console.log('🔒 ProtectedRoute: User not authenticated, redirecting to login');
+    console.log('🔒 ProtectedRoute: User not authenticated or token expired, redirecting to login');
+    
+    // Clear any stale auth data
+    if (!isReallyAuthenticated) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    }
     
     // Determine redirect path based on current location
     const currentPath = window.location.pathname;
@@ -30,6 +39,10 @@ const ProtectedRoute = ({ children, requireOnboarding = false }) => {
       redirectPath = '/admin/login';
     } else if (currentPath.startsWith('/superadmin')) {
       redirectPath = '/login';
+    } else if (currentPath.startsWith('/support')) {
+      redirectPath = '/support-login';
+    } else if (currentPath.startsWith('/sales')) {
+      redirectPath = '/sales/login';
     }
     
     console.log(`🔒 ProtectedRoute: Redirecting to ${redirectPath}`);

@@ -180,18 +180,25 @@ const SuperadminLayout = () => {
     },
     {
       name: 'Sales',
-      href: '/superadmin/sales-analytics',
-      icon: BarChart3
+      icon: BarChart3,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          name: 'Sales Managers',
+          href: '/superadmin/sales-managers',
+          icon: Users
+        },
+        {
+          name: 'Sales Analytics',
+          href: '/superadmin/sales-analytics',
+          icon: BarChart3
+        }
+      ]
     },
     {
       name: 'Settings',
       href: '/superadmin/settings',
       icon: Settings
-    },
-    {
-      name: 'Sales Managers',
-      href: '/superadmin/sales-managers',
-      icon: Users
     }
   ];
 

@@ -5,7 +5,7 @@ import {
   Building2, 
   User, 
   Upload, 
-  Calendar,
+  Calendar as CalendarIcon,
   CheckCircle2,
   X,
   Eye,
@@ -26,13 +26,23 @@ import {
   TrendingUp,
   TrendingDown,
   Clock,
-  CalendarDays
+  CalendarDays,
+  History,
+  ArrowLeft,
+  Image as ImageIcon
 } from 'lucide-react';
+import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 import { api } from '../../services/auth.service';
 import { Tooltip } from 'antd';
 import { selectSelectedBranch } from '../../store/slices/branch.slice';
+import { Calendar } from '../../components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '../../components/ui/popover';
 
 const Payments = () => {
   const { user } = useSelector((state) => state.auth);
@@ -75,6 +85,13 @@ const Payments = () => {
   // State for resident details modal
   const [showResidentDetails, setShowResidentDetails] = useState(false);
   
+  // State for payment history
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(false);
+  const [selectedPaymentForView, setSelectedPaymentForView] = useState(null);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  
   // Loading states
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingResidents, setLoadingResidents] = useState(true);
@@ -89,8 +106,15 @@ const Payments = () => {
   // Calculate payment statistics
   useEffect(() => {
     if (residents.length > 0) {
-      const paidCount = residents.filter(r => r.paymentStatus === 'paid' || r.hasCurrentMonthPayment).length;
-      const pendingCount = residents.filter(r => r.paymentStatus !== 'paid' && !r.hasCurrentMonthPayment).length;
+      // Check actual payment status - only count as paid if status is 'paid' AND hasCurrentMonthPayment is true
+      const paidCount = residents.filter(r => 
+        r.paymentStatus === 'paid' || 
+        (r.hasCurrentMonthPayment && (r.currentMonthPaymentStatus === 'paid' || r.paymentStatus === 'paid'))
+      ).length;
+      const pendingCount = residents.filter(r => 
+        r.paymentStatus !== 'paid' && 
+        (!r.hasCurrentMonthPayment || r.currentMonthPaymentStatus === 'pending' || r.paymentStatus === 'pending')
+      ).length;
       const totalAmount = residents.reduce((sum, r) => sum + (r.rentAmount || 8000), 0);
       
       setPaymentStats({
@@ -173,7 +197,10 @@ const Payments = () => {
   };
 
   const handleRoomResidentSelect = (resident) => {
-    if (resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment) {
+    // Check actual payment status - only block if status is 'paid'
+    const isPaid = resident.paymentStatus === 'paid' || 
+                   (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid');
+    if (isPaid) {
       toast.error('Payment for this month has already been completed');
       return;
     }
@@ -248,14 +275,150 @@ const Payments = () => {
       }
     } catch (error) {
       console.error('Error marking payment:', error);
-      if (error.response?.data?.message?.includes('already exists')) {
-        toast.error('Payment for this month has already been marked as completed');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to mark payment';
+      
+      if (error.response?.status === 409 || errorMessage.includes('already exists')) {
+        toast.error(errorMessage || 'Payment for this month has already been marked as completed');
       } else {
-        toast.error('Failed to mark payment. Please try again.');
+        toast.error(errorMessage || 'Failed to mark payment. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Fetch payment history for a resident
+  const fetchPaymentHistory = async (residentId) => {
+    try {
+      setLoadingPaymentHistory(true);
+      const response = await api.get(`/payments/resident/${residentId}`);
+      if (response.data.success) {
+        const payments = response.data.data || [];
+        // Format and sort payments by date (newest first)
+        const formattedPayments = payments.map(payment => ({
+          ...payment,
+          // Ensure amount is a number
+          amount: typeof payment.amount === 'number' ? payment.amount : parseFloat(payment.amount) || 0,
+          // Ensure status is properly set (default to 'pending' if not set)
+          status: payment.status || 'pending',
+          // Ensure dates are properly formatted
+          paymentDate: payment.paymentDate || payment.createdAt,
+          // Ensure receiptImage is properly structured
+          receiptImage: payment.receiptImage || null,
+          // Ensure month and year are present
+          month: payment.month || new Date(payment.paymentDate || payment.createdAt).toLocaleString('en-US', { month: 'long' }),
+          year: payment.year || new Date(payment.paymentDate || payment.createdAt).getFullYear()
+        }));
+        
+        const sortedPayments = formattedPayments.sort((a, b) => {
+          const dateA = new Date(a.paymentDate || a.createdAt);
+          const dateB = new Date(b.paymentDate || b.createdAt);
+          return dateB - dateA;
+        });
+        setPaymentHistory(sortedPayments);
+      } else {
+        toast.error('Failed to fetch payment history');
+        setPaymentHistory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+      toast.error('Failed to fetch payment history');
+      setPaymentHistory([]);
+    } finally {
+      setLoadingPaymentHistory(false);
+    }
+  };
+
+  // Handle history icon click - directly show history component
+  const handleHistoryClick = async () => {
+    const residentId = selectedRoomResident?._id || selectedResident?._id;
+    if (residentId) {
+      // Close payment modal and show history
+      setShowPaymentModal(false);
+      await fetchPaymentHistory(residentId);
+      setShowPaymentHistory(true);
+    }
+  };
+
+  // Component to load and display payment image with authentication
+  const PaymentReceiptImage = ({ payment }) => {
+    const [imageUrl, setImageUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    
+    useEffect(() => {
+      if (!payment?.receiptImage?.filePath || !payment?._id) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Fetch image as blob with authentication
+      const fetchImage = async () => {
+        try {
+          const response = await api.get(`/payments/${payment._id}/receipt`, {
+            responseType: 'blob'
+          });
+          
+          // Create blob URL
+          const blob = new Blob([response.data], { 
+            type: response.headers['content-type'] || 'image/jpeg' 
+          });
+          const blobUrl = URL.createObjectURL(blob);
+          
+          setImageUrl(blobUrl);
+          setError(false);
+        } catch (err) {
+          console.error('Error loading payment receipt image:', err);
+          setError(true);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchImage();
+      
+      // Cleanup blob URL on unmount or when payment changes
+      return () => {
+        if (imageUrl && imageUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(imageUrl);
+        }
+      };
+    }, [payment?._id, payment?.receiptImage?.filePath]);
+    
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+        </div>
+      );
+    }
+    
+    if (error || !imageUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8">
+          <ImageIcon className="h-12 w-12 text-gray-400 mb-2" />
+          <p className="text-sm text-gray-600">Receipt image not available</p>
+          {payment?.receiptImage?.originalName && (
+            <p className="text-xs text-gray-500 mt-1">
+              Expected: {payment.receiptImage.originalName}
+            </p>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <img
+        src={imageUrl}
+        alt="Payment Receipt"
+        className="max-w-full max-h-96 rounded-lg shadow-md object-contain bg-white"
+        onError={() => {
+          setError(true);
+          setImageUrl(null);
+        }}
+      />
+    );
   };
 
   // New function to refresh data after payment completion
@@ -282,9 +445,18 @@ const Payments = () => {
 
     if (statusFilter !== 'all') {
       if (statusFilter === 'paid') {
-        filtered = filtered.filter(r => r.paymentStatus === 'paid' || r.hasCurrentMonthPayment);
+        // Only show as paid if status is actually 'paid'
+        filtered = filtered.filter(r => 
+          r.paymentStatus === 'paid' || 
+          (r.hasCurrentMonthPayment && r.currentMonthPaymentStatus === 'paid')
+        );
       } else if (statusFilter === 'pending') {
-        filtered = filtered.filter(r => r.paymentStatus !== 'paid' && !r.hasCurrentMonthPayment);
+        // Show as pending if status is 'pending' or no payment exists or payment status is 'pending'
+        filtered = filtered.filter(r => 
+          r.paymentStatus === 'pending' || 
+          !r.hasCurrentMonthPayment || 
+          r.currentMonthPaymentStatus === 'pending'
+        );
       }
     }
 
@@ -297,8 +469,8 @@ const Payments = () => {
         case 'amount':
           return (b.rentAmount || 8000) - (a.rentAmount || 8000);
         case 'status':
-          const aStatus = a.paymentStatus === 'paid' || a.hasCurrentMonthPayment ? 'paid' : 'pending';
-          const bStatus = b.paymentStatus === 'paid' || b.hasCurrentMonthPayment ? 'paid' : 'pending';
+          const aStatus = (a.paymentStatus === 'paid' || (a.hasCurrentMonthPayment && a.currentMonthPaymentStatus === 'paid')) ? 'paid' : 'pending';
+          const bStatus = (b.paymentStatus === 'paid' || (b.hasCurrentMonthPayment && b.currentMonthPaymentStatus === 'paid')) ? 'paid' : 'pending';
           return aStatus.localeCompare(bStatus);
         default:
           return 0;
@@ -560,11 +732,14 @@ const Payments = () => {
                                   <div className="text-right">
                                     <p className="text-xs text-gray-600">₹{resident.rentAmount || 8000}</p>
                                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                                      resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment
+                                      resident.paymentStatus === 'paid' || 
+                                      (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid')
                                         ? 'bg-green-100 text-green-800' 
                                         : 'bg-yellow-100 text-yellow-800'
                                     }`}>
-                                      {resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment ? 'Paid' : 'Pending'}
+                                      {resident.paymentStatus === 'paid' || 
+                                       (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid') 
+                                        ? 'Paid' : 'Pending'}
                                     </span>
                                   </div>
                                 </div>
@@ -580,25 +755,40 @@ const Payments = () => {
                                   </div>
                                 </div>
                                 
-                                {resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment ? (
-                                  <Tooltip title="Payment already completed for this month" placement="top">
-                                    <button
-                                      disabled
-                                      className="w-full flex items-center justify-center space-x-1 px-2 py-1.5 bg-gray-300 text-gray-500 rounded text-xs cursor-not-allowed transition-all"
-                                    >
-                                      <CheckCircle className="h-3 w-3" />
-                                      <span>Payment Done</span>
-                                    </button>
-                                  </Tooltip>
-                                ) : (
+                                <div className="flex space-x-2">
                                   <button
-                                    onClick={() => handleRoomResidentSelect(resident)}
-                                    className="w-full flex items-center justify-center space-x-1 px-2 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded text-xs hover:from-green-600 hover:to-emerald-600 transition-all"
+                                    onClick={async () => {
+                                      setSelectedRoomResident(resident);
+                                      await fetchPaymentHistory(resident._id);
+                                      setShowPaymentHistory(true);
+                                    }}
+                                    className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-all"
+                                    title="View Payment History"
                                   >
-                                    <Plus className="h-3 w-3" />
-                                    <span>Mark Payment</span>
+                                    <History className="h-3 w-3" />
+                                    <span>History</span>
                                   </button>
-                                )}
+                                  {(resident.paymentStatus === 'paid' || 
+                                     (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid')) ? (
+                                    <Tooltip title="Payment already completed for this month" placement="top">
+                                      <button
+                                        disabled
+                                        className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-gray-300 text-gray-500 rounded text-xs cursor-not-allowed transition-all"
+                                      >
+                                        <CheckCircle className="h-3 w-3" />
+                                        <span>Paid</span>
+                                      </button>
+                                    </Tooltip>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleRoomResidentSelect(resident)}
+                                      className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded text-xs hover:from-green-600 hover:to-emerald-600 transition-all"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      <span>Mark Payment</span>
+                                    </button>
+                                  )}
+                                </div>
                               </motion.div>
                             ))}
                           </div>
@@ -707,11 +897,14 @@ const Payments = () => {
                             <div className="text-right">
                               <p className="text-xs text-gray-600">₹{resident.rentAmount || 8000}</p>
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                                resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment
+                                resident.paymentStatus === 'paid' || 
+                                (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid')
                                   ? 'bg-green-100 text-green-800' 
                                   : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {resident.paymentStatus === 'paid' || resident.hasCurrentMonthPayment ? 'Paid' : 'Pending'}
+                                {resident.paymentStatus === 'paid' || 
+                                 (resident.hasCurrentMonthPayment && resident.currentMonthPaymentStatus === 'paid') 
+                                  ? 'Paid' : 'Pending'}
                               </span>
                             </div>
                           </div>
@@ -727,13 +920,27 @@ const Payments = () => {
                             </div>
                           </div>
                           
-                          <button
-                            onClick={() => handleResidentSelect(resident)}
-                            className="w-full flex items-center justify-center space-x-1 px-2 py-1.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded text-xs hover:from-sky-600 hover:to-blue-600 transition-all"
-                          >
-                            <Eye className="h-3 w-3" />
-                            <span>View Details</span>
-                          </button>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={async () => {
+                                setSelectedResident(resident);
+                                await fetchPaymentHistory(resident._id);
+                                setShowPaymentHistory(true);
+                              }}
+                              className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 transition-all"
+                              title="View Payment History"
+                            >
+                              <History className="h-3 w-3" />
+                              <span>History</span>
+                            </button>
+                            <button
+                              onClick={() => handleResidentSelect(resident)}
+                              className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded text-xs hover:from-sky-600 hover:to-blue-600 transition-all"
+                            >
+                              <Eye className="h-3 w-3" />
+                              <span>Details</span>
+                            </button>
+                          </div>
                         </motion.div>
                       ))}
                     </div>
@@ -747,53 +954,87 @@ const Payments = () => {
 
       {/* Compact Payment Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 max-w-sm w-full mx-4">
-            <div className="flex items-center justify-between mb-3">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg w-full max-w-md mx-auto my-4 flex flex-col max-h-[95vh] overflow-hidden">
+            {/* Header - Sticky */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-base font-bold text-gray-900">Mark Payment as Completed</h3>
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleHistoryClick}
+                  className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors"
+                  title="View Payment History"
+                >
+                  <History className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             
-            <div className="space-y-3">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Resident Info */}
               <div className="bg-gray-50 p-3 rounded-lg">
                 <h4 className="font-semibold text-gray-900 text-sm mb-1">
                   {selectedRoomResident?.firstName} {selectedRoomResident?.lastName}
                 </h4>
                 <div className="text-xs text-gray-600 space-y-0.5">
-                  <p>Room: {selectedRoomResident?.roomNumber}</p>
-                  <p>Bed: {selectedRoomResident?.bedNumber}</p>
+                  <p>Room: {selectedRoomResident?.roomNumber || 'N/A'}</p>
+                  <p>Bed: {selectedRoomResident?.bedNumber || 'Unassigned'}</p>
                   <p>Amount: ₹{selectedRoomResident?.rentAmount || 8000}</p>
                 </div>
               </div>
 
               {/* Payment Date */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   Payment Date
                 </label>
-                <input
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-left border border-gray-300 rounded-lg flex items-center justify-between text-sm hover:bg-gray-50 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
+                        {paymentDate 
+                          ? format(new Date(paymentDate), 'dd-MMM-yyyy')
+                          : 'Select payment date'}
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={paymentDate ? new Date(paymentDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setPaymentDate(format(date, 'yyyy-MM-dd'));
+                        } else {
+                          setPaymentDate('');
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Payment Method */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   Payment Method
                 </label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
                 >
                   <option value="">Select Method</option>
                   <option value="cash">Cash</option>
@@ -803,10 +1044,10 @@ const Payments = () => {
 
               {/* Image Upload */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   Payment Receipt {paymentMethod === 'upi' ? '(Required)' : '(Optional)'}
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-3 text-center">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-sky-400 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
@@ -814,19 +1055,19 @@ const Payments = () => {
                     className="hidden"
                     id="payment-image"
                   />
-                  <label htmlFor="payment-image" className="cursor-pointer">
+                  <label htmlFor="payment-image" className="cursor-pointer block">
                     {paymentImagePreview ? (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <img 
                           src={paymentImagePreview} 
                           alt="Receipt preview" 
-                          className="w-24 h-24 object-cover rounded mx-auto"
+                          className="w-32 h-32 object-cover rounded-lg mx-auto border border-gray-200"
                         />
                         <p className="text-xs text-gray-600">Click to change image</p>
                       </div>
                     ) : (
-                      <div className="space-y-1">
-                        <Upload className="h-8 w-8 text-gray-400 mx-auto" />
+                      <div className="space-y-2">
+                        <Upload className="h-10 w-10 text-gray-400 mx-auto" />
                         <p className="text-xs text-gray-600">
                           {paymentMethod === 'upi' ? 'Upload UPI receipt (Required)' : 'Upload receipt (Optional)'}
                         </p>
@@ -835,31 +1076,304 @@ const Payments = () => {
                   </label>
                 </div>
               </div>
+            </div>
 
-              {/* Submit Button */}
-              <div className="flex space-x-2 pt-2">
+            {/* Footer - Sticky */}
+            <div className="flex space-x-2 p-4 border-t border-gray-200 flex-shrink-0">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePaymentSubmit}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded-lg text-sm font-medium hover:from-sky-600 hover:to-blue-600 transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  'Mark Payment'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Component */}
+      {showPaymentHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => setShowPaymentModal(false)}
-                  disabled={isSubmitting}
-                  className="flex-1 px-3 py-2 text-gray-700 bg-gray-100 rounded text-sm hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  onClick={() => {
+                    setShowPaymentHistory(false);
+                    setSelectedPaymentForView(null);
+                  }}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
                 >
-                  Cancel
+                  <ArrowLeft className="h-5 w-5" />
                 </button>
-                <button
-                  onClick={handlePaymentSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 px-3 py-2 bg-gradient-to-r from-sky-500 to-blue-500 text-white rounded text-sm hover:from-sky-600 hover:to-blue-600 transition-colors disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                      Processing...
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Payment History</h3>
+                  <p className="text-xs text-gray-600">
+                    {selectedRoomResident 
+                      ? `${selectedRoomResident.firstName} ${selectedRoomResident.lastName}`
+                      : selectedResident
+                      ? `${selectedResident.firstName} ${selectedResident.lastName}`
+                      : 'Resident'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPaymentHistory(false);
+                  setSelectedPaymentForView(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content Area - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              {loadingPaymentHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+                </div>
+              ) : selectedPaymentForView ? (
+                /* Payment Detail View */
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-sky-50 to-blue-50 p-4 rounded-lg border border-sky-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-base font-bold text-gray-900">Payment Details</h4>
+                      <button
+                        onClick={() => setSelectedPaymentForView(null)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">Amount:</span>
+                        <span className="ml-2 font-semibold text-gray-900">
+                          ₹{typeof selectedPaymentForView.amount === 'number' 
+                            ? selectedPaymentForView.amount.toLocaleString('en-IN')
+                            : parseFloat(selectedPaymentForView.amount || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Status:</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          selectedPaymentForView.status === 'paid' 
+                            ? 'bg-green-100 text-green-800' 
+                            : selectedPaymentForView.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : selectedPaymentForView.status === 'overdue'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {(selectedPaymentForView.status || 'pending').toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Payment Date:</span>
+                        <span className="ml-2 font-medium text-gray-900">
+                          {selectedPaymentForView.paymentDate 
+                            ? new Date(selectedPaymentForView.paymentDate).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                            : selectedPaymentForView.createdAt
+                            ? new Date(selectedPaymentForView.createdAt).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                            : 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Payment Method:</span>
+                        <span className="ml-2 font-medium text-gray-900 capitalize">
+                          {selectedPaymentForView.paymentMethod?.replace('_', ' ') || 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Month:</span>
+                        <span className="ml-2 font-medium text-gray-900">
+                          {selectedPaymentForView.month || 'N/A'} {selectedPaymentForView.year || ''}
+                        </span>
+                      </div>
+                      {selectedPaymentForView.markedBy && (
+                        <div>
+                          <span className="text-gray-600">Marked By:</span>
+                          <span className="ml-2 font-medium text-gray-900">
+                            {typeof selectedPaymentForView.markedBy === 'object' 
+                              ? `${selectedPaymentForView.markedBy?.firstName || ''} ${selectedPaymentForView.markedBy?.lastName || ''}`.trim() || 'N/A'
+                              : selectedPaymentForView.markedBy || 'N/A'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {selectedPaymentForView.notes && (
+                      <div className="mt-3 pt-3 border-t border-sky-200">
+                        <span className="text-gray-600 text-sm">Notes:</span>
+                        <p className="text-sm text-gray-900 mt-1">{selectedPaymentForView.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Receipt Image Preview */}
+                  {selectedPaymentForView.receiptImage && (
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                        <ImageIcon className="h-4 w-4 mr-2" />
+                        Payment Receipt
+                      </h5>
+                      <div className="flex justify-center">
+                        <PaymentReceiptImage payment={selectedPaymentForView} />
+                      </div>
+                      {selectedPaymentForView.receiptImage.originalName && (
+                        <p className="text-xs text-gray-600 mt-2 text-center">
+                          {selectedPaymentForView.receiptImage.originalName}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Payment List View */
+                <div className="space-y-3">
+                  {/* Status Filter */}
+                  <div className="flex items-center space-x-2 mb-4">
+                    <button
+                      onClick={() => setHistoryStatusFilter('all')}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        historyStatusFilter === 'all'
+                          ? 'bg-sky-100 text-sky-700 border border-sky-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setHistoryStatusFilter('paid')}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        historyStatusFilter === 'paid'
+                          ? 'bg-green-100 text-green-700 border border-green-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Paid
+                    </button>
+                    <button
+                      onClick={() => setHistoryStatusFilter('pending')}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        historyStatusFilter === 'pending'
+                          ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => setHistoryStatusFilter('overdue')}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        historyStatusFilter === 'overdue'
+                          ? 'bg-red-100 text-red-700 border border-red-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Overdue
+                    </button>
+                  </div>
+
+                  {/* Payment Cards */}
+                  {paymentHistory.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-600">No payment records found</p>
                     </div>
                   ) : (
-                    'Mark Payment'
+                    <div className="space-y-2">
+                      {paymentHistory
+                        .filter(payment => historyStatusFilter === 'all' || payment.status === historyStatusFilter)
+                        .map((payment) => {
+                          const isUpcoming = payment.status === 'pending' && 
+                            new Date(payment.paymentDate || payment.createdAt) > new Date();
+                          
+                          return (
+                            <div
+                              key={payment._id}
+                              className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3 mb-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      payment.status === 'paid' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : payment.status === 'pending'
+                                        ? isUpcoming 
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : 'bg-yellow-100 text-yellow-800'
+                                        : payment.status === 'overdue'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {isUpcoming ? 'UPCOMING' : payment.status?.toUpperCase()}
+                                    </span>
+                                    <span className="text-sm font-semibold text-gray-900">
+                                      ₹{payment.amount?.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-600 space-y-0.5">
+                                    <p>
+                                      {payment.month} {payment.year}
+                                    </p>
+                                    <p>
+                                      {payment.paymentDate 
+                                        ? new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric'
+                                          })
+                                        : 'Date not available'}
+                                    </p>
+                                    <p className="capitalize">
+                                      {payment.paymentMethod?.replace('_', ' ') || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {payment.status === 'paid' && (
+                                  <button
+                                    onClick={() => setSelectedPaymentForView(payment)}
+                                    className="ml-3 px-3 py-1.5 bg-sky-50 text-sky-700 rounded text-xs font-medium hover:bg-sky-100 transition-colors flex items-center space-x-1"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    <span>View</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
                   )}
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -891,11 +1405,14 @@ const Payments = () => {
                   <p>Bed: {selectedResident.bedNumber || 'Unassigned'}</p>
                   <p>Amount: ₹{selectedResident.rentAmount || 8000}</p>
                   <p>Status: <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedResident.paymentStatus === 'paid' || selectedResident.hasCurrentMonthPayment
+                    selectedResident.paymentStatus === 'paid' || 
+                    (selectedResident.hasCurrentMonthPayment && selectedResident.currentMonthPaymentStatus === 'paid')
                       ? 'bg-green-100 text-green-800' 
                       : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {selectedResident.paymentStatus === 'paid' || selectedResident.hasCurrentMonthPayment ? 'Paid' : 'Pending'}
+                    {selectedResident.paymentStatus === 'paid' || 
+                     (selectedResident.hasCurrentMonthPayment && selectedResident.currentMonthPaymentStatus === 'paid') 
+                      ? 'Paid' : 'Pending'}
                   </span></p>
                 </div>
               </div>
@@ -907,7 +1424,8 @@ const Payments = () => {
                 >
                   Close
                 </button>
-                {selectedResident.paymentStatus !== 'paid' && !selectedResident.hasCurrentMonthPayment && (
+                {(selectedResident.paymentStatus !== 'paid' && 
+                  (!selectedResident.hasCurrentMonthPayment || selectedResident.currentMonthPaymentStatus === 'pending')) && (
                   <button
                     onClick={() => {
                       setShowResidentDetails(false);
@@ -919,7 +1437,8 @@ const Payments = () => {
                     Mark Payment
                   </button>
                 )}
-                {selectedResident.paymentStatus === 'paid' || selectedResident.hasCurrentMonthPayment ? (
+                {(selectedResident.paymentStatus === 'paid' || 
+                   (selectedResident.hasCurrentMonthPayment && selectedResident.currentMonthPaymentStatus === 'paid')) ? (
                   <Tooltip title="Payment already completed for this month" placement="top">
                     <button
                       disabled

@@ -79,6 +79,14 @@ router.get('/',
   paymentController.getPayments
 );
 
+// Get payment receipt (must come before /:paymentId to avoid route conflicts)
+router.get('/:paymentId/receipt',
+  authenticate,
+  adminOrSuperadmin,
+  trackAdminActivity(),
+  paymentController.getPaymentReceipt
+);
+
 // Get payment by ID
 router.get('/:paymentId',
   authenticate,
@@ -101,14 +109,6 @@ router.delete('/:paymentId',
   adminOrSuperadmin,
   trackAdminActivity(),
   paymentController.deletePayment
-);
-
-// Get payment receipt
-router.get('/:paymentId/receipt',
-  authenticate,
-  adminOrSuperadmin,
-  trackAdminActivity(),
-  paymentController.getPaymentReceipt
 );
 
 // Generate payment report

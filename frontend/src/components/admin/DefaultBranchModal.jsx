@@ -28,7 +28,7 @@ import branchService from '../../services/branch.service';
 import maintainerService from '../../services/maintainer.service';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateAuthState } from '../../store/slices/authSlice';
-import { setBranches } from '../../store/slices/branch.slice';
+import { addBranch, setSelectedBranch, fetchBranches } from '../../store/slices/branch.slice';
 
 const DefaultBranchModal = ({
   isOpen,
@@ -81,10 +81,36 @@ const DefaultBranchModal = ({
     { name: 'Furnished', icon: Sofa, color: 'brown' }
   ];
 
-  // Fetch maintainers when modal opens
+  // Fetch maintainers when modal opens and reset form
   useEffect(() => {
     if (isOpen && pgId) {
       fetchMaintainers();
+      // Reset form when modal opens
+      setFormData({
+        name: '',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          pincode: '',
+          landmark: ''
+        },
+        contact: {
+          phone: '',
+          email: '',
+          alternatePhone: ''
+        },
+        maintainerId: '',
+        capacity: {
+          totalRooms: 0,
+          totalBeds: 0,
+          availableRooms: 0
+        },
+        amenities: [],
+        status: 'active',
+        isDefault: true
+      });
+      setShowMaintainerDropdown(false);
     }
   }, [isOpen, pgId]);
 
@@ -108,11 +134,22 @@ const DefaultBranchModal = ({
     }
   };
 
-  // Handle maintainer selection
+  // Handle maintainer selection and auto-fill contact info
   const handleMaintainerSelect = (maintainer) => {
+    const maintainerUser = maintainer.user || maintainer;
+    const phone = maintainerUser.phone || maintainer.mobile || maintainer.phone || '';
+    const email = maintainerUser.email || maintainer.email || '';
+    
     setFormData(prev => ({
       ...prev,
-      maintainerId: maintainer._id
+      maintainerId: maintainer._id,
+      contact: {
+        ...prev.contact,
+        phone: phone,
+        email: email,
+        // Keep alternate phone if already filled, otherwise leave empty
+        alternatePhone: prev.contact.alternatePhone || ''
+      }
     }));
     setShowMaintainerDropdown(false);
   };
@@ -245,10 +282,13 @@ const DefaultBranchModal = ({
       if (response.success) {
         toast.success('Default branch created successfully!');
 
+        // Get the created branch from response
+        const createdBranch = response.data.branch || response.data;
+        
         // Update auth state to mark default branch as set and store branch ID
         dispatch(updateAuthState({
           default_branch: true,
-          defaultBranchId: response.data.branch?._id || response.data._id,
+          defaultBranchId: createdBranch._id,
           // Also update the user data if provided in response
           ...(response.data.user && {
             default_branch: response.data.user.defaultBranch,
@@ -256,10 +296,15 @@ const DefaultBranchModal = ({
           })
         }));
 
-        // Update branches state to include the new branch
-        dispatch(setBranches([response.data.branch]));
+        // Add the new branch to Redux and automatically select it
+        dispatch(addBranch(createdBranch));
+        dispatch(setSelectedBranch(createdBranch));
+        
+        // Refresh branches list to ensure consistency
+        dispatch(fetchBranches());
 
         console.log('DefaultBranchModal: Branch created successfully:', response.data);
+        console.log('DefaultBranchModal: Auto-selected branch:', createdBranch);
 
         // Call onBranchCreated callback if provided
         onBranchCreated && onBranchCreated(response.data);
@@ -303,10 +348,10 @@ const DefaultBranchModal = ({
         </div>
 
         {/* Modal Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Basic Information */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <Building2 className="h-4 w-4 mr-2 text-blue-600" />
               Basic Information
             </h4>
@@ -343,8 +388,8 @@ const DefaultBranchModal = ({
           </div>
 
           {/* Address Information */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <MapPin className="h-4 w-4 mr-2 text-green-600" />
               Address Information
             </h4>
@@ -407,12 +452,124 @@ const DefaultBranchModal = ({
             </div>
           </div>
 
-          {/* Contact Information */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+          {/* Maintainer Selection - Moved before Contact */}
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+              <UserCheck className="h-4 w-4 mr-2 text-orange-600" />
+              Select Maintainer
+            </h4>
+
+            {/* Maintainer Dropdown */}
+            <div className="relative maintainer-dropdown">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Branch Maintainer <span className="text-red-500">*</span>
+              </label>
+              <div className="relative maintainer-dropdown">
+                <button
+                  type="button"
+                  onClick={() => setShowMaintainerDropdown(!showMaintainerDropdown)}
+                  className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between transition-all ${
+                    formData.maintainerId 
+                      ? 'border-blue-300 bg-blue-50' 
+                      : 'border-gray-300 bg-white hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center flex-1 min-w-0">
+                    {getSelectedMaintainer() ? (
+                      <>
+                        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                          <span className="text-white font-semibold text-xs">
+                            {((getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'U').charAt(0) + 
+                              (getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '').charAt(0)).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {(getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'Unknown')} {(getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '')}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {getSelectedMaintainer().user?.email || getSelectedMaintainer().email} • {getSelectedMaintainer().user?.phone || getSelectedMaintainer().mobile || getSelectedMaintainer().phone}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">Select a maintainer for this branch</span>
+                    )}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform flex-shrink-0 ml-2 ${showMaintainerDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown Options */}
+                {showMaintainerDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {maintainersLoading ? (
+                      <div className="px-4 py-3 text-center text-gray-500">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <span className="text-xs">Loading maintainers...</span>
+                      </div>
+                    ) : (Array.isArray(maintainers) && maintainers.length > 0) ? (
+                      maintainers.map((maintainer) => {
+                        const firstName = maintainer.user?.firstName || maintainer.firstName || 'Unknown';
+                        const lastName = maintainer.user?.lastName || maintainer.lastName || '';
+                        const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+                        const isSelected = formData.maintainerId === maintainer._id;
+                        
+                        return (
+                          <button
+                            key={maintainer._id}
+                            type="button"
+                            onClick={() => handleMaintainerSelect(maintainer)}
+                            className={`w-full px-3 py-2.5 text-left transition-all flex items-center ${
+                              isSelected 
+                                ? 'bg-blue-50 border-l-2 border-blue-600' 
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                              <span className="text-white font-semibold text-xs">{initials}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 truncate">
+                                {firstName} {lastName}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {maintainer.user?.email || maintainer.email} • {maintainer.user?.phone || maintainer.mobile || maintainer.phone}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <div className="ml-auto flex-shrink-0">
+                                <Check className="h-4 w-4 text-blue-600" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="px-4 py-3 text-center text-gray-500 text-sm">
+                        No maintainers found. Please add maintainers first.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+
+          {/* Contact Information - Moved after Maintainer */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <Phone className="h-4 w-4 mr-2 text-purple-600" />
               Contact Information
             </h4>
+            {getSelectedMaintainer() && (
+              <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700 flex items-center">
+                  <Check className="h-3 w-3 mr-1.5" />
+                  Contact info auto-filled from selected maintainer
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
@@ -451,113 +608,9 @@ const DefaultBranchModal = ({
             </div>
           </div>
 
-          {/* Maintainer Selection */}
-          <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-              <UserCheck className="h-4 w-4 mr-2 text-orange-600" />
-              Select Maintainer
-            </h4>
-
-            {/* Maintainer Dropdown */}
-            <div className="relative maintainer-dropdown">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Branch Maintainer *
-              </label>
-              <div className="relative maintainer-dropdown">
-                <button
-                  type="button"
-                  onClick={() => setShowMaintainerDropdown(!showMaintainerDropdown)}
-                  className={`w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between ${
-                    formData.maintainerId ? 'border-gray-300' : 'border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    {getSelectedMaintainer() ? (
-                      <>
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                          <UserCheck className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {(getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'Unknown')} {(getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '')}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {getSelectedMaintainer().user?.email || getSelectedMaintainer().email} • {getSelectedMaintainer().user?.phone || getSelectedMaintainer().mobile || getSelectedMaintainer().phone}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-gray-500">Select a maintainer for this branch</span>
-                    )}
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showMaintainerDropdown ? 'rotate-180' : ''}`} />
-                </button>
-
-                {/* Dropdown Options */}
-                {showMaintainerDropdown && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {maintainersLoading ? (
-                      <div className="px-4 py-3 text-center text-gray-500">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                        Loading maintainers...
-                      </div>
-                    ) : (Array.isArray(maintainers) && maintainers.length > 0) ? (
-                      maintainers.map((maintainer) => (
-                        <button
-                          key={maintainer._id}
-                          type="button"
-                          onClick={() => handleMaintainerSelect(maintainer)}
-                          className="w-full px-4 py-3 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none flex items-center"
-                        >
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                            <UserCheck className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {(maintainer.user?.firstName || maintainer.firstName || 'Unknown')} {(maintainer.user?.lastName || maintainer.lastName || '')}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {maintainer.user?.email || maintainer.email} • {maintainer.user?.phone || maintainer.mobile || maintainer.phone}
-                            </div>
-                          </div>
-                          {formData.maintainerId === maintainer._id && (
-                            <div className="ml-auto">
-                              <Check className="h-4 w-4 text-blue-600" />
-                            </div>
-                          )}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-center text-gray-500">
-                        No maintainers found. Please add maintainers first.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Selected maintainer info */}
-              {getSelectedMaintainer() && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <UserCheck className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <div className="text-sm font-medium text-blue-900">
-                        {(getSelectedMaintainer().user?.firstName || getSelectedMaintainer().firstName || 'Unknown')} {(getSelectedMaintainer().user?.lastName || getSelectedMaintainer().lastName || '')}
-                      </div>
-                      <div className="text-xs text-blue-700">
-                        {getSelectedMaintainer().user?.email || getSelectedMaintainer().email} • {getSelectedMaintainer().user?.phone || getSelectedMaintainer().mobile || getSelectedMaintainer().phone}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Capacity Information */}
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <Users className="h-4 w-4 mr-2 text-indigo-600" />
               Capacity Information
             </h4>
@@ -599,8 +652,8 @@ const DefaultBranchModal = ({
           </div>
 
           {/* Amenities */}
-          <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-4">
-            <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+          <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <Sparkles className="h-4 w-4 mr-2 text-pink-600" />
               Amenities (Optional)
             </h4>

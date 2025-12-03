@@ -65,7 +65,7 @@ export const useAuth = () => {
     }
   };
 
-  // Check authentication status on mount
+  // Check authentication status on mount - CRITICAL: This runs on app startup
   useEffect(() => {
     // Prevent multiple auth checks
     if (authCheckInitiated.current) {
@@ -75,7 +75,7 @@ export const useAuth = () => {
     authCheckInitiated.current = true;
     
     const checkAuth = async () => {
-      console.log('🚀 useAuth: Starting auth check...');
+      console.log('🚀 useAuth: Starting auth check on app startup...');
       console.log('👤 Current user from Redux:', user);
       console.log('🔐 Is authenticated from Redux:', isAuthenticated);
       console.log('⏳ Is loading from Redux:', isLoading);
@@ -91,6 +91,20 @@ export const useAuth = () => {
         console.log('🔄 Refresh token in localStorage:', !!refreshToken);
         console.log('👤 Stored user in localStorage:', !!storedUser);
         
+        // CRITICAL: Check token validity on app startup
+        // If token is expired, clear auth and redirect to login
+        if (accessToken) {
+          const isTokenValid = authService.isAuthenticated();
+          
+          if (!isTokenValid) {
+            console.log('❌ Token is expired on app startup, clearing auth and redirecting to login');
+            authService.clearAuth();
+            // Don't redirect here - let ProtectedRoute handle it
+            setHasCheckedAuth(true);
+            return;
+          }
+        }
+        
         if (accessToken && !user) {
           console.log('🔄 Have tokens but no Redux user, checking token validity...');
           
@@ -105,6 +119,7 @@ export const useAuth = () => {
             }
           } else {
             console.log('❌ Token is expired or invalid, user not authenticated');
+            authService.clearAuth();
           }
         } else if (!accessToken) {
           console.log('🚫 No access token found, user not authenticated');
@@ -113,6 +128,8 @@ export const useAuth = () => {
         }
       } catch (error) {
         console.log('❌ Auth check error:', error);
+        // On error, clear auth to be safe
+        authService.clearAuth();
       } finally {
         // Always mark auth check as complete
         setHasCheckedAuth(true);

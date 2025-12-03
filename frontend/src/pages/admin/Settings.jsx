@@ -137,13 +137,24 @@ const Settings = () => {
   ];
 
   useEffect(() => {
-    // Check if user is admin
-    if (!user) {
+    // Check if user is admin - get user from Redux or localStorage as fallback
+    const currentUser = user || (() => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (!currentUser) {
       navigate('/admin/login');
       return;
     }
 
-    if (!['admin', 'maintainer'].includes(user?.role)) {
+    const userRole = currentUser?.role;
+    if (!userRole || !['admin', 'maintainer'].includes(userRole)) {
+      console.error('Access denied - User role:', userRole, 'User:', currentUser);
       toast.error('Access denied. Admin or Maintainer privileges required.');
       navigate('/login');
       return;
@@ -357,8 +368,17 @@ const Settings = () => {
     }));
   };
 
-  // Check if user is admin or maintainer
-  if (!user || !['admin', 'maintainer'].includes(user?.role)) {
+  // Check if user is admin or maintainer - get user from Redux or localStorage as fallback
+  const currentUser = user || (() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (!currentUser || !currentUser?.role || !['admin', 'maintainer'].includes(currentUser.role)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">

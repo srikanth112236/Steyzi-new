@@ -134,11 +134,12 @@ export const useTokenExpiry = () => {
       checkTokenExpiry();
     };
 
-    // Check immediately
+    // Check immediately on mount
     checkExpiry();
 
-    // Check every 30 seconds
-    const interval = setInterval(checkExpiry, 30000);
+    // Check every 30 minutes (1800000 ms) for activity indicator
+    // This is less frequent to reduce unnecessary checks while still catching expired tokens
+    const interval = setInterval(checkExpiry, 30 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [checkTokenExpiry]);

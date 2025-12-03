@@ -74,8 +74,33 @@ class PaymentService {
         isActive: true
       });
 
+      // If payment exists and is pending, update it to paid
       if (existingPayment) {
-        throw new Error(`Payment for ${month} ${year} already exists for this resident`);
+        if (existingPayment.status === 'pending') {
+          // Update existing pending payment to paid
+          existingPayment.status = 'paid';
+          existingPayment.paymentDate = paymentDate;
+          existingPayment.paymentMethod = paymentData.paymentMethod || 'other';
+          existingPayment.receiptImage = receiptImage || existingPayment.receiptImage;
+          existingPayment.markedBy = markedBy;
+          existingPayment.markedAt = new Date();
+          if (paymentData.notes) {
+            existingPayment.notes = paymentData.notes;
+          }
+          
+          await existingPayment.save();
+          
+          // Update resident payment status
+          await Resident.findByIdAndUpdate(residentId, {
+            paymentStatus: 'paid',
+            lastPaymentDate: paymentDate
+          });
+          
+          return existingPayment;
+        } else {
+          // Payment already exists and is paid
+          throw new Error(`Payment for ${month} ${year} already exists for this resident`);
+        }
       }
 
       // Create payment record with explicit field validation
@@ -286,7 +311,7 @@ class PaymentService {
       // Check for existing payments for current month for each resident
       const residentsWithPaymentStatus = await Promise.all(
         residents.map(async (resident) => {
-          // Check if there's already a payment for current month
+          // Check if there's already a payment for current month and get its actual status
           const existingPayment = await Payment.findOne({
             residentId: resident._id,
             month: currentMonth,
@@ -296,7 +321,20 @@ class PaymentService {
 
           // Convert to plain object and add payment status
           const residentObj = resident.toObject();
-          residentObj.hasCurrentMonthPayment = !!existingPayment;
+          // Only mark as paid if payment exists AND status is 'paid'
+          residentObj.hasCurrentMonthPayment = existingPayment && existingPayment.status === 'paid';
+          residentObj.currentMonthPaymentStatus = existingPayment ? existingPayment.status : null;
+          
+          // Update paymentStatus based on actual payment status if payment exists
+          if (existingPayment) {
+            // If there's a current month payment, use its status
+            if (existingPayment.status === 'paid') {
+              residentObj.paymentStatus = 'paid';
+            } else if (existingPayment.status === 'pending') {
+              residentObj.paymentStatus = 'pending';
+            }
+            // Otherwise keep the resident's existing paymentStatus
+          }
           
           return residentObj;
         })

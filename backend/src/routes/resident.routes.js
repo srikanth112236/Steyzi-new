@@ -32,7 +32,7 @@ router.get('/', authenticate, adminOrSuperadmin, trackAdminActivity(), async (re
       });
     }
 
-    const { page = 1, limit = 10, status, search, gender, branchId } = req.query;
+    const { page = 1, limit = 10, status, search, gender, branchId, email, phone } = req.query;
     const filters = {};
     
     // Handle status filter for moved out residents
@@ -55,6 +55,13 @@ router.get('/', authenticate, adminOrSuperadmin, trackAdminActivity(), async (re
     
     if (gender) filters.gender = gender;
     if (branchId) filters.branchId = branchId;
+    if (email) filters.email = email.toLowerCase().trim();
+    if (phone) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length === 10) {
+        filters.phone = cleanPhone;
+      }
+    }
 
     const result = await residentService.getResidents(pgId, filters, parseInt(page), parseInt(limit));
     return res.status(result.statusCode).json(result);

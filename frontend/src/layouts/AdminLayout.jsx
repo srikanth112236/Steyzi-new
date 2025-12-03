@@ -35,7 +35,10 @@ import {
   Calculator,
   DollarSign,
   Receipt,
-  ChevronUp
+  ChevronUp,
+  ArrowRight,
+  Lock,
+  Package
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice';
 import toast from 'react-hot-toast';
@@ -46,9 +49,10 @@ import { selectSelectedBranch } from '../store/slices/branch.slice';
 import HeaderNotifications from '../components/common/HeaderNotifications';
 import SubscriptionStatusIndicator from '../components/common/SubscriptionStatusIndicator';
 import { useSubscription } from '../utils/subscriptionUtils';
-import { selectUser, selectSubscription, updateAuthState, selectPgConfigured, selectDefaultBranch, selectPgId } from '../store/slices/authSlice';
+import { selectUser, selectSubscription, updateAuthState, selectPgConfigured, selectDefaultBranch, selectPgId, selectOnboardingCompleted } from '../store/slices/authSlice';
 import FreeTrialModal from '../components/common/FreeTrialModal';
-import { Package } from 'lucide-react';
+import TrialExpiredModal from '../components/common/TrialExpiredModal';
+import SubscriptionUpgradeModal from '../components/common/SubscriptionUpgradeModal';
 import PGConfigurationModal from '../components/admin/PGConfigurationModal';
 import DefaultBranchModal from '../components/admin/DefaultBranchModal';
 import PaymentHistory from '../components/admin/PaymentHistory';
@@ -92,6 +96,9 @@ const AdminLayout = () => {
 
   // Free trial modal state
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [showTrialExpiredModal, setShowTrialExpiredModal] = useState(false);
+  const [showSubscriptionUpgradeModal, setShowSubscriptionUpgradeModal] = useState(false);
+  const [lastUpgradeModalShown, setLastUpgradeModalShown] = useState(null);
 
   // State for configuration modals - now controlled by individual pages
   const [showDefaultBranchModal, setShowDefaultBranchModal] = useState(false);
@@ -101,6 +108,7 @@ const AdminLayout = () => {
   const pgConfigured = useSelector(selectPgConfigured) || false;
   const defaultBranch = useSelector(selectDefaultBranch) || false;
   const pgId = useSelector(selectPgId);
+  const onboardingCompleted = useSelector(selectOnboardingCompleted) || false;
 
   // Check if user has active paid subscription with fallback
   const hasActivePaidSubscription = 
@@ -248,19 +256,106 @@ const AdminLayout = () => {
     }
   }, [subscription?.trialEndDate, subscription?.startDate]); // Only depend on trial dates
 
-  // Check for trial modal flag on component mount
+  // Check if trial is less than 1 day remaining and show upgrade modal
   useEffect(() => {
+    if (!subscription || user?.role !== 'admin' || user?.role === 'maintainer') return;
+    if (hasActivePaidSubscription) return;
+
+    const checkAndShowModal = () => {
+      // Only check for active trials
+      if (subscription.billingCycle === 'trial' && subscription.trialEndDate && trialTimeLeft && !trialTimeLeft.expired) {
+        const totalHours = (trialTimeLeft.days * 24) + trialTimeLeft.hours;
+        const isLessThanOneDay = totalHours < 24;
+
+        if (isLessThanOneDay) {
+          // Check if we've shown the modal recently (within last 2 hours)
+          const now = Date.now();
+          const lastShown = lastUpgradeModalShown || 0;
+          const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+
+          // Show modal if:
+          // 1. Never shown before, OR
+          // 2. Last shown more than 2 hours ago
+          if (!lastUpgradeModalShown || (now - lastShown) > twoHours) {
+            setShowSubscriptionUpgradeModal(true);
+            setLastUpgradeModalShown(now);
+          }
+        } else {
+          // Reset modal state if trial has more than 1 day
+          setShowSubscriptionUpgradeModal(false);
+        }
+      }
+    };
+
+    // Check immediately
+    checkAndShowModal();
+
+    // Check every 30 minutes to show modal regularly
+    const interval = setInterval(checkAndShowModal, 30 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [subscription, trialTimeLeft, hasActivePaidSubscription, user?.role, lastUpgradeModalShown]);
+
+  // Check for trial expiration and show appropriate modal
+  useEffect(() => {
+    if (!subscription) return;
+
+    // Maintainers should not see subscription activation modals
+    if (user?.role === 'maintainer') {
+      setShowTrialModal(false);
+      setShowTrialExpiredModal(false);
+      // Clear any activation modal flags for maintainers
+      sessionStorage.removeItem('showTrialModal');
+      sessionStorage.removeItem('showTrialModalAfterOnboarding');
+      return;
+    }
+
+     // Check multiple conditions for expired trial:
+     // 1. billingCycle is 'trial' and trialEndDate has passed
+     // 2. Backend flag indicating trial expired (trialExpired or hadTrialExpired)
+     // 3. status is 'free' with trialExpired flag
+     // 4. status is 'expired'
+     const isTrialExpiredByDate = subscription.billingCycle === 'trial' && 
+                                  subscription.trialEndDate && 
+                                  new Date() > new Date(subscription.trialEndDate);
+
+     const isTrialExpiredByFlag = subscription.trialExpired === true || 
+                                  subscription.hadTrialExpired === true;
+
+     const isFreeStatusWithExpiredTrial = subscription.status === 'free' && 
+                                          (subscription.trialExpired === true || 
+                                           subscription.hadTrialExpired === true) &&
+                                          !hasActivePaidSubscription;
+
+     const isExpiredStatus = subscription.status === 'expired';
+
+     const isTrialExpired = (isTrialExpiredByDate || isTrialExpiredByFlag || 
+                            isFreeStatusWithExpiredTrial || isExpiredStatus) &&
+                           !hasActivePaidSubscription;
+
+     if (isTrialExpired) {
+       // Don't auto-show expired modal, let user click "Plan Expired" button to show it
+       setShowTrialModal(false);
+       // Clear any activation modal flags
+       sessionStorage.removeItem('showTrialModal');
+       sessionStorage.removeItem('showTrialModalAfterOnboarding');
+     } else {
+       // Check for trial activation modal flag only if trial is not expired
     const shouldShowTrialModal = sessionStorage.getItem('showTrialModal');
     const shouldShowTrialModalAfterOnboarding = sessionStorage.getItem('showTrialModalAfterOnboarding');
 
-    if ((shouldShowTrialModal === 'true' || shouldShowTrialModalAfterOnboarding === 'true') && !hasActivePaidSubscription) {
+       if ((shouldShowTrialModal === 'true' || shouldShowTrialModalAfterOnboarding === 'true') && 
+           !hasActivePaidSubscription && 
+           !isTrialExpired) {
       // Clear the flags to prevent showing on refresh
       sessionStorage.removeItem('showTrialModal');
       sessionStorage.removeItem('showTrialModalAfterOnboarding');
-      // Show the modal only if user doesn't have active paid subscription
+         // Show the modal only if user doesn't have active paid subscription and trial is not expired
       setShowTrialModal(true);
+         setShowTrialExpiredModal(false);
     }
-  }, [subscription]); // Depend on subscription status
+     }
+   }, [subscription, hasActivePaidSubscription, user?.role]); // Depend on subscription status and user role
 
   // Token expiry handling
   const {
@@ -1244,8 +1339,49 @@ const AdminLayout = () => {
             
             {/* Right Side - Actions & User */}
             <div className="flex items-center space-x-2 flex-shrink-0">
-              {/* Free Trial Activation Button - Desktop */}
-              {!trialTimeLeft && !trialInfo && !hasActivePaidSubscription && (
+               {/* Check if trial is expired or subscription is free/expired */}
+               {/* Only show subscription-related buttons for admin role, not maintainer */}
+               {user?.role === 'admin' && (() => {
+                 // Check multiple conditions for expired trial:
+                 // 1. billingCycle is 'trial' and trialEndDate has passed
+                 // 2. Backend flag indicating trial expired (trialExpired or hadTrialExpired)
+                 // 3. status is 'free' with trialExpired flag
+                 // 4. status is 'expired'
+                 const isTrialExpiredByDate = subscription?.billingCycle === 'trial' && 
+                                               subscription?.trialEndDate && 
+                                               new Date() > new Date(subscription.trialEndDate);
+                 
+                 const isTrialExpiredByFlag = subscription?.trialExpired === true || 
+                                             subscription?.hadTrialExpired === true;
+                 
+                 const isFreeStatusWithExpiredTrial = subscription?.status === 'free' && 
+                                                      (subscription?.trialExpired === true || 
+                                                       subscription?.hadTrialExpired === true) &&
+                                                      !hasActivePaidSubscription;
+                 
+                 const isExpiredStatus = subscription?.status === 'expired';
+                 
+                 const isTrialExpired = (isTrialExpiredByDate || isTrialExpiredByFlag || 
+                                        isFreeStatusWithExpiredTrial || isExpiredStatus) &&
+                                       !hasActivePaidSubscription;
+                 
+                 // Show "Plan Expired" button when trial is expired or subscription is free/expired
+                 if (isTrialExpired) {
+                   return (
+                     <button
+                       onClick={() => setShowTrialExpiredModal(true)}
+                       className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-red-300 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 hover:from-red-100 hover:to-orange-100 transition-all duration-200"
+                       title="Plan Expired - Click to upgrade"
+                     >
+                       <Lock className="h-4 w-4" />
+                       <span className="font-semibold text-xs">Plan Expired</span>
+                     </button>
+                   );
+                 }
+                 
+                 // Show "Free Trial" button when no trial and no paid subscription
+                 if (!trialTimeLeft && !trialInfo && !hasActivePaidSubscription) {
+                   return (
                 <button
                   onClick={() => setShowTrialModal(true)}
                   className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 hover:from-green-100 hover:to-emerald-100 transition-all duration-200"
@@ -1254,10 +1390,12 @@ const AdminLayout = () => {
                   <Package className="h-4 w-4" />
                   <span className="font-semibold text-xs">Free Trial</span>
                 </button>
-              )}
+                   );
+                 }
 
-              {/* Trial Already Used - Desktop */}
-              {trialTimeLeft?.expired && trialInfo && !hasActivePaidSubscription && (
+                 // Show "Trial Used" when trial was previously used but not expired (edge case)
+                 if (trialTimeLeft?.expired && trialInfo && !hasActivePaidSubscription && !isTrialExpired) {
+                   return (
                 <motion.div
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -1267,10 +1405,12 @@ const AdminLayout = () => {
                   <Package className="h-4 w-4" />
                   <span className="font-semibold text-xs">Trial Used</span>
                 </motion.div>
-              )}
+                   );
+                 }
 
-              {/* Trial Active Indicator - Desktop */}
-              {trialTimeLeft && !trialTimeLeft.expired && (
+                 // Show active trial countdown when trial is active
+                 if (trialTimeLeft && !trialTimeLeft.expired) {
+                   return (
                 <motion.button
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -1282,25 +1422,11 @@ const AdminLayout = () => {
                     {trialTimeLeft.days}d {trialTimeLeft.hours}h left
                   </span>
                 </motion.button>
-              )}
-
-              {/* Trial Expired Indicator - Desktop */}
-              {trialTimeLeft?.expired && (
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="hidden sm:flex items-center space-x-2 px-2.5 py-1.5 bg-gradient-to-r from-red-50 to-red-100 border border-red-300 rounded-lg text-red-700"
-                >
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="font-semibold text-xs whitespace-nowrap">Trial Ended</span>
-                  <button
-                    onClick={() => navigate('/admin/subscription-selection')}
-                    className="ml-1 px-2 py-0.5 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 transition-colors"
-                  >
-                    Upgrade
-                  </button>
-                </motion.div>
-              )}
+                   );
+                 }
+                 
+                 return null;
+               })()}
 
 
               {/* Global Branch Selector (compact) */}
@@ -1380,6 +1506,58 @@ const AdminLayout = () => {
             <div className="max-w-full mx-auto px-6">
               {/* Subscription Status Indicator */}
               <SubscriptionStatusIndicator />
+               {/* Data Restriction Overlay - Show when trial is expired */}
+               {/* Only show for admin role, not maintainer */}
+               {user?.role === 'admin' && (() => {
+                 // Check multiple conditions for expired trial
+                 const isTrialExpiredByDate = subscription?.billingCycle === 'trial' && 
+                                              subscription?.trialEndDate && 
+                                              new Date() > new Date(subscription.trialEndDate);
+                 
+                 const isTrialExpiredByFlag = subscription?.trialExpired === true || 
+                                              subscription?.hadTrialExpired === true;
+                 
+                 const isFreeStatusWithExpiredTrial = subscription?.status === 'free' && 
+                                                      (subscription?.trialExpired === true || 
+                                                       subscription?.hadTrialExpired === true) &&
+                                                      !hasActivePaidSubscription;
+                 
+                 const isExpiredStatus = subscription?.status === 'expired';
+                 
+                 const isTrialExpired = (isTrialExpiredByDate || isTrialExpiredByFlag || 
+                                        isFreeStatusWithExpiredTrial || isExpiredStatus) &&
+                                       !hasActivePaidSubscription;
+                 
+                 if (isTrialExpired) {
+                  return (
+                    <div className="bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 border-2 border-orange-200 rounded-xl p-8 mb-6">
+                      <div className="text-center">
+                        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Lock className="h-8 w-8 text-orange-600" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                          Access Restricted
+                        </h2>
+                        <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
+                          Your free trial has expired. To continue accessing your PG data and all features, 
+                          please upgrade to a subscription plan.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowTrialExpiredModal(true);
+                            navigate('/admin/subscription-history');
+                          }}
+                          className="px-6 py-3 bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:from-purple-700 hover:via-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 inline-flex items-center space-x-2"
+                        >
+                          <span>Upgrade to Subscription</span>
+                          <ArrowRight className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <Outlet />
             </div>
           </div>
@@ -1393,12 +1571,33 @@ const AdminLayout = () => {
         onRefresh={handleRefreshToken}
       />
 
-      {/* Free Trial Modal */}
-      <FreeTrialModal
-        isOpen={showTrialModal}
-        onClose={() => setShowTrialModal(false)}
-        onTrialActivated={handleTrialActivated}
-      />
+      {/* Free Trial Modal - Only show for admin role, not maintainer */}
+      {user?.role === 'admin' && (
+        <FreeTrialModal
+          isOpen={showTrialModal && !showTrialExpiredModal}
+          onClose={() => setShowTrialModal(false)}
+          onTrialActivated={handleTrialActivated}
+        />
+      )}
+
+      {/* Trial Expired Modal - Only show for admin role, not maintainer */}
+      {user?.role === 'admin' && (
+        <TrialExpiredModal
+          isOpen={showTrialExpiredModal}
+          onClose={() => setShowTrialExpiredModal(false)}
+          trialEndDate={subscription?.trialEndDate}
+          subscription={subscription}
+        />
+      )}
+
+      {/* Subscription Upgrade Modal - Show when trial is less than 1 day remaining */}
+      {user?.role === 'admin' && (
+        <SubscriptionUpgradeModal
+          isOpen={showSubscriptionUpgradeModal}
+          onClose={() => setShowSubscriptionUpgradeModal(false)}
+          trialTimeLeft={trialTimeLeft}
+        />
+      )}
 
       {/* Default Branch Modal */}
       <DefaultBranchModal
@@ -1415,9 +1614,9 @@ const AdminLayout = () => {
         onConfigured={handlePGConfigured}
       />
 
-      {/* Free Trial Info Popup */}
+      {/* Free Trial Info Popup - Only show for admin role, not maintainer */}
       <AnimatePresence>
-        {showTrialInfoPopup && trialTimeLeft && !trialTimeLeft.expired && (
+        {user?.role === 'admin' && showTrialInfoPopup && trialTimeLeft && !trialTimeLeft.expired && (
           <>
             {/* Backdrop */}
             <motion.div

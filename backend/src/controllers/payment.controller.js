@@ -238,20 +238,44 @@ class PaymentController {
     }
   }
 
-  // Get payment receipt
+  // Get payment receipt (returns image file)
   async getPaymentReceipt(req, res) {
     try {
       const { paymentId } = req.params;
+      const fs = require('fs').promises;
+      const path = require('path');
+      
       const receipt = await paymentService.getPaymentReceipt(paymentId);
 
-      if (!receipt) {
-        return createResponse(res, 404, false, 'Receipt not found');
+      if (!receipt || !receipt.filePath) {
+        return res.status(404).json({
+          success: false,
+          message: 'Receipt not found'
+        });
       }
 
-      return createResponse(res, 200, true, 'Receipt retrieved successfully', receipt);
+      // Check if file exists
+      try {
+        await fs.access(receipt.filePath);
+      } catch (error) {
+        return res.status(404).json({
+          success: false,
+          message: 'Receipt file not found'
+        });
+      }
+
+      // Send the image file
+      res.setHeader('Content-Type', receipt.mimeType || 'image/jpeg');
+      res.setHeader('Content-Disposition', `inline; filename="${receipt.originalName || receipt.fileName}"`);
+      
+      const fileStream = require('fs').createReadStream(receipt.filePath);
+      fileStream.pipe(res);
     } catch (error) {
       console.error('Error getting payment receipt:', error);
-      return createResponse(res, 500, false, error.message || 'Failed to get receipt');
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to get receipt'
+      });
     }
   }
 

@@ -21,7 +21,9 @@ import {
   BarChart3,
   Mail,
   Phone,
-  Bed
+  Bed,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import subscriptionService from '../../services/subscription.service';
@@ -51,6 +53,10 @@ const SubscriberManagement = () => {
   const [selectedSubscriberHistory, setSelectedSubscriberHistory] = useState(null);
   const [showAllSubscriptions, setShowAllSubscriptions] = useState(true);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     loadData();
   }, []);
@@ -62,6 +68,11 @@ const SubscriberManagement = () => {
   useEffect(() => {
     applyFilters();
   }, [filters, subscribers]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   const loadData = async () => {
     try {
@@ -140,6 +151,17 @@ const SubscriberManagement = () => {
     setFilteredSubscribers(filtered);
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredSubscribers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSubscribers = filteredSubscribers.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -171,8 +193,8 @@ const SubscriberManagement = () => {
     const Icon = config.icon;
 
     return (
-      <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded border ${config.color}`}>
-        <Icon className="h-3 w-3" />
+      <span className={`inline-flex items-center space-x-0.5 px-1 py-0.5 text-[10px] font-bold rounded border ${config.color}`}>
+        <Icon className="h-2 w-2" />
         <span className="capitalize">{status}</span>
       </span>
     );
@@ -219,9 +241,9 @@ const SubscriberManagement = () => {
     }
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded border ${color}`}>
-        <Clock className="h-3 w-3 mr-1" />
-        {daysRemaining < 0 ? 'Expired' : `${daysRemaining} days left`}
+      <span className={`inline-flex items-center space-x-0.5 px-1 py-0.5 text-[10px] font-bold rounded border ${color}`}>
+        <Clock className="h-2 w-2" />
+        <span>{daysRemaining < 0 ? 'Expired' : `${daysRemaining}d left`}</span>
       </span>
     );
   };
@@ -545,12 +567,12 @@ const SubscriberManagement = () => {
 
       {/* Subscribers Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-4 py-2.5 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-sm font-semibold text-gray-900">
               Subscribers ({filteredSubscribers.length})
               {showAllSubscriptions && (
-                <span className="text-sm text-blue-600 ml-2">(including cancelled)</span>
+                <span className="text-xs text-blue-600 ml-2">(including cancelled)</span>
               )}
             </h2>
             {(filters.search || filters.status !== (showAllSubscriptions ? 'all' : 'active') || filters.billingCycle !== 'all' ||
@@ -565,7 +587,7 @@ const SubscriberManagement = () => {
 
         {/* Mobile Cards View */}
         <div className="block md:hidden space-y-3 p-3">
-          {filteredSubscribers.map((subscriber, index) => (
+          {paginatedSubscribers.map((subscriber, index) => (
             <motion.div
               key={subscriber._id}
               initial={{ opacity: 0, y: 20 }}
@@ -640,129 +662,228 @@ const SubscriberManagement = () => {
           ))}
         </div>
 
-        {/* Desktop Table View */}
+        {/* Desktop Table View - Ultra Compact Design */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subscriber
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Plan & Status
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Dates
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usage
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              <AnimatePresence>
-                {filteredSubscribers.map((subscriber, index) => (
-                  <motion.tr
-                    key={subscriber._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="hover:bg-gray-50"
+          <div className="inline-block min-w-full align-middle">
+            <div className="overflow-hidden shadow-sm ring-1 ring-black ring-opacity-5 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                      Subscriber
+                    </th>
+                    <th className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                      Plan & Status
+                    </th>
+                    <th className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                      Dates
+                    </th>
+                    <th className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                      Usage
+                    </th>
+                    <th className="px-2 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  <AnimatePresence>
+                    {paginatedSubscribers.map((subscriber, index) => (
+                      <motion.tr
+                        key={subscriber._id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.15 }}
+                        className="hover:bg-blue-50/50 transition-colors duration-100 border-b border-gray-100"
+                      >
+                        {/* Subscriber Info - Ultra Compact */}
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <div className="flex items-center space-x-1.5">
+                            <div className="flex-shrink-0 w-6 h-6">
+                              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center shadow-sm">
+                                <User className="h-3 w-3 text-white" />
+                              </div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[11px] font-semibold text-gray-900 truncate leading-tight">
+                                {subscriber.userId?.firstName} {subscriber.userId?.lastName}
+                              </div>
+                              <div className="text-[10px] text-gray-500 truncate flex items-center leading-tight">
+                                <Mail className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                                <span className="truncate max-w-[140px]">{subscriber.userId?.email}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Plan & Status - Ultra Compact */}
+                        <td className="px-2 py-1.5">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-1 flex-wrap gap-0.5">
+                              <span className="text-[11px] font-semibold text-gray-900 truncate max-w-[100px]">
+                                {subscriber.subscriptionPlanId?.planName || 'N/A'}
+                              </span>
+                              {getStatusBadge(subscriber.status)}
+                            </div>
+                            <div className="text-[10px] text-gray-600 font-medium">
+                              {subscriber.billingCycle === 'trial' 
+                                ? '₹0/trial' 
+                                : `${formatCurrency(subscriber.totalPrice)}/${subscriber.billingCycle === 'monthly' ? 'mo' : 'yr'}`}
+                            </div>
+                            <div className="flex items-center space-x-1.5 text-[10px] text-gray-500">
+                              <span className="flex items-center space-x-0.5">
+                                <Bed className="h-2.5 w-2.5" />
+                                <span>{subscriber.totalBeds}</span>
+                              </span>
+                              {subscriber.totalBranches > 1 && (
+                                <span className="flex items-center space-x-0.5">
+                                  <Building2 className="h-2.5 w-2.5" />
+                                  <span>{subscriber.totalBranches}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Dates - Ultra Compact */}
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <div className="text-[11px] leading-tight">
+                            <div className="text-gray-900 font-semibold">{formatDate(subscriber.startDate)}</div>
+                            <div className="text-gray-500">
+                              {subscriber.billingCycle === 'trial' 
+                                ? `→ ${formatDate(subscriber.trialEndDate)}` 
+                                : `→ ${formatDate(subscriber.endDate)}`}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Usage - Ultra Compact */}
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <div className="text-[11px] space-y-0.5">
+                            <div className="flex items-center space-x-0.5 text-gray-700">
+                              <Bed className="h-2.5 w-2.5 text-gray-400" />
+                              <span className="font-medium">{subscriber.currentBedUsage || 0}/{subscriber.totalBeds}</span>
+                            </div>
+                            <div className="flex items-center space-x-0.5 text-gray-700">
+                              <Building2 className="h-2.5 w-2.5 text-gray-400" />
+                              <span className="font-medium">{subscriber.currentBranchUsage || 1}/{subscriber.totalBranches}</span>
+                            </div>
+                            <div className="mt-0.5">
+                              {getDaysRemainingBadge(subscriber.daysRemaining, subscriber.isExpiringSoon)}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Actions - Ultra Compact */}
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <div className="flex items-center justify-center space-x-0.5">
+                            <button
+                              onClick={() => handleViewDetails(subscriber)}
+                              className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-all duration-100"
+                              title="View Details"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => handleViewHistory(subscriber)}
+                              className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-all duration-100"
+                              title="History"
+                            >
+                              <History className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6 rounded-b-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {/* Subscriber Info */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 w-8 h-8">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="h-4 w-4 text-white" />
-                          </div>
-                        </div>
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">
-                            {subscriber.userId?.firstName} {subscriber.userId?.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500 flex items-center">
-                            <Mail className="h-3 w-3 mr-1" />
-                            <span className="truncate max-w-32">{subscriber.userId?.email}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Plan & Status */}
-                    <td className="px-3 py-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-900">
-                            {subscriber.subscriptionPlanId?.planName}
-                          </span>
-                          {getStatusBadge(subscriber.status)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatCurrency(subscriber.totalPrice)}/{subscriber.billingCycle}
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
-                          <span className="flex items-center space-x-1">
-                            <Bed className="h-3 w-3" />
-                            <span>{subscriber.totalBeds} beds</span>
-                          </span>
-                          {subscriber.totalBranches > 1 && (
-                            <span className="flex items-center space-x-1">
-                              <Building2 className="h-3 w-3" />
-                              <span>{subscriber.totalBranches} br</span>
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="relative ml-3 inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs text-gray-700">
+                      Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                      <span className="font-medium">{Math.min(endIndex, filteredSubscribers.length)}</span> of{' '}
+                      <span className="font-medium">{filteredSubscribers.length}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-1.5 rounded-l-md border border-gray-300 bg-white text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show first page, last page, current page, and pages around current
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <button
+                              key={page}
+                              onClick={() => handlePageChange(page)}
+                              className={`relative inline-flex items-center px-3 py-1.5 border text-xs font-medium transition-colors ${
+                                currentPage === page
+                                  ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          );
+                        } else if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <span key={page} className="relative inline-flex items-center px-3 py-1.5 border border-gray-300 bg-white text-xs font-medium text-gray-700">
+                              ...
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Dates */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="text-xs">
-                        <div className="text-gray-900 font-medium">{formatDate(subscriber.startDate)}</div>
-                        <div className="text-gray-500">
-                          {subscriber.billingCycle === 'trial' ? 'to ' + formatDate(subscriber.trialEndDate) : 'to ' + formatDate(subscriber.endDate)}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Usage */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="text-xs text-gray-900 space-y-1">
-                        <div>Beds: {subscriber.currentBedUsage}/{subscriber.totalBeds}</div>
-                        <div>Br: {subscriber.currentBranchUsage}/{subscriber.totalBranches}</div>
-                        {getDaysRemainingBadge(subscriber.daysRemaining, subscriber.isExpiringSoon)}
-                      </div>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={() => handleViewDetails(subscriber)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                          title="View Details & History"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleViewHistory(subscriber)}
-                          className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
-                          title="View Subscription History"
-                        >
-                          <History className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-2 py-1.5 rounded-r-md border border-gray-300 bg-white text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {filteredSubscribers.length === 0 && (
@@ -774,6 +895,33 @@ const SubscriberManagement = () => {
                 ? 'No subscribers have been added yet.'
                 : 'Try adjusting your filters to see more results.'}
             </p>
+          </div>
+        )}
+
+        {/* Mobile Pagination */}
+        {totalPages > 1 && (
+          <div className="block md:hidden bg-white px-4 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </button>
+              <span className="text-xs text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </button>
+            </div>
           </div>
         )}
 

@@ -436,7 +436,7 @@ router.post('/logout', authenticate, async (req, res) => {
   try {
     // Since we're using localStorage, we don't need to pass the token
     // The authenticate middleware already verified the token
-    const result = await AuthService.logout();
+    const result = await AuthService.logout(req.user?._id);
 
     // No need to clear cookies since we're using localStorage
     // Frontend will handle clearing localStorage

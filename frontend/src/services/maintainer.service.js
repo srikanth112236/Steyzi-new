@@ -27,6 +27,13 @@ class MaintainerService {
 
       return response.data;
     } catch (error) {
+      // Re-throw the error with response data so frontend can access error details
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        const customError = new Error(errorData.message || 'Failed to create maintainer');
+        customError.response = { data: errorData };
+        throw customError;
+      }
       this.handleError(error);
     }
   }

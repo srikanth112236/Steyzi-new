@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const razorpayService = require('../services/razorpay.service');
 const subscriptionService = require('../services/subscription.service');
+const subscriptionManagementService = require('../services/subscriptionManagement.service');
 const logger = require('../utils/logger');
 
 /**
@@ -319,7 +320,7 @@ exports.getPaymentHistory = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
 
     // Get user's subscription history with payment details
-    const subscriptionHistory = await subscriptionService.getUserSubscriptionHistory(userId);
+    const subscriptionHistory = await subscriptionManagementService.getUserSubscriptionHistory(userId);
 
     if (!subscriptionHistory.success) {
       return res.status(500).json({
@@ -1129,7 +1130,7 @@ exports.getPaymentAnalytics = async (req, res) => {
 
     // Get user's payment history
     const userId = req.user._id;
-    const subscriptionHistory = await subscriptionService.getUserSubscriptionHistory(userId);
+    const subscriptionHistory = await subscriptionManagementService.getUserSubscriptionHistory(userId);
 
     if (subscriptionHistory.success && subscriptionHistory.data) {
       let totalPayments = 0;
